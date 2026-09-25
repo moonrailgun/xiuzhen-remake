@@ -14,6 +14,8 @@ npm run dev     # 打开 http://localhost:5273
 
 首次打开是建号页。建完号就能升经脉与法术、看地图、走路、领任务、炼器、淬炼、出击打人、
 买卖真气、进城镇投资、翻游戏指南。七个主标签全部接真实存档。
+建号 10 天（或道行满 18 年）出保之后，附近的「狼」会打过来——护身先接战，
+守不住就被抢走暗仓以外的真气并被击退，和当年一样。
 关掉浏览器再打开，离线期间的进度会按游戏时钟补算。顶栏「关于」可以调倍速、导入导出存档。
 
 **端口固定 5273**：存档按 origin 隔离（含端口），换端口会让存档「消失」。
@@ -21,8 +23,8 @@ npm run dev     # 打开 http://localhost:5273
 ## 开发
 
 ```bash
-npm run check      # 类型检查 + 625 个单元测试
-npm run playtest   # 端到端试玩 50 步（需先 npm run dev）
+npm run check      # 类型检查 + 639 个单元测试
+npm run playtest   # 端到端试玩 54 步（需先 npm run dev）
 npm run smoke      # 全页面冒烟（需先 npm run dev）
 npm run parity     # 截图对齐检查（需先 npm run dev）
 ```

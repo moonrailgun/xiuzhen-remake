@@ -79,6 +79,29 @@ export function generationBonus(
   return bonus
 }
 
+/**
+ * 护身先迎敌。[原文]
+ *
+ * 官方攻略《护身揭密》：「即使对方飞剑凌体之时，护身都可以自动御敌，将敌剑挡在空中，
+ * 给予各位道友祭起飞剑的时间。至于抵挡的时间，则是由护身本身的敏捷决定。」
+ *
+ * 所以来袭时先由护身接战，护身撑住的秒数 = 护身敏捷之和；这段时间够不够让
+ * 主人把飞剑祭起来，决定了飞剑能不能加入这一战。
+ *
+ * @returns 护身能争取到的秒数；没有护身则为 0
+ */
+export const guardHoldSeconds = (guards: readonly CombatSword[]): number =>
+  guards.filter((g) => g.defensiveOnly).reduce((sum, g) => sum + g.agility, 0)
+
+/**
+ * 来袭时的迎敌顺序：护身在前、飞剑在后。
+ * 「护法的基础是防御方必须要有护身」——飞剑敏捷只有几百秒（几分钟），
+ * 而 +5 的最低级护身能撑 1.6 小时，护法才来得及支援。[原文]
+ */
+export function defenseOrder(items: readonly CombatSword[]): readonly CombatSword[] {
+  return [...items].sort((a, b) => Number(b.defensiveOnly ?? false) - Number(a.defensiveOnly ?? false))
+}
+
 /** 缠斗时长 = 双方敏捷之和（秒）。 */
 export const tangleDuration = (a: readonly CombatSword[], b: readonly CombatSword[]): number =>
   [...a, ...b].reduce((sum, s) => sum + s.agility, 0)

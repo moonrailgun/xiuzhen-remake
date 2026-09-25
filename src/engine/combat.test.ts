@@ -7,6 +7,8 @@ import {
   tangleDuration,
   isCountering,
   COUNTER_MULTIPLIER,
+  guardHoldSeconds,
+  defenseOrder,
   type CombatSword,
 } from './combat.ts'
 
@@ -188,4 +190,30 @@ test('结算是纯函数：重复调用结果一致', () => {
   const a = [sword({ id: 'a1', element: '火' })]
   const d = [sword({ id: 'd1', element: '金' })]
   assert.deepEqual(resolveBattle(a, d), resolveBattle(a, d))
+})
+
+// —— 护身迎敌（官方攻略《护身揭密》原文）——
+
+test('护身先迎敌，飞剑排在后面', () => {
+  const guard = sword({ id: 'g', defensiveOnly: true, agility: 5760 })
+  const blade = sword({ id: 'b', agility: 3 })
+  const order = defenseOrder([blade, guard])
+  assert.equal(order[0]!.id, 'g', '护身应排在最前')
+  assert.equal(order[1]!.id, 'b')
+})
+
+test('护身抵挡时长 = 护身敏捷之和，飞剑不计入', () => {
+  const guard = sword({ id: 'g', defensiveOnly: true, agility: 5760 })
+  const blade = sword({ id: 'b', agility: 300 })
+  assert.equal(guardHoldSeconds([guard, blade]), 5760, '只算护身')
+  assert.equal(guardHoldSeconds([blade]), 0, '没有护身就撑不住')
+})
+
+test('护身能撑到护法赶来，飞剑撑不住（攻略里的对比）', () => {
+  // 攻略：飞剑 +6/+7 敏捷不过 300 多（约 5 分钟）；+5 的最低级护身能撑 1.6 小时
+  const blade = sword({ id: 'b', agility: 384 })
+  const guard = sword({ id: 'g', defensiveOnly: true, agility: 180 * 32 }) // 上品指玄道藏碑 +5
+  assert.ok(guardHoldSeconds([blade]) / 60 < 1, '只有飞剑时几乎没有缓冲')
+  const hours = guardHoldSeconds([guard]) / 3600
+  assert.ok(hours > 1.5 && hours < 1.7, `护身撑 ${hours.toFixed(2)} 小时`)
 })

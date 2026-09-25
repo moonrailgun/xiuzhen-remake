@@ -62,7 +62,14 @@ body {
      字体实验见 docs/PROGRESS.md 阶段 1 第 2 步。 */
   font-family: SimSun, 'Songti SC', STSong, serif;
   font-size: var(--fs-small);
-  -webkit-font-smoothing: none;  /* 关抗锯齿，靠近当年的点阵观感 */
+  /* 这里曾经写过 `-webkit-font-smoothing: none`，想还原当年的点阵观感。去掉了，因为它
+     **在想讨好的平台上不起作用，只在别的平台上帮倒忙**：
+       - Windows：这个属性 Blink 根本不实现；而且 SimSun 在 12–14px 用的是内嵌点阵字形，
+         本来就不抗锯齿 —— 关不关都一样；
+       - macOS：没有 SimSun，落到 Songti SC（轮廓字体）。关掉抗锯齿后 12px 的细横画
+         会直接断掉，在 2 倍屏上尤其糊。实测同一段字截图 922 字节 vs 开着 4483 字节
+         （小 = 只剩纯黑纯白，没有灰阶）。
+     要真还原点阵观感，得内嵌一份点阵字库，而不是把轮廓字体的抗锯齿关掉。 */
 }
 
 a { text-decoration: none; }

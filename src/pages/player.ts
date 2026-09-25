@@ -8,7 +8,7 @@
  * 人体剪影只是底图。
  */
 
-import { esc, each, when } from './html.ts'
+import { esc, each, js, when } from './html.ts'
 import { pageHeader } from './shell.ts'
 import {
   MERIDIANS,
@@ -154,7 +154,7 @@ ${each(BODY_PARTS, (p, i) => {
 /** 人物信息表 —— 结构与 class 照原版 DOM。 */
 function infoTable(vm: PlayerVm): string {
   const realmCell = vm.realmQuestId
-    ? `<A class=skillup href="#" onclick="openLWindow('', 'quest.jsp?questid=${esc(vm.realmQuestId)}')">${esc(vm.realm)}</A>`
+    ? `<A class=skillup href="#" onclick="openLWindow('', 'quest.jsp?questid=${js(vm.realmQuestId)}')">${esc(vm.realm)}</A>`
     : esc(vm.realm)
   const row = (label: string, value: string) =>
     `<TR class="trbg middle" align=middle><TD class=middlebold width=60><A class=help href="#" onclick="hlp('${esc(label)}')">${esc(label)}</A></TD><TD>${value}</TD></TR>`

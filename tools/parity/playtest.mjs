@@ -353,7 +353,48 @@ check('秘笈词条是原版逐字的用途表',
 check('底部有「历史：」访问记录', helpText.includes('历史：'))
 await page.evaluate(() => window.closeHWindow())
 
-// 16. 产业页与排行榜浮窗能打开（原版 L 窗路由）
+// —— 16. 五行互化：表单提交不能把游戏页跳走 ——
+const beforeTurn = await page.evaluate(() => {
+  const env = JSON.parse(localStorage.getItem('xiuzhen.save'))
+  // 丹田气海 0 级只能存 1000，所以数额要在上限内（否则 tick 会先截断）
+  env.state.player.qi = [1000, 0, 0, 0, 0]
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  return env.state.player.bonusCoin
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(300)
+await page.evaluate(() => window.openLWindow('', 'turnres.jsp'))
+await page.waitForTimeout(300)
+await page.selectOption('#lwindowcontent select[name=from]', '金')
+await page.selectOption('#lwindowcontent select[name=to]', '木')
+await page.fill('#lwindowcontent input[name=amount]', '400')
+await page.click('#lwindowcontent input[type=submit]')
+await page.waitForTimeout(400)
+check('五行互化后还在游戏页（表单没把页面跳走）',
+  await page.locator('#gpage').count() > 0)
+const afterTurn = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return { gold: Math.floor(st.player.qi[0]), wood: Math.floor(st.player.qi[1]), bonus: st.player.bonusCoin }
+})
+check('五行互化：总量守恒、扣 3 仙石',
+  afterTurn.gold === 600 && afterTurn.wood === 400 && afterTurn.bonus === beforeTurn - 3,
+  JSON.stringify(afterTurn))
+
+// —— 17. 任务详情窗 ——
+await page.click('#bigmenu a[href="player.jsp"]')
+await page.waitForTimeout(250)
+const questLink = page.locator('#gright a[onclick*="quest.jsp?questid="]').first()
+if (await questLink.count() > 0) {
+  await questLink.click()
+  await page.waitForTimeout(350)
+  const qText = (await page.locator('#lwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+  check('任务详情窗显示任务标题与概要', qText.length > 10, qText.slice(0, 50))
+  await page.evaluate(() => window.closeLWindow())
+} else {
+  check('任务详情窗显示任务标题与概要', false, '右栏没有任务链接')
+}
+
+// 18. 产业页与排行榜浮窗能打开（原版 L 窗路由）
 await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
 await page.waitForTimeout(300)
 check('排行榜浮窗列出 NPC',

@@ -50,7 +50,7 @@ import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../eng
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
-import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation } from '../engine/quest.ts'
+import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation } from '../engine/quest.ts'
 import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
@@ -68,7 +68,7 @@ import type { FiveQi } from '../engine/state.ts'
 import { changeRate } from '../engine/game.ts'
 import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
-import { startCultivate, planUpgrade, speedUp, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
+import { startCultivate, planUpgrade, speedUp, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
 import { sorted } from '../engine/timeline.ts'
 import type { GameState } from '../engine/state.ts'
@@ -797,6 +797,14 @@ export function installGameActions(): void {
       doMarketCancel(Number(p.get('sheet') ?? -1))
       return
     }
+    if (action === 'finishquest') {
+      doClaimQuest(p.get('questid') ?? '')
+      return
+    }
+    if (action === 'cancelquest') {
+      g2['cancelquest']!(p.get('questid') ?? '')
+      return
+    }
     openWindow('mwindow', '提示',
       `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
@@ -1083,6 +1091,9 @@ function resolvePage(url: string): string {
     case 'playerlist':
       return playerListWindow(s)
 
+    case 'guard':
+      return guardWindow(Number(q.get('tab') ?? 1))
+
     case 'npc':
       return npcWindow(s, q.get('name') ?? '')
 
@@ -1300,10 +1311,35 @@ ${esc(s.player.name)} (${s.player.x},${s.player.y}) → ${esc(t.name)} (${t.x},$
 <SPAN class=smallgray>（原版战场示意图的页面结构没有留下存档）</SPAN></DIV>`
 }
 
-/** 产业页：城镇投资的每小时收益。 */
+/** 产业页：我在各城镇的投资与每小时分利。 */
 function estateVm(s: GameState) {
-  // 基准期只有投资一种产业，没有投资时是空表（原版同样显示空表）
-  return { rows: [], slotCap: MAX_INVESTMENTS, ...(s ? {} : {}) }
+  const rows = Object.values(s.towns)
+    .filter((t) => t.investments.some((i) => i.owner === s.player.name))
+    .map((t) => ({
+      name: t.name,
+      x: t.x,
+      y: t.y,
+      level: commerceLevel(t),
+      invested: t.investments.find((i) => i.owner === s.player.name)?.silver ?? 0,
+      share: Math.round(shareOf(t, s.player.name) * 1000) / 10,
+      income: hourlyIncomeOf(t, s.player.name),
+    }))
+  return { rows, slotCap: MAX_INVESTMENTS }
+}
+
+/**
+ * 护法页（`guard.jsp?tab=1|2`）。**零截图零 DOM**，只知道两个入口与
+ * 右栏那两块「为我护法 (0/7)」「为他护法 (0/7)」。
+ *
+ * 单机版没有真人可护，所以这里只如实说明，不编一套假的护法名单。
+ */
+function guardWindow(tab: number): string {
+  const which = tab === 2 ? '为他护法' : '为我护法'
+  return `<DIV class=middle style="padding:12px">
+<SPAN class=bigbold>${esc(which)}</SPAN><BR><BR>
+<SPAN class=smallgray>护法是原版的真人互助玩法：把飞剑留在道友身边替他挡刀。<BR>
+单机版没有别的真人，这一页只保留入口。<BR>
+（原版护法页既无截图也无 DOM，正文结构本就没有存档。）</SPAN></DIV>`
 }
 
 /** 「点击此处查看更多玩家」：视野内的人，按道行排。 */
@@ -1474,6 +1510,51 @@ function craftQuality(s: GameState): '废品' | '凡品' | '上品' | '极品' {
 }
 
 // —— 市场 ——
+
+/** 领取任务奖励（任务窗底部那个「领取奖励」按钮）。 */
+function doClaimQuest(id: string): void {
+  if (!state) return
+  const r = claim(state.quests, state, id)
+  if (!r.ok) {
+    openWindow('mwindow', '无法领取', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+    return
+  }
+  state = { ...r.value.state, quests: r.value.log }
+  closeWindow('lwindow')
+  step()
+}
+
+/**
+ * 五行互化（`turnres.jsp` 的表单）。付费功能，每次 3 仙石，总量守恒。
+ * 原版「自由分配…比例」是 3 仙石（付费页原文）。
+ */
+function doTurnRes(p: URLSearchParams): void {
+  if (!state) return
+  const from = p.get('from') as Element | null
+  const to = p.get('to') as Element | null
+  const amount = Math.floor(Number(p.get('amount')) || 0)
+  if (!from || !to || from === to || amount <= 0) {
+    openWindow('mwindow', '五行互化', '<DIV class=middle style="padding:10px">请选择不同的五行并填写数量。</DIV>')
+    return
+  }
+  const fi = ELEMENTS.indexOf(from)
+  const ti = ELEMENTS.indexOf(to)
+  if ((state.player.qi[fi] ?? 0) < amount) {
+    openWindow('mwindow', '五行互化', '<DIV class=middle style="padding:10px">真气不足。</DIV>')
+    return
+  }
+  const paid = spendCoin(state, TURN_RES_COIN)
+  if (!paid.ok) {
+    openWindow('mwindow', '五行互化', `<DIV class=middle style="padding:10px">${esc(paid.reason)}</DIV>`)
+    return
+  }
+  const cap = resourceBarOf(paid.state).capacity
+  const qi = paid.state.player.qi.map((v, i) =>
+    i === fi ? v - amount : i === ti ? Math.min(cap, v + amount) : v) as unknown as FiveQi
+  state = { ...paid.state, player: { ...paid.state.player, qi } }
+  closeWindow('lwindow')
+  step()
+}
 
 /** 交易页的 sheet 号 → 真实挂单 id（那一屏渲染时记下来的）。 */
 const sheetId = (sheet: number): string | undefined => tradeSheets[sheet]
@@ -1716,12 +1797,19 @@ export function boot(): void {
     if (!state || !href || href === '#' || href.startsWith('javascript:')) return
     if (routeJsp(href)) ev.preventDefault()
   })
+  // 页面里的原版表单同样是往 .jsp 提交的。本地版没有服务端，
+  // 所以凡是 .jsp 的表单一律拦下（不拦就会真的跳走、把游戏页丢掉）。
   document.addEventListener('submit', (ev) => {
     const form = ev.target as HTMLFormElement | null
     const action = form?.getAttribute('action')
-    if (!state || !form || !action) return
+    if (!state || !form || !action || !action.includes('.jsp')) return
+    ev.preventDefault()
     const q = new URLSearchParams(new FormData(form) as unknown as Record<string, string>)
-    if (routeJsp(`${action}?${q}`)) ev.preventDefault()
+    if (action.includes('turnres.jsp')) {
+      doTurnRes(q)
+      return
+    }
+    routeJsp(`${action}?${q}`)
   })
 
   if (STORAGE_KEY_AVAILABLE) {

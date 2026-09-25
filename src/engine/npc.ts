@@ -84,6 +84,8 @@ export type NpcState = {
   readonly swords: number
   /** 单把飞剑的战力（攻击面板值） */
   readonly swordPower: number
+  /** 单机重建：术数随同一实力标量成长，最高500级。 */
+  readonly yijing: number
   /** 丹田里的真气（可被掠夺的部分） */
   readonly qi: number
   readonly experience: number
@@ -120,6 +122,8 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
 
   const swords = Math.max(0, Math.min(5, Math.floor(power / 8)) - (patch.swordsLost ?? 0))
   const swordPower = Math.floor(16 * (1 + power / 10))
+  // NPC本来就是单机重建；复用同一实力标量，不把真实玩家失落的成长表当成已知。
+  const yijing = Math.min(500, Math.floor(power))
   const qi = Math.max(0, Math.floor(power * 260) - (patch.qiLost ?? 0))
 
   // 位置：羊待在驻点；狼按日游走。被击退过就用修正位置。
@@ -145,6 +149,7 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
     realm,
     swords,
     swordPower,
+    yijing,
     qi,
     experience: Math.floor(power * 4000),
     estate: Math.floor(power * 120),

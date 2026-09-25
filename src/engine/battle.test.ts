@@ -164,8 +164,8 @@ test('剑没断的话会飞回来（返回事件）', () => {
   const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
   const flight = started.timeline.events[0]!.finishAt
 
-  // 只推进到「飞到了」这一刻
-  const arrived = advanceTo(started, started.timeline, flight, (st, ev) => resolveBattleEvent(st, ev))
+  // 飞到后缠斗13秒，再排返航
+  const arrived = advanceTo(started, started.timeline, flight + 13, (st, ev) => resolveBattleEvent(st, ev))
   assert.equal(countByKind(arrived.timeline, 'battle'), 1, '应排上返回事件')
   assert.equal(arrived.timeline.events[0]!.payload['phase'], 'returning')
 
@@ -278,7 +278,9 @@ test('支援赶得上：并进同一场，并按新剑敏捷延长缠斗（原�
   assert.equal(after.timeline.events.length, 1, '并进同一场，不新开事件')
   const ev = after.timeline.events[0]!
   assert.equal((ev.payload['swords'] as unknown[]).length, 2, '两把剑一起战斗')
-  assert.ok(ev.finishAt > beforeFinish, '缠斗时间应按新剑的敏捷延长')
+  assert.equal(ev.finishAt, beforeFinish, '支援不改变先发飞剑的抵达时刻')
+  const fighting = advanceTo(after, after.timeline, beforeFinish, resolveBattleEvent)
+  assert.equal(fighting.timeline.events[0]!.finishAt, beforeFinish + 16, '双方敏捷总和延长缠斗')
 })
 
 test('自己支援自己（原文明确提到的玩法）', () => {
@@ -304,7 +306,7 @@ test('飞剑已在返回途中时不能再支援', () => {
   const s = state()
   const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
   const flight = started.timeline.events[0]!.finishAt
-  const arrived = advanceTo(started, started.timeline, flight, (st, ev) => resolveBattleEvent(st, ev))
+  const arrived = advanceTo(started, started.timeline, flight + 13, (st, ev) => resolveBattleEvent(st, ev))
   const back = { ...arrived.state, timeline: arrived.timeline }
   const r = reinforce(back, back.timeline.events[0]!.id, [qinglong('x')])
   assert.equal(r.ok, false)
@@ -316,4 +318,100 @@ test('不选飞剑无法支援', () => {
   const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
   const r = reinforce(started, started.timeline.events[0]!.id, [])
   assert.equal(r.ok, false)
+})
+
+const ownedSword = (id = 's1'): GameState['player']['artifacts'][number] => ({
+  id, kind: 'sword', name: '青龙伏魔剑', quality: '极品', refine: 0, status: '空闲', count: 1,
+})
+
+test('返航完成恢复空闲，原剑可再次出击', () => {
+  const s = state({ artifacts: [ownedSword()] })
+  const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
+  assert.equal(started.player.artifacts[0]!.status, '斩杀中')
+  const done = advanceTo(started, started.timeline, 10000, resolveBattleEvent)
+  assert.equal(done.state.player.artifacts[0]!.status, '空闲')
+  assert.equal(launch({ ...done.state, timeline: done.timeline }, skeleton(), [qinglong()]).ok, true)
+})
+
+test('到达先缠斗双方敏捷之和，结束后才给战报与战利品', () => {
+  const started = (launch(state(), skeleton(), [qinglong()]) as { state: GameState }).state
+  const arrival = started.timeline.events[0]!.finishAt
+  const fighting = advanceTo(started, started.timeline, arrival, resolveBattleEvent)
+  assert.equal(fighting.timeline.events[0]!.payload['phase'], 'fighting')
+  assert.equal(fighting.timeline.events[0]!.finishAt, arrival + 13)
+  assert.equal(fighting.state.mail.length, 0)
+  assert.deepEqual(fighting.state.player.qi, started.player.qi)
+  const done = advanceTo(fighting.state, fighting.timeline, arrival + 13, resolveBattleEvent)
+  assert.equal(done.state.mail.length, 1)
+  assert.equal(done.timeline.events[0]!.payload['phase'], 'returning')
+})
+
+test('三大被动作用于出击速度和战报攻耐', () => {
+  const skills = { 心剑诀: 20, 身剑诀: 20, 大周天剑法: 20 }
+  const plain = (launch(state(), skeleton(), [qinglong()]) as { state: GameState }).state
+  const boosted = (launch(state({ skills }), skeleton(), [qinglong()]) as { state: GameState }).state
+  assert.ok(boosted.timeline.events[0]!.finishAt < plain.timeline.events[0]!.finishAt)
+  const done = advanceTo(boosted, boosted.timeline, 10000, resolveBattleEvent)
+  const rows = done.state.mail[0]!.body['rows'] as { attack: number; durability: number }[]
+  assert.equal(rows[0]!.attack, 192)
+  assert.equal(rows[0]!.durability, 96)
+})
+
+test('原战斗失败后迟到支援直接返回，不另打一场或发战利品', () => {
+  const boss = { ...skeleton(), attack: 1000, hp: 1000 }
+  const started = (launch(state(), boss, [qinglong()]) as { state: GameState }).state
+  const supported = (reinforce(started, started.timeline.events[0]!.id, [{ ...qinglong('late', 10), speed: 1 }]) as { state: GameState }).state
+  const done = advanceTo(supported, supported.timeline, 10000, resolveBattleEvent)
+  assert.equal(done.state.mail.length, 1)
+  assert.equal(done.state.mail[0]!.body['won'], false)
+  assert.deepEqual(done.state.player.qi, started.player.qi)
+})
+
+test('缠斗中的支援按到达时刻加入并延长敏捷时间', () => {
+  const started = (launch(state(), { ...skeleton(), agility: 1000 }, [qinglong()]) as { state: GameState }).state
+  const arrival = started.timeline.events[0]!.finishAt
+  const fighting = advanceTo(started, started.timeline, arrival, resolveBattleEvent)
+  const current = { ...fighting.state, clock: { ...fighting.state.clock, gameT: arrival }, timeline: fighting.timeline }
+  const before = current.timeline.events[0]!
+  const supported = reinforce(current, before.id, [qinglong('support', 1)])
+  assert.equal(supported.ok, true)
+  const after = (supported as { state: GameState }).state.timeline.events[0]!
+  assert.equal(after.finishAt, before.finishAt + 6, '淬炼后的敏捷为6')
+  assert.equal((after.payload['swordIds'] as string[]).length, 2)
+})
+
+test('攻击真实NPC无需注入战利品，掠夺后消耗其可掠夺库存', async () => {
+  const { npcAt } = await import('./npc.ts')
+  const base = state()
+  const now = 30 * 86400
+  const s = { ...base, clock: { ...base.clock, gameT: now } }
+  const npc = npcAt(s.npc, s.npc.bases[0]!, now, s.worldSeed)
+  const victim: BattleTarget = { ...skeleton(npc.x, npc.y), kind: 'player', name: npc.base.name, npcId: npc.base.id }
+  const started = (launch(s, victim, [qinglong()], { sightRange: 999 }) as { state: GameState }).state
+  const done = advanceTo(started, started.timeline, now + 1e6, resolveBattleEvent)
+  assert.ok(done.state.player.qi.some((v) => v > 0))
+  assert.ok((done.state.npc.patches[npc.base.id]?.qiLost ?? 0) > 0)
+  const after = npcAt(done.state.npc, npc.base, now, s.worldSeed)
+  assert.ok(after.qi < npc.qi)
+})
+
+
+test('战利品在飞剑返航完成前不可使用，返航只入账一次', () => {
+  const started = (launch(state(), skeleton(), [qinglong()]) as { state: GameState }).state
+  const arrival = started.timeline.events[0]!.finishAt
+  const fighting = advanceTo(started, started.timeline, arrival + 13, resolveBattleEvent)
+  assert.equal(fighting.state.mail[0]!.body['won'], true)
+  assert.deepEqual(fighting.state.player.qi, started.player.qi)
+  const backAt = fighting.timeline.events[0]!.finishAt
+  const done = advanceTo(fighting.state, fighting.timeline, backAt, resolveBattleEvent)
+  assert.deepEqual(done.state.player.qi, [90, 90, 90, 90, 90])
+  assert.deepEqual(advanceTo(done.state, done.timeline, backAt + 100, resolveBattleEvent).state.player.qi, done.state.player.qi)
+})
+
+test('怪物已被先发飞剑杀死时，迟到支援不能重复获得战利品', () => {
+  const started = (launch(state(), skeleton(), [qinglong()]) as { state: GameState }).state
+  const supported = (reinforce(started, started.timeline.events[0]!.id, [{ ...qinglong('late'), speed: 1 }]) as { state: GameState }).state
+  const done = advanceTo(supported, supported.timeline, 10000, resolveBattleEvent)
+  assert.equal(done.state.mail.length, 1)
+  assert.deepEqual(done.state.player.qi, [90, 90, 90, 90, 90])
 })

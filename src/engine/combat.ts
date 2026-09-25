@@ -126,22 +126,19 @@ export function resolveBattle(
   const effDurability = (s: CombatSword, bonus: ReadonlyMap<string, { durability: number }>) =>
     s.durability + (bonus.get(s.id)?.durability ?? 0)
 
-  const totalAttackOf = (side: readonly CombatSword[], bonus: ReadonlyMap<string, { attack: number }>) =>
-    side.reduce((sum, s) => sum + effAttack(s, bonus), 0)
-
   const side = (
     mine: readonly CombatSword[],
     myBonus: ReadonlyMap<string, { attack: number; durability: number }>,
-    theirTotalAttack: number,
     theirs: readonly CombatSword[],
+    theirBonus: ReadonlyMap<string, { attack: number }>,
   ): SwordOutcome[] => {
     if (mine.length === 0) return []
-    const perSword = theirTotalAttack / mine.length
     return mine.map((s) => {
       const dur = effDurability(s, myBonus)
-      // 相克：判定断剑时对方攻击额外 ×150%
-      const countered = theirs.some((t) => isCountering(t.element, s.element))
-      const incoming = perSword * (countered ? COUNTER_MULTIPLIER : 1)
+      // 官方算例（corpus/4309）：逐属性分摊，仅「我克」的那部分额外 +50%。
+      // 相生加出的攻击属于接受支援的剑，因此也按该剑属性判断。
+      const incoming = theirs.reduce((sum, t) => sum + effAttack(t, theirBonus)
+        * (isCountering(t.element, s.element) ? COUNTER_MULTIPLIER : 1), 0) / mine.length
       const broken = incoming >= dur
       return {
         id: s.id,
@@ -152,8 +149,8 @@ export function resolveBattle(
   }
 
   return {
-    attacker: side(attackers, aBonus, totalAttackOf(defenders, dBonus), defenders),
-    defender: side(defenders, dBonus, totalAttackOf(attackers, aBonus), attackers),
+    attacker: side(attackers, aBonus, defenders, dBonus),
+    defender: side(defenders, dBonus, attackers, aBonus),
     tangleSeconds: tangleDuration(attackers, defenders),
   }
 }

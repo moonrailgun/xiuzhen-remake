@@ -128,6 +128,16 @@ test('相克：判定断剑时额外 ×150%', () => {
   assert.equal(resolveBattle(atk('金'), def()).defender[0]!.broken, true)
 })
 
+test('混合属性攻击只给克制目标的那部分伤害加成', () => {
+  // 官方算例按单一属性攻击分摊后判断相克，不能把不相克的火剑一起乘 150%。
+  const result = resolveBattle([
+    sword({ id: 'gold', element: '金', attack: 100 }),
+    sword({ id: 'fire', element: '火', attack: 100 }),
+  ], [sword({ id: 'wood', element: '木', durability: 260 })])
+  assert.equal(result.defender[0]!.damageTaken, 250)
+  assert.equal(result.defender[0]!.broken, false)
+})
+
 test('相生：把自身攻击与耐久的一半加给所生属性的剑，按数量平分', () => {
   // 金生水：金剑 100/100 → 给水剑 +50 攻 +50 耐
   const swords = [

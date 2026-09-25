@@ -52,6 +52,7 @@ test('★同一时刻，四个入口看到的同一个 NPC 数值完全一致', 
     assert.equal(other.swords, direct.swords, '飞剑数')
     assert.equal(other.swordPower, direct.swordPower, '战力')
     assert.equal(other.qi, direct.qi, '真气')
+    assert.equal(other.yijing, direct.yijing, '易经')
     assert.equal(other.x, direct.x, '位置 x')
     assert.equal(other.y, direct.y, '位置 y')
     assert.equal(other.realm, direct.realm, '境界')
@@ -226,4 +227,18 @@ test('NPC 世界可 JSON 往返（进存档）', () => {
   const back = JSON.parse(JSON.stringify(w)) as NpcWorld
   assert.equal(back.bases.length, 50)
   assert.deepEqual(back.patches[3], { swordsLost: 1, x: 5, y: 6 })
+})
+
+
+test('NPC易经按共享成长派生，出生为零、逐日单调且封顶500', () => {
+  const w = world(1)
+  const base = { ...w.bases[0]!, bornAt: 0 }
+  assert.equal(npcAt(w, base, 0, SEED).yijing, 0)
+  const levels = [1, 10, 30, 60, 300, 1000].map((day) => npcAt(w, base, day * DAY, SEED).yijing)
+  assert.ok(levels[1]! > 0)
+  for (let i = 1; i < levels.length; i++) assert.ok(levels[i]! >= levels[i - 1]!)
+  assert.equal(levels.at(-1), 500)
+  const original = npcAt(w, base, 30 * DAY, SEED)
+  const looted = npcAt(patchNpc(w, base.id, { qiLost: 100000 }), base, 30 * DAY, SEED)
+  assert.equal(looted.yijing, original.yijing, '抢真气不会抹掉已学术数')
 })

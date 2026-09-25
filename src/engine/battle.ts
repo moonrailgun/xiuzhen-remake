@@ -15,17 +15,20 @@
  */
 
 import { schedule, type GameEvent } from './timeline.ts'
-import { resolveBattle, type CombatSword } from './combat.ts'
-import { addQi, subQi, type FiveQi, type GameState, type MailItem } from './state.ts'
+import { resolveBattle, tangleDuration, type CombatSword } from './combat.ts'
+import { addQi, totalQi, ZERO_QI, type FiveQi, type GameState, type MailItem } from './state.ts'
 import { distance } from '../data/world.ts'
 import { lootFrom } from './loot.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
+import { npcAt, patchNpc } from './npc.ts'
 
 /** 战斗事件的四种状态，对应原版事件栏的四种句式。 */
 export type BattlePhase = 'outbound' | 'fighting' | 'returning'
 
 export type BattleTarget = {
   readonly kind: 'monster' | 'player'
+  /** NPC稳定标识；旧存档仅在名字唯一时回退。 */
+  readonly npcId?: number
   readonly name: string
   readonly x: number
   readonly y: number
@@ -38,6 +41,8 @@ export type BattleTarget = {
 
 /** 出击用的飞剑（从背包里选）。 */
 export type LaunchSword = {
+  /** 出击时快照，途中修炼不会追溯改变已出击飞剑。 */
+  readonly launchedStats?: LaunchedSwordStats
   readonly id: string
   readonly name: string
   readonly quality: Quality
@@ -85,7 +90,9 @@ export function launch(
 ): LaunchResult {
   if (swords.length === 0) return { ok: false, reason: '请选择出击的飞剑' }
 
-  const limit = swordsOutLimit(opts.wanjianLevel ?? 0)
+  if (!availableSwords(state, swords)) return { ok: false, reason: '只能选择空闲且不重复的飞剑' }
+  swords = prepareSwords(state, swords)
+  const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {
     return { ok: false, reason: `最多只能同时控制 ${limit} 把飞剑` }
   }
@@ -96,7 +103,7 @@ export function launch(
     return { ok: false, reason: '目标不在视野范围内，需要先用九宫飞星法推算其位置' }
   }
 
-  const slowest = Math.min(...swords.map((s) => s.speed))
+  const slowest = Math.min(...swords.map((s) => statsOf(s).speed))
   const seconds = flightSeconds(dist, slowest)
 
   // id 要连同序号：同一时刻可以对同一个目标连着放两批剑（原版的「支援」就是这样），
@@ -113,19 +120,47 @@ export function launch(
       swordIds: swords.map((s) => s.id),
     },
   }
-  return { ok: true, state: { ...state, timeline: schedule(state.timeline, event) } }
+  return { ok: true, state: { ...swordStatus(state, swords, '斩杀中'), timeline: schedule(state.timeline, event) } }
 }
 
-/** 把出击飞剑换算成参战单位（面板值 = 基础 × 品质 × 2^淬炼）。 */
-function toCombat(s: LaunchSword): CombatSword {
+export type LaunchedSwordStats = {
+  readonly attack: number
+  readonly durability: number
+  readonly agility: number
+  readonly speed: number
+}
+
+/** 被动仅出击生效。攻耐每级1%由战报反推（02 §3）；速度幅度按同量级重建。 */
+export function launchedSwordStats(sword: LaunchSword, skills: Readonly<Record<string, number>>): LaunchedSwordStats {
+  const bonus = (name: string) => 1 + Math.max(0, Math.min(20, skills[name] ?? 0)) / 100
   return {
-    id: s.id,
-    name: s.name,
-    element: s.element,
-    attack: panelStat(s.attack, s.quality, s.refine),
-    durability: panelStat(s.durability, s.quality, s.refine),
-    agility: panelStat([s.agility, s.agility], s.quality, s.refine),
+    attack: Math.floor(panelStat(sword.attack, sword.quality, sword.refine) * bonus('心剑诀')),
+    durability: Math.floor(panelStat(sword.durability, sword.quality, sword.refine) * bonus('身剑诀')),
+    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
+    speed: sword.speed * bonus('大周天剑法'),
   }
+}
+
+const statsOf = (sword: LaunchSword): LaunchedSwordStats => sword.launchedStats ?? launchedSwordStats(sword, {})
+const prepareSwords = (state: GameState, swords: readonly LaunchSword[]): LaunchSword[] =>
+  swords.map((sword) => ({ ...sword, launchedStats: launchedSwordStats(sword, state.player.skills) }))
+
+function swordStatus(state: GameState, swords: readonly LaunchSword[], status: string): GameState {
+  const ids = new Set(swords.map((sword) => sword.id))
+  return { ...state, player: { ...state.player, artifacts: state.player.artifacts.map((artifact) =>
+    ids.has(artifact.id) ? { ...artifact, status } : artifact) } }
+}
+
+function availableSwords(state: GameState, swords: readonly LaunchSword[]): boolean {
+  const out = new Set(state.timeline.events.filter((event) => event.kind === 'battle')
+    .flatMap((event) => event.payload['swordIds'] as string[] ?? []))
+  return new Set(swords.map((sword) => sword.id)).size === swords.length && swords.every((sword) =>
+    !out.has(sword.id) && !state.player.artifacts.some((artifact) => artifact.id === sword.id && artifact.status !== '空闲'))
+}
+
+/** 旧存档没有出击快照时沿用原面板值。 */
+function toCombat(s: LaunchSword): CombatSword {
+  return { id: s.id, name: s.name, element: s.element, ...statsOf(s) }
 }
 
 function targetToCombat(t: BattleTarget): CombatSword {
@@ -139,69 +174,86 @@ export type BattleOutcome = {
   readonly report: MailItem
 }
 
-/**
- * 战斗事件到点。
- *  - outbound：飞到了 → 结算 → 生成战报 → 排「返回」事件；
- *  - returning：飞剑回到身上，事件结束。
- */
+/** 幸存飞剑在完成返回事件时才重新可用。 */
+function returnEvent(state: GameState, event: GameEvent, target: BattleTarget, swords: readonly LaunchSword[], loot: FiveQi = ZERO_QI): GameEvent[] {
+  if (!swords.length) return []
+  return [{
+    id: `${event.id}:back`,
+    kind: 'battle',
+    finishAt: event.finishAt + flightSeconds(distance(state.player.x, state.player.y, target.x, target.y),
+      Math.min(...swords.map((sword) => statsOf(sword).speed))),
+    payload: { phase: 'returning' satisfies BattlePhase, target, swords, swordIds: swords.map((sword) => sword.id), loot },
+  }]
+}
+
+/** 飞到→缠斗→结算→返航；只有缠斗结束才产生outcome（供任务结算）。 */
 export function resolveBattleEvent(
   state: GameState,
   event: GameEvent,
-): { state: GameState; follow?: GameEvent[] } {
+): { state: GameState; follow?: GameEvent[]; outcome?: BattleOutcome } {
   const phase = event.payload['phase'] as BattlePhase
   const target = event.payload['target'] as BattleTarget
   const swords = event.payload['swords'] as LaunchSword[]
 
   if (phase === 'returning') {
-    // 飞剑归位，没有额外结算
-    return { state }
+    const returned = swordStatus(state, swords, '空闲')
+    const loot = (event.payload['loot'] as FiveQi | undefined) ?? ZERO_QI
+    return { state: { ...returned, player: { ...returned.player, qi: addQi(returned.player.qi, loot) } } }
   }
 
-  const mine = swords.map(toCombat)
-  const theirs = [targetToCombat(target)]
-  const result = resolveBattle(mine, theirs)
+  if (phase === 'outbound') {
+    if (event.payload['lateReinforce']) {
+      const source = state.mail.find((mail) => mail.kind === 'battle' && mail.body['eventId'] === event.payload['sourceBattleId'])
+      // 原战败则直接回；怪物已被原队击杀不能重复领战利品。
+      // 旧存档未记录来源或原信件已删除时安全返航，不凭空另开战斗。
+      if (!source?.body['won'] || target.kind === 'monster') {
+        return { state: swordStatus(state, swords, '返回中'), follow: returnEvent(state, event, target, swords) }
+      }
+    }
+    return {
+      state: swordStatus(state, swords, '缠斗中'),
+      follow: [{ ...event, finishAt: event.finishAt + tangleDuration(swords.map(toCombat), [targetToCombat(target)]),
+        payload: { ...event.payload, phase: 'fighting' satisfies BattlePhase } }],
+    }
+  }
 
-  const lost = result.attacker.filter((o) => o.broken).map((o) => o.id)
-  const won = result.defender.every((o) => o.broken)
+  const result = resolveBattle(swords.map(toCombat), [targetToCombat(target)])
+  const lost = result.attacker.filter((outcome) => outcome.broken).map((outcome) => outcome.id)
+  const won = result.defender.every((outcome) => outcome.broken)
+  let loot: FiveQi = ZERO_QI
+  let npc = state.npc
+  if (won && target.kind === 'player') {
+    const matches = state.npc.bases.filter((base) => target.npcId !== undefined ? base.id === target.npcId : base.name === target.name)
+    const base = matches.length === 1 ? matches[0] : undefined
+    if (base) {
+      // 与九宫飞星保持同一NPC状态及五行/暗仓推导，不重复使用出击时的库存快照。
+      const current = npcAt(state.npc, base, event.finishAt, state.worldSeed)
+      const qi = Array(5).fill(Math.floor(current.qi / 5)) as unknown as FiveQi
+      loot = lootFrom(qi, Math.max(0, Math.floor(current.daoxing / 20000))).taken
+      const previous = npc.patches[base.id]
+      npc = patchNpc(npc, base.id, { qiLost: (previous?.qiLost ?? 0) + totalQi(loot) })
+    } else {
+      // 兼容旧版已保存的显式战利品载荷。
+      loot = lootFrom((event.payload['targetQi'] as FiveQi) ?? ZERO_QI,
+        (event.payload['targetRootLevel'] as number) ?? 0).taken
+    }
+  } else if (won) {
+    // 怪物没有暗仓，按生命折算战利品 [重建]。
+    loot = Array(5).fill(target.hp * 2) as unknown as FiveQi
+  }
 
-  // 赢了抢真气。打玩家时照原版规则：**只有超出对方固本培元暗仓的部分**抢得走；
-  // 打怪没有暗仓，按生命值折算一份战利品 [重建]。
-  const loot: FiveQi = !won
-    ? ([0, 0, 0, 0, 0] as unknown as FiveQi)
-    : target.kind === 'player'
-      ? lootFrom(
-          (event.payload['targetQi'] as FiveQi) ?? ([0, 0, 0, 0, 0] as unknown as FiveQi),
-          (event.payload['targetRootLevel'] as number) ?? 0,
-        ).taken
-      : ([target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2] as unknown as FiveQi)
-
-  const report = buildReport(state, target, swords, result, won)
-
-  const survivors = swords.filter((s) => !lost.includes(s.id))
-  const next: GameEvent[] = survivors.length
-    ? [{
-        id: `${event.id}:back`,
-        kind: 'battle',
-        finishAt: event.finishAt + flightSeconds(
-          distance(state.player.x, state.player.y, target.x, target.y),
-          Math.min(...survivors.map((s) => s.speed)),
-        ),
-        payload: { phase: 'returning' satisfies BattlePhase, target, swords: survivors, swordIds: survivors.map((s) => s.id) },
-      }]
-    : []
-
+  const report = buildReport(state, target, swords, result, won, event)
+  const survivors = swords.filter((sword) => !lost.includes(sword.id))
+  const nextState = swordStatus({
+    ...state,
+    npc,
+    player: { ...state.player, artifacts: state.player.artifacts.filter((artifact) => !lost.includes(artifact.id)) },
+    mail: [report, ...state.mail].slice(0, 200),
+  }, survivors, '返回中')
   return {
-    state: {
-      ...state,
-      player: {
-        ...state.player,
-        qi: addQi(state.player.qi, loot),
-        // 断掉的剑从背包里移除
-        artifacts: state.player.artifacts.filter((a) => !lost.includes(a.id)),
-      },
-      mail: [report, ...state.mail].slice(0, 200),
-    },
-    follow: next,
+    state: nextState,
+    follow: returnEvent(state, event, target, survivors, loot),
+    outcome: { won, lostSwordIds: lost, loot, report },
   }
 }
 
@@ -218,6 +270,7 @@ function buildReport(
   swords: readonly LaunchSword[],
   result: ReturnType<typeof resolveBattle>,
   won: boolean,
+  event: GameEvent,
 ): MailItem {
   const rows = swords.map((s, i) => {
     const o = result.attacker[i]
@@ -232,13 +285,13 @@ function buildReport(
   })
 
   return {
-    id: `mail:${state.clock.gameT}:${target.name}`,
+    id: `mail:${event.id}`,
     subject: `${state.player.name}攻击${target.name}`,
     from: '系统',
-    at: state.clock.gameT,
+    at: event.finishAt,
     read: false,
     kind: 'battle',
-    body: { intro: BATTLE_INTRO, rows, won, target: target.name },
+    body: { intro: BATTLE_INTRO, rows, won, target: target.name, eventId: event.id },
   }
 }
 
@@ -306,7 +359,9 @@ export function reinforce(
     return { ok: false, reason: '飞剑已经在返回途中' }
   }
 
-  const limit = swordsOutLimit(opts.wanjianLevel ?? 0)
+  if (!availableSwords(state, swords)) return { ok: false, reason: '只能选择空闲且不重复的飞剑' }
+  swords = prepareSwords(state, swords)
+  const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {
     return { ok: false, reason: `最多只能同时控制 ${limit} 把飞剑` }
   }
@@ -314,22 +369,24 @@ export function reinforce(
   const target = ev.payload['target'] as BattleTarget
   const dist = distance(state.player.x, state.player.y, target.x, target.y)
   const arriveAt =
-    state.clock.gameT + flightSeconds(dist, Math.min(...swords.map((s) => s.speed)))
+    state.clock.gameT + flightSeconds(dist, Math.min(...swords.map((s) => statsOf(s).speed)))
 
   // 赶得上：并进原事件，并按新剑的敏捷延长缠斗
-  if (arriveAt <= ev.finishAt) {
+  const fighting = ev.payload['phase'] === 'fighting'
+  const fightEnd = ev.finishAt + (fighting ? 0 : tangleDuration((ev.payload['swords'] as LaunchSword[]).map(toCombat), [targetToCombat(target)]))
+  if (arriveAt <= fightEnd) {
     const merged = [...(ev.payload['swords'] as LaunchSword[]), ...swords]
-    const extraTangle = swords.reduce((sum, s) => sum + s.agility, 0)
+    const extraTangle = swords.reduce((sum, s) => sum + statsOf(s).agility, 0)
     const events = state.timeline.events.map((e) =>
       e.id === eventId
         ? {
             ...e,
-            finishAt: e.finishAt + extraTangle,
+            finishAt: e.finishAt + (fighting ? extraTangle : 0),
             payload: { ...e.payload, swords: merged, swordIds: merged.map((s) => s.id) },
           }
         : e,
     )
-    return { ok: true, state: { ...state, timeline: { events } } }
+    return { ok: true, state: { ...swordStatus(state, swords, '斩杀中'), timeline: { events } } }
   }
 
   // 赶不上：单独排一个事件，到点时那场已经结束，按结果处理
@@ -337,7 +394,7 @@ export function reinforce(
   return {
     ok: true,
     state: {
-      ...state,
+      ...swordStatus(state, swords, '斩杀中'),
       timeline: schedule(state.timeline, {
         id: `battle:${state.clock.gameT}:${seq}:${target.name}`,
         kind: 'battle',
@@ -348,6 +405,7 @@ export function reinforce(
           swords,
           swordIds: swords.map((s) => s.id),
           lateReinforce: true,
+          sourceBattleId: ev.id,
         },
       }),
     },

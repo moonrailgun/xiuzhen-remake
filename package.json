@@ -9,7 +9,10 @@
     "build": "vite build",
     "play": "vite preview --port 5273 --strictPort",
     "test": "node --test 'src/**/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "parity": "node tools/parity/compare.mjs",
+    "playtest": "node tools/parity/playtest.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

@@ -48,9 +48,12 @@ export const MIGRATIONS: readonly Migration[] = [
     migrate: (old) => ({ ...(old as object), quests: emptyQuestLog() }),
   },
   {
-    // v3 → v4：市场挂单进存档。空市场即可，下一次 tick 会按世界种子补上 NPC 单。
+    // v3 → v4：市场挂单进存档。**播种就在这里做完**，不要留给读档时补。
+    // 补货只能在整点边界发生（`tick` 末尾那段注释论证了为什么），读档时无条件补
+    // 会让存档往返不是恒等：一小时内把 12 张 NPC 单全买走再存盘，读回来又冒出 12 张。
+    // `refillNpcOrders` 只用到 clock / worldSeed / timeline / market，v3 的存档全都有。
     from: 3,
-    migrate: (old) => ({ ...(old as object), market: emptyMarket() }),
+    migrate: (old) => refillNpcOrders({ ...(old as object), market: emptyMarket() } as GameState),
   },
   {
     // v4 → v5：城镇投资进存档。城镇是踩上去才生成的，所以空表即可。
@@ -304,11 +307,9 @@ export function importGame(text: string): GameState {
  * 「读本地存档」会得到不同的市场。
  */
 function settleLoaded(state: GameState): GameState {
-  const next = { ...state, v: SAVE_VERSION }
-  // **只在市场是空的时候播种。** 无条件补货会让存档往返不是恒等：市场被买空过几张、
-  // 还没到下一个游戏整点时存盘，读回来会凭空多出几张单（实测 9 → 12）。
-  // 那正是 `tick` 末尾那段注释拒绝做的事，settleLoaded 不该开后门。
-  return next.market.qi.length === 0 ? refillNpcOrders(next) : next
+  // **读档不补货。** 补货只在整点边界做（见 `tick` 末尾那段注释），在这里补会让
+  // 存档往返不是恒等 —— 存盘时 0 张、读回来 12 张。老存档的播种交给 v3→v4 迁移。
+  return { ...state, v: SAVE_VERSION }
 }
 
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */

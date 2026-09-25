@@ -212,17 +212,28 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
     if ((qiIn[i] ?? 0) > qiCap) { notes.push(`${ELEMENTS[i]}真气 收到丹田上限 ${qiCap}`); break }
   }
 
-  // 法宝格：炼器队列里在炼的那些也占位置（`artifactSpaceUsed`）
+  // 法宝格：炼器队列里在炼的那些也占位置（`artifactSpaceUsed`）。
+  //
+  // **超格就整份拒绝，绝不替使用者丢东西。** 数值收拢是面板明说过的，销毁法宝不是。
+  // 以前这里是个 `while (超格 && 还有得丢) pop()` 的裁剪循环，有两个后果：
+  //  1. 光是炼器队列就超格时（关掉 VIP、把袖里乾坤降回 0），它会把背包**清空**之后放弃，
+  //     法宝永久销毁，而占用依然超标 —— 此后炼制/购买/换银票全被 `canAcquireArtifacts` 拒；
+  //  2. 明明没做到，却还返回 `ok`。
   const slots = artifactCapacity(draft)
-  const trimmed = [...artifacts]
-  while (artifactSpaceUsed({ ...draft, player: { ...draft.player, artifacts: trimmed } }) > slots && trimmed.length) {
-    const dropped = trimmed.pop()!
-    notes.push(`背包超出 ${slots} 格，丢弃了「${dropped.name}」`)
+  const used = artifactSpaceUsed({ ...draft, player: { ...draft.player, artifacts } })
+  if (used > slots) {
+    const queued = used - artifacts.reduce((n, a) => n + a.count, 0)
+    return {
+      ok: false,
+      reason: `法宝会超出袖里乾坤的格数（要占 ${used} 格，只有 ${slots} 格`
+        + (queued > 0 ? `，其中炼器队列占了 ${queued} 格` : '')
+        + '）。请先减少法宝、清空炼器队列，或者别把格数调这么小。',
+    }
   }
 
   const next: GameState = {
     ...draft,
-    player: { ...draft.player, qi, artifacts: trimmed },
+    player: { ...draft.player, qi, artifacts },
   }
 
   // —— 6. 最后一道闸：改出来的存档必须读得回来 ——

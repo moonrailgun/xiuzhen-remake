@@ -165,7 +165,8 @@ export function renderGm(vm: GmVm): string {
 <DIV class=smallred style="padding:0 2px 6px">
 <B>GM 面板 · 本地版工具，不是原版的东西。</B><BR>
 改动会直接覆盖当前存档且无法撤销，要留后路请先「导出备份」。超出上限的值会被收拢到上限，
-因为超限的存档在游戏里是死数据：真气会被下一次产出抹平、21 级经脉收益为零、法宝超格之后炼器和购买全被拒。
+因为超限的存档在游戏里是死数据：真气会被下一次产出抹平、21 级经脉收益为零、法宝超格之后炼器和购买全被拒。<BR>
+<B>法宝装不下时整份拒绝、一件都不丢</B>——收拢的只有数值。
 </DIV>
 ${notice}
 <FORM id=gmform onsubmit="return false">

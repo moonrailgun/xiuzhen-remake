@@ -554,9 +554,29 @@ test('★存档往返是恒等：市场被买空过几张也不会读一次多�
   // 买走 3 张（直接删，重点是「少了几张、还没到补货时刻」这个局面）
   cur = { ...cur, market: { ...cur.market, qi: cur.market.qi.slice(3) } }
 
+  for (const [label, qiOrders] of [
+    ['买掉 3 张', cur.market.qi.slice(3)],
+    ['整个买空', [] as typeof cur.market.qi],
+    ['原样不动', cur.market.qi],
+  ] as const) {
+    const at = { ...cur, market: { ...cur.market, qi: qiOrders } }
+    const store = memStorage()
+    saveGame(store, at, at.clock.wallT)
+    const back = loadGame(store)
+    assert.ok(back)
+    assert.equal(back.market.qi.length, qiOrders.length, `${label}：读档不该凭空补货`)
+  }
+})
+
+test('★v3 老存档迁移过来仍然看得到 NPC 挂单（播种在迁移里做，不在读档时做）', () => {
+  const s = fresh()
+  const v3 = JSON.parse(JSON.stringify(s)) as Record<string, unknown>
+  v3['v'] = 3
+  delete v3['market']
+  delete v3['towns']
   const store = memStorage()
-  saveGame(store, cur, cur.clock.wallT)
+  store.setItem(SAVE_KEYS.main, JSON.stringify({ v: 3, savedAt: 0, state: v3 }))
   const back = loadGame(store)
   assert.ok(back)
-  assert.equal(back.market.qi.length, cur.market.qi.length, '读档不该凭空补货')
+  assert.ok(back.market.qi.length > 0, '迁移完就该有单，不能等到下一个游戏整点')
 })

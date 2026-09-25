@@ -2257,7 +2257,11 @@ function doMarketCancel(action: 'unsellqi' | 'unsellitem', sheet: number): void 
   if (!state) return
   const id = sheetId(sheet)
   if (!id) return
-  if (action === 'unsellitem' && !canAcquireArtifacts(state, 1)) {
+  // 按这一单实际占几格来查，不能写死 1 —— 否则引擎里的检查和这里的提示会分叉
+  const slotsBack = action === 'unsellitem'
+    ? Math.max(1, state.market.artifacts.find((o) => o.id === id)?.artifact?.count ?? 1)
+    : 1
+  if (action === 'unsellitem' && !canAcquireArtifacts(state, slotsBack)) {
     return openWindow('mwindow', '无法撤销', '<DIV class=middle style="padding:10px">法宝携带数量已达上限，请先提升袖里乾坤或腾出空位</DIV>')
   }
   state = applyCtx((action === 'unsellitem' ? cancelArtifactOrders : cancelQiOrders)(ctxOf(state), [id]))

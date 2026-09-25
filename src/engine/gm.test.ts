@@ -80,26 +80,44 @@ test('★真气按**改完之后**的丹田上限收拢', () => {
   assert.ok(s.player.qi.every((v) => v <= cap), '不能超过丹田上限')
 })
 
-test('★背包不会被塞到超格；VIP 开着就多 5 格', () => {
+test('★背包超格整份拒绝，绝不替使用者销毁法宝', () => {
   const s0 = fresh()
   const many = Array.from({ length: 40 }, (_, i) => item(`gm:${i}`))
+  const tooMany = applyGm(s0, { artifacts: many })
+  assert.equal(tooMany.ok, false, '塞不下就该拒绝，不是丢掉多余的')
+  assert.match((tooMany as { reason: string }).reason, /格/)
 
-  const noVip = unwrap(applyGm(s0, { artifacts: many, vip: false }))
-  assert.ok(artifactSpaceUsed(noVip) <= artifactCapacity(noVip))
+  // 正好塞满可以
+  const fit = applyGm(s0, { artifacts: many.slice(0, artifactCapacity(s0)) })
+  assert.equal(fit.ok, true)
+  assert.equal(artifactSpaceUsed(unwrap(fit)), artifactCapacity(s0))
 
-  const withVip = unwrap(applyGm(s0, { artifacts: many, vip: true }))
-  assert.equal(artifactCapacity(withVip), artifactCapacity(noVip) + 5, 'VIP +5 格')
-  assert.ok(artifactSpaceUsed(withVip) <= artifactCapacity(withVip))
-  assert.ok(withVip.player.artifacts.length > noVip.player.artifacts.length, 'VIP 能多带几件')
+  // VIP 多 5 格
+  const vipFit = unwrap(applyGm(s0, { artifacts: many.slice(0, artifactCapacity(s0) + 5), vip: true }))
+  assert.equal(artifactCapacity(vipFit), artifactCapacity(s0) + 5)
+  assert.equal(artifactSpaceUsed(vipFit), artifactCapacity(vipFit))
+})
 
-  // 袖里乾坤升级同样在同一次补丁里生效
-  const sleeve = unwrap(applyGm(s0, { artifacts: many, body: [0, 0, 0, BODY_MAX_LEVEL, 0, 0, 0, 0] }))
-  assert.equal(artifactSpaceUsed(sleeve), artifactCapacity(sleeve))
+test('★缩小格数时不会把背包清空后放弃：炼器队列已经超格也得拒绝', () => {
+  // 关掉 VIP + 把袖里乾坤降回 0，而炼器队列里 13 件在炼 —— 光队列就超过 5 格。
+  // 以前的裁剪循环会把背包 pop 空之后放弃，两件法宝永久销毁，占用依然 13 > 5。
+  const s0 = fresh()
+  const s: GameState = {
+    ...s0,
+    player: { ...s0.player, vip: true, body: [0, 0, 0, 10, 0, 0, 0, 0], artifacts: [item('x'), item('y')] },
+    timeline: { events: [{ id: 'craft:1', kind: 'craft', finishAt: 9999, payload: { count: 13, kind: 'sword', name: '剑', quality: '凡品' } }] },
+  }
+  const r = applyGm(s, { vip: false, body: [0, 0, 0, 0, 0, 0, 0, 0] })
+  assert.equal(r.ok, false, '做不到就要说做不到')
+  assert.match((r as { reason: string }).reason, /炼器队列/)
+  assert.equal(s.player.artifacts.length, 2, '原状态一件都不能少')
 })
 
 test('★堆叠数量也算格子，不能用 count 绕过去', () => {
-  const s = unwrap(applyGm(fresh(), { artifacts: [item('gm:0', { count: 9999 })] }))
-  assert.ok(artifactSpaceUsed(s) <= artifactCapacity(s), `占用 ${artifactSpaceUsed(s)}`)
+  const s0 = fresh()
+  assert.equal(applyGm(s0, { artifacts: [item('gm:0', { count: 9999 })] }).ok, false)
+  const ok = unwrap(applyGm(s0, { artifacts: [item('gm:0', { count: artifactCapacity(s0) })] }))
+  assert.equal(artifactSpaceUsed(ok), artifactCapacity(s0))
 })
 
 test('★法宝状态必须是九种之一，重复 id 会被丢掉', () => {

@@ -8,7 +8,7 @@
     "dev": "vite --port 5273 --strictPort",
     "build": "vite build",
     "play": "vite preview --port 5273 --strictPort",
-    "test": "node --test 'src/**/*.test.ts'",
+    "test": "node --test 'src/**/*.test.ts' 'docs/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "parity": "node tools/parity/compare.mjs",

@@ -51,7 +51,7 @@ import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation } from '../engine/quest.ts'
-import { questTitle } from '../data/quests.ts'
+import { questTitle, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
@@ -135,7 +135,8 @@ function playerVm(s: GameState): PlayerVm {
     gender: s.player.gender,
     school: s.player.school,
     realm: s.player.realm,
-    experience: [Math.floor(s.player.experience), 345600],
+    // 阅历上限随境界涨（345600 × 1..5），不是定值
+    experience: [Math.floor(s.player.experience), EXPERIENCE_THRESHOLDS[s.player.realm]],
     silver: s.player.silver,
     meridianLevels: s.player.meridians,
     bodyLevels: s.player.body,

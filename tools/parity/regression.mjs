@@ -19,6 +19,13 @@ const importText = async raw => {
   await page.evaluate(() => importSavePrompt())
   await (await chooser).setFiles({ name: 'regression.json', mimeType: 'application/json', buffer: Buffer.from(raw) })
   await page.waitForTimeout(100)
+  // 导入会当场盖掉进度，所以有一道二次确认（#mwindow2）。不点它的话导入根本没发生，
+  // 后面所有基于「导入后的存档」的断言都会在旧状态上静默通过。
+  const ok = page.locator('a[onclick="OnMDialog2OK()"]')
+  if (await ok.isVisible()) {
+    await ok.click()
+    await page.waitForTimeout(100)
+  }
 }
 const acceptQuest = async id => {
   await page.evaluate(() => showAvailableQuests())
@@ -97,7 +104,14 @@ try {
   await page.locator('a[onclick="OnMDialog2OK()"] ').click()
   const complete = await saved()
   check('立即完成确认实际执行并扣10仙石', complete.player.body[0] === 1 && complete.player.bonusCoin === half.player.bonusCoin - 10 && !complete.timeline.events.some(e => e.kind === 'cultivate'))
-  check('未实现的历史套餐明确禁用', await page.locator('#lwindow a[onclick*="pay=1\'"]').count() === 0 && (await page.locator('#lwindowcontent').textContent()).includes('暂未开放'))
+  // 未实现的历史套餐**不从页面上抹掉**（payment.ts 顶部：DOM 逐字保真），
+  // 而是点下去由 purchase() 当场拒绝、且一枚仙石都不扣。
+  await page.locator('#lwindow a[onclick*="pay=1\'"]').first().click()
+  const refused = await saved()
+  check('未实现的历史套餐点下去被拒且不扣费',
+    (await page.locator('#mwindow').textContent()).includes('暂未开放') &&
+    refused.player.bonusCoin === complete.player.bonusCoin)
+  await page.evaluate(() => closeMWindow())
   await page.evaluate(() => closeLWindow())
 
   await page.locator('#bigmenu a[href="trade.jsp"]').click()
@@ -148,6 +162,9 @@ try {
   core.player.realm = '金丹期'
   core.player.body[5] = 30
   core.player.qi[1] = 286000
+  // 境界链一次只开放一个：先天那步还挂着的话，结丹根本不会出现在可领列表里
+  // （`quest.ts:chainUnlocked` 要求前序 entry 已 done）。把它按已交付处理。
+  core.quests.entries = core.quests.entries.map(e => e.id.startsWith('realm:') ? { ...e, cleared: true, done: true } : e)
   await importText(JSON.stringify({ ...payload, state: core }))
   await acceptQuest('realm:jindan:1')
   await quest('realm:jindan:1')

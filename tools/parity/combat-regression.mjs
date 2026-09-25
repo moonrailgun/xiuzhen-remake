@@ -25,6 +25,12 @@ const importState = async state => {
   await page.evaluate(() => importSavePrompt())
   await (await chooser).setFiles({ name: 'combat-regression.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) })
   await page.waitForTimeout(100)
+  // 导入会当场盖掉进度，先过二次确认（#mwindow2），否则导入压根没发生。
+  const importOk = page.locator('a[onclick="OnMDialog2OK()"]')
+  if (await importOk.isVisible()) {
+    await importOk.click()
+    await page.waitForTimeout(100)
+  }
 }
 const openQuest = () => page.locator('a[onclick*="quest.jsp?questid=beast:1"]').click()
 const launchSelected = async () => {
@@ -75,7 +81,7 @@ try {
   check('出击事件在页面显示目标', (await openEvents(2)).includes('你放去攻击'))
 
   const fighting = await reachNextPhase()
-  check('飞到目标后进入缠斗而非立即结算', battle(fighting)?.payload.phase === 'fighting' && sword(fighting)?.status === '缠斗中' && !fighting.mail.some(mail => mail.kind === 'battle'))
+  check('飞到目标后进入缠斗而非立即结算', battle(fighting)?.payload.phase === 'fighting' && sword(fighting)?.status === '绞杀中' && !fighting.mail.some(mail => mail.kind === 'battle'))
   check('缠斗事件在页面可见', (await openEvents(2)).includes('缠斗'))
   const returning = await reachNextPhase()
   const loot = battle(returning)?.payload.loot

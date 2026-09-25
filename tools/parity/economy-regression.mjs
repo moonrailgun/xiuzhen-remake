@@ -70,6 +70,13 @@ try {
   await page.evaluate(() => importSavePrompt())
   await (await chooser).setFiles({ name: 'economy-fixture.json', mimeType: 'application/json',
     buffer: Buffer.from(serialize(fixture, wall.getTime())) })
+  await page.waitForTimeout(100)
+  // 导入会当场盖掉进度，先过二次确认（#mwindow2），否则导入压根没发生。
+  const importOk = page.locator('a[onclick="OnMDialog2OK()"]')
+  if (await importOk.isVisible()) {
+    await importOk.click()
+    await page.waitForTimeout(100)
+  }
   await page.waitForFunction(expected => JSON.parse(localStorage.getItem('xiuzhen.save'))?.state.player.name === expected, name)
   check('真实文件选择器导入经济夹具', (await saved()).player.name, name)
 

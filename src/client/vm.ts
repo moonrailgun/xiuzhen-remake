@@ -275,6 +275,8 @@ export function tradeVm(
   view: TradeView,
   page: number,
   filter: { readonly give?: Element | ''; readonly want?: Element | '' } = {},
+  /** 购买法宝页的筛选：名称关键字 + 品质（0 全部 / 1 废品 / 2 凡品 / 3 上品 / 4 极品） */
+  itemFilter: { readonly search?: string; readonly level?: number } = {},
 ): { readonly vm: TradeVm; readonly sheets: TradeSheets } {
   const give = filter.give ?? ''
   const want = filter.want ?? ''
@@ -288,7 +290,14 @@ export function tradeVm(
   const slice = all.slice((p - 1) * TRADE_PAGE_SIZE, p * TRADE_PAGE_SIZE)
 
   const mine = s.market.qi.filter((o) => o.seller === s.player.name)
-  const artifacts = s.market.artifacts.filter((o) => o.seller !== s.player.name)
+  // 法宝页的名称/品质筛选。市场上只有极品可交易（listArtifact 拦着），
+  // 所以 level 选「极品」等于不筛，选别的品质就是空表 —— 与原版一致。
+  const search = (itemFilter.search ?? '').trim()
+  const level = itemFilter.level ?? 0
+  const artifacts = s.market.artifacts
+    .filter((o) => o.seller !== s.player.name)
+    .filter((o) => search === '' || o.name.includes(search))
+    .filter((o) => level === 0 || level === 4)
   const myArtifacts = s.market.artifacts.filter((o) => o.seller === s.player.name)
 
   const toItemOffer = (o: typeof artifacts[number], i: number): ItemOffer => ({
@@ -307,8 +316,8 @@ export function tradeVm(
       pager: { page: p, pages },
       filterGive: give,
       filterWant: want,
-      search: '',
-      level: 0,
+      search,
+      level,
       order: 2,
       myQiOffers: mine.map((o, i) => qiOfferOf(s, o, i)),
       myItemOffers: myArtifacts.map(toItemOffer),

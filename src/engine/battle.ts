@@ -211,7 +211,9 @@ export function resolveBattleEvent(
       }
     }
     return {
-      state: swordStatus(state, swords, '缠斗中'),
+      // 缠斗阶段的**法宝状态**原版逐字是「绞杀中...」（03 §1.12 [原文]，09b §156 真实 DOM）。
+      // 「缠斗」只出现在事件标题句「在(x,y)缠斗 剩余…结束」里，不是状态词。
+      state: swordStatus(state, swords, '绞杀中'),
       follow: [{ ...event, finishAt: event.finishAt + tangleDuration(swords.map(toCombat), [targetToCombat(target)]),
         payload: { ...event.payload, phase: 'fighting' satisfies BattlePhase } }],
     }

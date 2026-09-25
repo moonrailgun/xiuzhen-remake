@@ -46,6 +46,22 @@ export type PageResolver = (url: string) => string | Promise<string>
 let resolvePage: PageResolver = () => '<div>未接入</div>'
 export const setPageResolver = (r: PageResolver): void => void (resolvePage = r)
 
+/** 弹窗「确定」要执行的东西：原版是一段 JS 字符串，本项目新写的地方用函数。 */
+export type DialogAction = string | (() => void)
+
+/**
+ * 字符串形式按原版语义在**全局作用域**里执行（原版是内联 onclick，本来就跑在全局）。
+ * 用 `new Function` 而不是 `eval`，避免意外捕获本模块的局部作用域。
+ *
+ * 安全边界：这些字符串由我们自己的页面模块拼装，动态值一律先过 `escJs`。
+ * **不要把未经转义的玩家输入拼进来。**
+ */
+function toAction(a: DialogAction | undefined): (() => void) | null {
+  if (a === undefined) return null
+  if (typeof a === 'function') return a
+  return () => { new Function(a)() }
+}
+
 async function openFromUrl(key: WindowKey, title: string, url: string): Promise<void> {
   const html = await resolvePage(url)
   openWindow(key, title, html)
@@ -118,20 +134,38 @@ export function installGlobals(): void {
   g['closeMWindow'] = () => closeWindow('mwindow')
   g['closeMWindow2'] = () => closeWindow('mwindow2')
 
+  /**
+   * 原版的 `$('id')` 简写（= `document.getElementById`）。页面模块照原版 DOM 保留了
+   * 对它的调用（`item.ts:245` 的「把可炼数量填进输入框」、`ally.ts:148` 的成员页码框），
+   * 以前没实现，点下去直接 `ReferenceError: $ is not defined`。
+   */
+  g['$'] = (id: string) => document.getElementById(id)
+
+  /** 地图上那个「点此移动」小菜单的关闭钮（原版 `mapMenuMove();closeMapMenu();`）。 */
+  g['closeMapMenu'] = () => {
+    const el = document.getElementById('mapmenu')
+    if (el) el.style.display = 'none'
+  }
+
   /** 游戏指南：原版是 hlp('词条') 打开无标题条的 H 窗。 */
   g['hlp'] = (topic: string) => void openFromUrl('hwindow', '', `help.jsp?topic=${encodeURIComponent(topic)}`)
 
   /**
    * 原版 MDialog 是**三参数** `MDialog(title, html, jsOnOk)`，而且是唯一带输入框的弹窗
    * （「请求援手」里有 <input id=gethelpname>）。这一点纠正了早期分析里"两参数纯提示框"的记法。
+   *
+   * **第三参既收函数也收 JS 字符串**。原版传的一律是字符串（`07 §197`：
+   * `MDialogOkCancel('', '确定购买?', 'ajaxPost(\\'buyqi\\', …);')`，`09b §2.1` 有 41 次
+   * 调用的逐字表），所以页面模块照原版写字符串；本项目自己新加的调用传函数更省事。
+   * 两种都支持，页面那边就不必为了迁就签名去改原版 DOM。
    */
-  g['MDialog'] = (title: string, html: string, onOk?: () => void) => {
+  g['MDialog'] = (title: string, html: string, onOk?: DialogAction) => {
     openWindow('mwindow', title, html)
-    pendingOk = onOk ?? null
+    pendingOk = toAction(onOk)
   }
-  g['MDialogOkCancel'] = (title: string, html: string, onOk?: () => void) => {
+  g['MDialogOkCancel'] = (title: string, html: string, onOk?: DialogAction) => {
     openWindow('mwindow2', title, html)
-    pendingOk2 = onOk ?? null
+    pendingOk2 = toAction(onOk)
   }
   g['OnMDialogOK'] = () => {
     const f = pendingOk

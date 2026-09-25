@@ -17,7 +17,7 @@ import { renderMsgDetail } from '../pages/msgdetail.ts'
 import { renderWriteMsg } from '../pages/writemsg.ts'
 import { renderItemMid } from '../pages/itemmid.ts'
 import { renderQuest } from '../pages/quest.ts'
-import { renderRank } from '../pages/rank.ts'
+import { renderRank, type RankTab } from '../pages/rank.ts'
 import { renderPlayerInfo } from '../pages/playerinfo.ts'
 import { renderTurnres } from '../pages/turnres.ts'
 import { renderPayment } from '../pages/payment.ts'
@@ -60,7 +60,7 @@ import {
 } from '../engine/battle.ts'
 import { startCraft, refineArtifact, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
-import { DEFENSIVE_ARTIFACTS, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
+import { DEFENSIVE_ARTIFACTS, PASSIVE_SWORD_ARTS, type Quality } from '../data/artifacts.ts'
 import {
   ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
 } from '../engine/market.ts'
@@ -72,6 +72,7 @@ import { purchase } from '../engine/payment.ts'
 import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
+import { roll, type RngState } from '../engine/rng.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
@@ -102,6 +103,9 @@ let allyTab: AllyTab = 'overview'
 /** 分页与筛选 */
 let tradePage = 1
 let tradeFilter: { give: Element | ''; want: Element | '' } = { give: '', want: '' }
+/** 购买法宝页的名称搜索与品质筛选（原版参数 search / level） */
+let tradeSearch = ''
+let tradeLevel = 0
 let allyPage = 1
 let msgPage = 1
 /** 当前交易页那一屏的挂单 id（原版界面用数字 sheet，这里反查回真 id） */
@@ -110,6 +114,45 @@ let tradeSheets: readonly string[] = []
 let mapCenter: { x: number; y: number } | null = null
 /** 地图上选中的格子 */
 let mapSelected: { x: number; y: number } | null = null
+
+/**
+ * 读档失败时把两份原始存档原样扣在这里，**并在玩家做出选择前禁止一切写盘**。
+ *
+ * 为什么必须这样：以前读不出来就静默进建号页，然后
+ *   第 1 次存档冲掉坏主档 → 1 秒后 pulse 第 2 次存档把**好备份**也冲掉，
+ * 两份一起没，不可恢复。丢的可能是几十小时进度，而触发条件只是
+ * 「将来改了 state 结构忘了加迁移」这种纯代码失误。
+ */
+let loadFailure: { readonly reason: string; readonly main: string | null; readonly backup: string | null } | null = null
+
+/**
+ * 把上面这些模块级的界面状态复位。
+ *
+ * 「重新开始」只清存档是不够的：这些 `let` 会原样留着，新号一进来就串在上个号的页面
+ * （实测：在交易页点重新开始 → 建新号 → 高亮还是「交易」、左栏直接是交易页），
+ * 连 `mapSelected` 都还是上个号选过的格子。
+ */
+function resetViewState(): void {
+  tab = 'player'
+  playerView = 'meridian'
+  skillTab = 'produce'
+  itemTab = 'list'
+  tradeView = 'buyqi'
+  allyTab = 'overview'
+  tradePage = 1
+  tradeFilter = { give: '', want: '' }
+  tradeSearch = ''
+  tradeLevel = 0
+  allyPage = 1
+  msgPage = 1
+  tradeSheets = []
+  mapCenter = null
+  mapSelected = null
+  fightTarget = null
+  reinforceEventId = null
+  helpHistory = []
+  helpForwardStack = []
+}
 
 const ELEMENT_BY_ATTR: Record<number, Element> = { 0: '金', 1: '木', 2: '土', 3: '水', 4: '火' }
 const SCHOOL_BY_ID: Record<number, '蜀山' | '昆仑' | '通天'> = { 1: '蜀山', 2: '昆仑', 3: '通天' }
@@ -167,7 +210,12 @@ function mapVm(s: GameState): MapVm {
     }
   })
   const sel = mapSelected ?? { x: s.player.x, y: s.player.y }
-  const selected = cells.find((c) => c.posx === sel.x && c.posy === sel.y) ?? cells[56]!
+  // 选中格不在当前这屏时会回落到屏幕中心格。必须把 `mapSelected` 一并对齐 ——
+  // 否则左栏显示的是中心格、而「向选中场景步行移动」用的还是屏外那个旧坐标，
+  // 等于「界面说去 A、实际走去 B」，而且没有任何提示。
+  const onScreen = cells.find((c) => c.posx === sel.x && c.posy === sel.y)
+  const selected = onScreen ?? cells[56]!
+  if (!onScreen) mapSelected = { x: selected.posx, y: selected.posy }
   return {
     centerX: center.x,
     centerY: center.y,
@@ -320,7 +368,7 @@ function leftPane(s: GameState): string {
     case 'item':
       return renderItem(itemVm(s, itemTab))
     case 'trade': {
-      const { vm, sheets } = tradeVm(s, tradeView, tradePage, tradeFilter)
+      const { vm, sheets } = tradeVm(s, tradeView, tradePage, tradeFilter, { search: tradeSearch, level: tradeLevel })
       tradeSheets = sheets.ids
       return renderTrade(vm)
     }
@@ -336,6 +384,11 @@ function leftPane(s: GameState): string {
 function render(live = false): void {
   const app = root()
   if (!app) return
+
+  if (loadFailure) {
+    app.innerHTML = recoveryPage(loadFailure)
+    return
+  }
 
   if (!state) {
     app.innerHTML = renderCreatePlayer(draft)
@@ -406,6 +459,11 @@ export function routeJsp(href: string): boolean {
           mapCenter = { x, y }
           mapSelected = { x, y }
         }
+      } else {
+        // 不带参数的 `map.jsp` 就是地图页下方那个「返回人物所在」（map.ts:187）。
+        // 清掉视图中心，下次渲染自然跟回角色身上。
+        mapCenter = null
+        mapSelected = null
       }
       break
     }
@@ -428,6 +486,11 @@ export function routeJsp(href: string): boolean {
       tradeView = q.has('tab') ? (byNum[n('tab')] ?? 'buyqi') : 'buyqi'
       // 尾页在原版写成 page=0
       tradePage = q.has('page') ? (n('page') || Number.MAX_SAFE_INTEGER) : 1
+      // 法宝页的名称/品质筛选（原版参数 search / level），以前直接丢掉 → 搜了没反应
+      if (q.has('search') || q.has('level')) {
+        tradeSearch = q.get('search') ?? ''
+        tradeLevel = n('level', 0)
+      }
       if (q.has('give') || q.has('want')) {
         tradeFilter = {
           give: (q.get('give') ?? '') as Element | '',
@@ -476,6 +539,8 @@ function pulse(): void {
 }
 
 function persist(): void {
+  // 读档失败且玩家还没选择怎么办：一个字节都不许写，否则会盖掉可恢复的原始存档
+  if (loadFailure) return
   if (!state || !STORAGE_KEY_AVAILABLE) return
   try {
     state = saveGame(localStorage, state, Date.now())
@@ -570,6 +635,9 @@ export function installGameActions(): void {
     tab = next as MainTab
     render()
   }
+
+  /** 页面里少数几处原版用 `location.href=` 跳转的地方改走这里（见 ally.ts 的说明）。 */
+  g['gotoJsp'] = (url: string) => void routeJsp(url)
 
   /** 地图：点格子选中。 */
   g['onMapCellClick'] = (x: number, y: number) => {
@@ -877,10 +945,22 @@ export function installGameActions(): void {
     openWindow('mwindow', '提示',
       `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
-  g['postForm'] = (action: string) => {
+  g['postForm'] = (action: string, params?: string) => {
     if (action === 'sellqi') return doListQi()
     if (action === 'sellitem') return doListArtifact()
     if (action === 'sendmsg') return doSendMsg()
+    // 个人资料窗用的是 postForm('addpal','playerid=N')，中栏用的是 addpal(name)，
+    // 两个入口要走同一条路（`playerinfo.ts:86` vs `sidebar.ts:218`）
+    if (action === 'addpal') {
+      const id = Number(new URLSearchParams(params ?? '').get('playerid') ?? 0)
+      if (!state) return
+      const who = allNpcsAt(state!.npc, state!.clock.gameT, state!.worldSeed)
+        .find((n2) => n2.base.id === id)
+      ;(globalThis as unknown as Record<string, (n: string) => void>)['addpal']!(
+        who?.base.name ?? '对方',
+      )
+      return
+    }
     openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
 
@@ -891,13 +971,14 @@ export function installGameActions(): void {
     if (itemTab === 'refine') return doRefine(itemId)
     const box = document.getElementById(`craft${itemId}`) as HTMLInputElement | null
     const n = Math.max(1, Math.floor(Number(box?.value) || count || 1))
-    const order = craftOrderFor(state, itemId, n)
-    if (!order) {
+    const made = craftOrderFor(state, itemId, n)
+    if (!made) {
       openWindow('mwindow', '无法炼制',
         '<DIV class=middle style="padding:10px">这件法宝没有留下炼制配方。</DIV>')
       return
     }
-    const r = startCraft(state, order)
+    // 掷过品质骰之后 rng 已经推进，写回存档再开炉
+    const r = startCraft({ ...state, rng: made.rng }, made.order)
     if (!r.ok) {
       openWindow('mwindow', '无法炼制', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
@@ -1061,6 +1142,37 @@ export function installGameActions(): void {
     step()
   }
 
+  /** 把读不出来的原始存档原样存成文件，交给玩家自己留底。 */
+  g['downloadRaw'] = (which: 'main' | 'backup') => {
+    const raw = which === 'main' ? loadFailure?.main : loadFailure?.backup
+    if (!raw) return
+    const blob = new Blob([raw], { type: 'application/json' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `xiuzhen-${which}-raw.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 0)
+  }
+
+  /** 玩家确认放弃抢救之后，才允许清掉旧档并重新开始。 */
+  g['discardBrokenSave'] = () => {
+    const g2 = globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>
+    g2['MDialogOkCancel']!(
+      '清空存档',
+      '<DIV class=middle style="padding:10px">确定清空这份读不出来的存档并重新建号？<BR>' +
+      '<SPAN class=smallred>清空之后就找不回来了，建议先下载原始数据。</SPAN></DIV>',
+      () => {
+        try {
+          clearSave(localStorage)
+        } catch { /* 忽略 */ }
+        loadFailure = null
+        state = null
+        resetViewState()
+        render()
+      },
+    )
+  }
+
   /** 顶栏「关于」→ 怀旧版设置。 */
   g['openSettings'] = () => {
     if (!state) return
@@ -1085,6 +1197,17 @@ export function installGameActions(): void {
     ;(globalThis as unknown as Record<string, () => void>)['openSettings']!()
   }
 
+  /**
+   * 原版付费页买完之后的回调，用来把那一页刷新一遍
+   * （原文 `ajaxPost('paycoin', 'pay=N', openPayment);` 的第三个参数）。
+   * 我们的页面模块照原版逐字渲染那一行，所以这个全局必须存在 —— 否则内联
+   * onclick 会在调用 ajaxPost 之前就抛 ReferenceError，点了毫无反应。
+   */
+  g['openPayment'] = () => {
+    if (!state) return
+    openWindow('lwindow', '', resolvePage('payment.jsp'))
+  }
+
   g['setRate'] = (rate: number) => {
     if (!state) return
     state = changeRate(state, Date.now(), rate)
@@ -1102,6 +1225,7 @@ export function installGameActions(): void {
       try {
         const loaded = importGame(await file.text())
         state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
+        loadFailure = null   // 导入成功，解除「禁止写盘」
         closeWindow('lwindow')
         step()
       } catch (e) {
@@ -1123,6 +1247,7 @@ export function installGameActions(): void {
           clearSave(localStorage)
         } catch { /* 忽略 */ }
         state = null
+        resetViewState()
         closeWindow('lwindow')
         render()
       },
@@ -1229,8 +1354,13 @@ function resolvePage(url: string): string {
     case 'allyinfo':
       return renderAlly(allyVm(s, 'overview', 1))
 
-    case 'rank':
-      return renderRank(rankVm(s, (q.get('tab') as 'power' | 'estate' | 'exp' | null) ?? 'power'))
+    case 'rank': {
+      // 原版子标签传的是数字（rank.ts：门派 3 / 产业 4 / 阅历 5），不是内部枚举名。
+      // 以前直接 `as` 成枚举，结果全部落到道行榜，而 renderRank 里 COLUMNS[undefined]
+      // 会抛 TypeError —— 异常吞在 openFromUrl 的 promise 里，表现成「点了没反应」。
+      const byNum: Record<string, RankTab> = { 3: 'ally', 4: 'estate', 5: 'exp' }
+      return renderRank(rankVm(s, byNum[q.get('tab') ?? ''] ?? 'power'))
+    }
 
     case 'playerinfo':
       // 侧栏按名字点进来，门派名册按 id —— 两种都接
@@ -1615,32 +1745,30 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
 // —— 炼制配方 ——
 
 /** 按炼制页的 itemId 反查配方。飞剑 501xx、护身 601xx、丹药三位数。 */
-function craftOrderFor(s: GameState, itemId: number, count: number): CraftOrder | null {
+function craftOrderFor(
+  s: GameState,
+  itemId: number,
+  count: number,
+): { readonly order: CraftOrder; readonly rng: RngState } | null {
   if (itemId >= 50100 && itemId < 60000) {
     const sw = SWORDS[Math.floor((itemId - 50100) / 100)]
     const cost = sw ? craftCostFor(sw.craftCost, s.player.element) : null
     // 转录不全的剑没有配方，宁可不给炼
     if (!sw || !cost || sw.craftSeconds === null) return null
+    const q = craftQuality(s)
     return {
-      kind: 'sword',
-      name: sw.name,
-      count,
-      cost,
-      baseSeconds: sw.craftSeconds,
-      quality: craftQuality(s),
+      order: { kind: 'sword', name: sw.name, count, cost, baseSeconds: sw.craftSeconds, quality: q.quality },
+      rng: q.rng,
     }
   }
   if (itemId >= 60100 && itemId < 60900) {
     const g = DEFENSIVE_ARTIFACTS[Math.floor((itemId - 60100) / 100)]
     const gcost = g?.craftCost ? craftCostFor(g.craftCost, s.player.element) : null
     if (!g || !gcost) return null
+    const q = craftQuality(s)
     return {
-      kind: 'guard',
-      name: g.name,
-      count,
-      cost: gcost,
-      baseSeconds: g.craftSeconds,
-      quality: craftQuality(s),
+      order: { kind: 'guard', name: g.name, count, cost: gcost, baseSeconds: g.craftSeconds, quality: q.quality },
+      rng: q.rng,
     }
   }
   // 丹药：百位 = 丹种，个位 = 炼数（09 §1.16 的 id 规律）
@@ -1650,14 +1778,18 @@ function craftOrderFor(s: GameState, itemId: number, count: number): CraftOrder 
     const kind = PILL_NAMES[kindIdx]
     const tier = PILL_TIERS[tierIdx]
     if (!kind || !tier) return null
+    // 丹药不分品质，不用掷骰，rng 原样带回
     return {
-      kind: 'pill',
-      name: `${tier}${kind}`,
-      count,
-      // 丹药的五行消耗原版页面就不显示（05 §5.2），这里按炼数取一个量级
-      cost: [0, 0, 0, 0, 0].map(() => 500 * (tierIdx + 1)) as unknown as FiveQi,
-      baseSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
-      quality: '凡品',
+      order: {
+        kind: 'pill',
+        name: `${tier}${kind}`,
+        count,
+        // 丹药的五行消耗原版页面就不显示（05 §5.2），这里按炼数取一个量级
+        cost: [0, 0, 0, 0, 0].map(() => 500 * (tierIdx + 1)) as unknown as FiveQi,
+        baseSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
+        quality: '凡品',
+      },
+      rng: s.rng,
     }
   }
   return null
@@ -1666,11 +1798,16 @@ function craftOrderFor(s: GameState, itemId: number, count: number): CraftOrder 
 /**
  * 出品品质。原版由「炼器总纲」（昆仑专属，上品率 50%→70%）与「物理通明」秘笈决定；
  * 没有总纲时的基础上品率零存档，这里按 50% 起步 [重建]。
+ *
+ * **掷骰走存档里的 rng**（和淬炼 `refineArtifact` 同一套），不用 `Math.random()` ——
+ * 全项目的约定是「同一个存档重放得到同一结果」，用墙钟随机会把这条打破，
+ * 而且结果不可复现、没法写测试。掷完要把推进后的 rng 写回存档。
  */
-function craftQuality(s: GameState): '废品' | '凡品' | '上品' | '极品' {
+function craftQuality(s: GameState): { readonly quality: Quality; readonly rng: RngState } {
   const zonggang = s.player.skills['炼器总纲'] ?? 0
   const rate = 0.5 + 0.05 * zonggang
-  return Math.random() < rate ? '上品' : '凡品'
+  const r = roll(s.rng, rate)
+  return { quality: r.hit ? '上品' : '凡品', rng: r.state }
 }
 
 // —— 市场 ——
@@ -2035,7 +2172,8 @@ function questWindow(s: GameState, id: string): string {
   })
 }
 
-function rankVm(s: GameState, tab: 'power' | 'estate' | 'exp') {
+function rankVm(s: GameState, tab: RankTab) {
+  // 门派榜在单机下没有真人门派，按道源（蜀山/昆仑/通天）排，与门派页同一套口径
   const kind = tab === 'estate' ? 'estate' : tab === 'exp' ? 'experience' : 'daoxing'
   const rows = ranking(s.npc, s.clock.gameT, s.worldSeed, kind, 20).map((n) => ({
     id: n.base.id,
@@ -2045,7 +2183,7 @@ function rankVm(s: GameState, tab: 'power' | 'estate' | 'exp') {
       : kind === 'estate' ? `${n.estate}两/小时`
       : String(n.experience),
   }))
-  return { tab: tab as 'power' | 'estate' | 'exp', rows }
+  return { tab, rows }
 }
 
 function playerInfoWindow(s: GameState, id: number): string {
@@ -2084,6 +2222,38 @@ function readDraft(): CreatePlayerVm {
     school: Number(sel('school')?.value ?? 0),
     posi: Number(q('input[name=posi]:checked')?.value ?? 0),
   }
+}
+
+/**
+ * 读档失败的落地页。
+ *
+ * 三件事，顺序不能反：**先让玩家能把原始存档拿走**，再让他决定重开。
+ * 在他点「重新开始」之前，`persist()` 一个字节都不写（见 `loadFailure`）。
+ */
+function recoveryPage(f: NonNullable<typeof loadFailure>): string {
+  const has = (s: string | null) => s !== null && s.length > 0
+  return `<DIV id=gpage><DIV class=middle style="padding:40px 30px;max-width:620px">
+<TABLE class=tablebg cellSpacing=1 cellPadding=6 width="100%" border=0><TBODY>
+<TR class="titlebg bigbold" align=middle><TD>存档读不出来</TD></TR>
+<TR class=trbg><TD>
+<SPAN class=smallred>${esc(f.reason)}</SPAN><BR><BR>
+<SPAN class=middle>为了不把还能抢救的数据冲掉，游戏<B>暂时不会写入任何存档</B>。<BR>
+请先把下面的原始存档下载下来备份，再决定要不要重新开始。</SPAN>
+</TD></TR>
+<TR class=trbg><TD>
+${has(f.main)
+    ? '<A class=skillup href="#" onclick="downloadRaw(\'main\')">下载主存档原始数据</A>'
+    : '<SPAN class=smallgray>主存档是空的</SPAN>'}
+<BR>
+${has(f.backup)
+    ? '<A class=skillup href="#" onclick="downloadRaw(\'backup\')">下载备份存档原始数据</A>'
+    : '<SPAN class=smallgray>没有备份存档</SPAN>'}
+</TD></TR>
+<TR class=trbg><TD align=middle>
+<A class=skillup href="#" onclick="importSavePrompt()">导入一份存档</A>　
+<A class=skillup href="#" onclick="discardBrokenSave()">清空并重新开始</A>
+</TD></TR>
+</TBODY></TABLE></DIV></DIV>`
 }
 
 /** 升级说明面板，结构照截图 #3 的经脉弹窗。 */
@@ -2142,8 +2312,15 @@ export function boot(): void {
   if (STORAGE_KEY_AVAILABLE) {
     try {
       state = loadGame(localStorage)
-    } catch {
-      state = null // 存档损坏：从建号开始，旧档仍留在备份 key 里
+    } catch (e) {
+      // **先把两份原始存档扣下来**，再决定怎么办 —— 不能直接进建号页，
+      // 那样两秒之内主档和备份都会被新号覆盖掉。
+      state = null
+      loadFailure = {
+        reason: e instanceof Error ? e.message : '存档读取失败',
+        main: localStorage.getItem(SAVE_KEYS.main),
+        backup: localStorage.getItem(SAVE_KEYS.backup),
+      }
     }
   }
   step()

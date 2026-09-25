@@ -17,6 +17,12 @@
  *    （列宽 5/35/35/25%、首格单字「攻/防/算」、门派列 `smallgray`「攻方 - 守方」、
  *    日期 `YY-MM-DD HH:MM`）。被推算时不暴露推算者，写「有人推算 X」。
  *
+ * **与原版唯一的一处改动**：成员页码框的 onkeydown 原文是
+ *   `location.href='ally.jsp?tab=2&page='+$('allypage').value+'&per=10&job=-2'`，
+ * 本地版没有服务端，直接赋 `location.href` 会把整个游戏页跳走。URL 的拼法一字未动，
+ * 只把 `location.href=` 换成 `gotoJsp(...)`（交给 `app.ts` 的路由拦截器）。
+ * 这与 `shell.ts` 给主标签加 `onclick="return gotoTab(…),false"` 是同一个做法。
+ *
  * 路由：09 §1.18 全量 grep 到的是 `ally.jsp?tab=1|2|3|4|61|62`，其中
  * tab=2=成员、tab=3=动态流水（DOM 里的 href 就是 `ally.jsp?tab=3#`）已确证；
  * 「攻击」与「功能」落在剩下的 tab=1 / tab=4 上是【推断】——
@@ -145,7 +151,7 @@ function memberPager(vm: AllyVm): string {
   const link = (p: number, label: string) =>
     `<A class=smallbold href="${esc(url(p))}">${label}</A>`
   return `<TR class="trbg small"><TD colSpan=6>${link(1, '首页')}　${link(Math.max(1, vm.page - 1), '上一页')}　` +
-    `第<INPUT class=small id=allypage onkeydown="if(event.keyCode==13){location.href='ally.jsp?tab=2&page='+$('allypage').value+'&per=10&job=-2'}" size=3 value=${vm.page} name=textfield2>` +
+    `第<INPUT class=small id=allypage onkeydown="if(event.keyCode==13){gotoJsp('ally.jsp?tab=2&page='+$('allypage').value+'&per=10&job=-2')}" size=3 value=${vm.page} name=textfield2>` +
     `/${vm.pages}页　${link(vm.page + 1, '下一页')}　${link(0, '尾页')}</TD></TR>`
 }
 

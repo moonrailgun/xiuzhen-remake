@@ -19,7 +19,7 @@
  * 11=修炼完成、18=VIP 7 天套餐。其余编号是【重建】，刻意避开这 5 个已占号。
  */
 
-import { esc, each, num, when } from './html.ts'
+import { esc, each, num, when, escJs } from './html.ts'
 import { RES_ICON } from './trade.ts'
 import type { Element } from '../data/meridian.ts'
 
@@ -140,16 +140,27 @@ export type PaymentVm = {
   readonly remaining: Readonly<Record<number, string>>
 }
 
-/** 操作列的链接。默认走 paycoin；有 confirm 的先弹 M2 窗；openWindow 的改开浮窗。 */
+/**
+ * 操作列的链接。
+ *
+ * **一律渲染原版那一行**：`ajaxPost('paycoin', 'pay={n}', openPayment);`
+ * （`09 §1.14` / `05 §14` 逐字存档，pay=18 的整行都在）。
+ *
+ * 本地版没实现的历史套餐**不把这行换成「暂未开放」** —— 那等于把一段逐字存档的
+ * 原版 DOM 从界面上抹掉。改成：DOM 照旧，点下去由 `engine/payment.ts` 的 `purchase()`
+ * 挡住，回一句「本地版暂未开放此套餐，不会扣除仙石」。保真与诚实两头都占。
+ *
+ * onclick 里只拼数字 `pay` 与本模块常量，所以原样输出（与原版逐字一致）；
+ * 凡是拼动态字符串的地方仍要走 `escJs`。
+ */
 function actionLink(it: PayItem): string {
-  if (!it.instant) return '<SPAN class=smallgray title="历史套餐尚未实现；VIP可在怀旧版设置中切换">暂未开放</SPAN>'
-  const call = `ajaxPost('paycoin', 'pay=${num(it.pay)}');`
+  const call = `ajaxPost('paycoin', 'pay=${num(it.pay)}', openPayment);`
   const onclick = it.openWindow
-    ? `openLWindow('', '${it.openWindow}')`
+    ? `openLWindow('', '${escJs(it.openWindow)}')`
     : it.confirm
-      ? `MDialogOkCancel('', ${JSON.stringify(it.confirm)}, function(){${call}})`
+      ? `MDialogOkCancel('', '${escJs(it.confirm)}', '${escJs(call)}')`
       : call
-  return `<A class=smallbold onclick="${esc(onclick)}" href="#">${esc(it.action)}</A>`
+  return `<A class=smallbold onclick="${onclick}" href="#">${esc(it.action)}</A>`
 }
 
 function itemRows(it: PayItem, vm: PaymentVm): string {

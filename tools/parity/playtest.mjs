@@ -135,11 +135,19 @@ check('发起移动后出现移动事件', (midText ?? '').includes('移动事�
 await page.screenshot({ path: join(OUT, 'play-6-moving.png') })
 
 // 9. 超出移动范围时给出提示
-await page.evaluate(() => {
-  const raw = localStorage.getItem('xiuzhen.save')
-  const st = JSON.parse(raw).state
-  window.onMapCellClick(st.player.x + 50, st.player.y)
+// 走真实玩家能走的路：先用「查看」把视图滚到很远的地方，再点那边屏幕上的一格。
+// （不要直接 onMapCellClick 一个屏幕外的坐标 —— 那是 UI 里点不到的格子，
+//   而且选中格一旦不在这屏，渲染时会被对齐回中心格，见 app.ts 的 mapVm。）
+const far = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return { x: st.player.x + 40, y: st.player.y + 40 }
 })
+await page.fill('#viewposx', String(far.x))
+await page.fill('#viewposy', String(far.y))
+await page.click('a[onclick="goToPos()"]')
+await page.waitForTimeout(250)
+await page.evaluate((f) => window.onMapCellClick(f.x, f.y), far)
+await page.waitForTimeout(150)
 await page.click('a[onclick="mapMenuMove()"]')
 await page.waitForTimeout(300)
 const dialog = await page.locator('#mwindowcontent').textContent()

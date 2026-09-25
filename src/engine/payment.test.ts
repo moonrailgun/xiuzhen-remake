@@ -9,7 +9,8 @@ test('购买编号只影响对应事件，并按半/完扣款', () => {
     { id: 'c', kind: 'cultivate' as const, finishAt: 100, payload: {} },
     { id: 'move', kind: 'move' as const, finishAt: 80, payload: { index: 0, legs: [{ x: 51, y: 50, seconds: 80 }, { x: 52, y: 50, seconds: 120 }] } },
   ] } }
-  for (const [pay, c, m, coin] of [[8, 100, 40, 98], [9, 100, 0, 90], [10, 50, 80, 98], [11, 0, 80, 90]] as const) {
+  // 价目照原版：移动 1/5、修炼 2/10（起始 bonusCoin=100）
+  for (const [pay, c, m, coin] of [[8, 100, 40, 99], [9, 100, 0, 95], [10, 50, 80, 98], [11, 0, 80, 90]] as const) {
     const result = purchase(state, pay)
     assert.equal(result.ok, true)
     if (!result.ok) return

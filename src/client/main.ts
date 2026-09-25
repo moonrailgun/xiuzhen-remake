@@ -1,31 +1,31 @@
 /**
  * 客户端入口。
  *
- * 阶段 1 的目标是把**界面**做出来并能和当年的截图叠图比对，所以这里用「夹具 vm」——
- * 逐字抄截图上的数字（见 `fixtures.ts` 顶部的说明）。真正的 `vm(state,…)` 选择器在阶段 2 接上。
- *
- * 开发期可以用 `?fixture=2010` 切到 2010-08 那张截图的场景（本体视图 + 多段移动事件）。
+ * 默认进**真实游戏**（`app.ts`）：读档，没有存档就进建号页。
+ * 带 `?demo=1` 时进阶段 1 的页面预览（用夹具数据逐字重现当年的截图，
+ * 供 `tools/parity/shoot.mjs` 做叠图比对）。
  */
 
 import { renderShell } from '../pages/shell.ts'
 import { renderPlayer } from '../pages/player.ts'
-import { renderDemoPage } from './demo.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { installGlobals, setPageResolver, startCountdowns } from './windows.ts'
-import {
-  SHELL_2008,
-  PLAYER_2008,
-  MID_2008,
-  RIGHT_2008,
-  PLAYER_BODY_2010,
-  MID_2010,
-} from './fixtures.ts'
+import { renderDemoPage } from './demo.ts'
+import { boot as bootGame } from './app.ts'
+import { SHELL_2008, PLAYER_2008, MID_2008, RIGHT_2008, PLAYER_BODY_2010, MID_2010 } from './fixtures.ts'
 
-function pick() {
-  const which = new URLSearchParams(location.search).get('fixture')
-  if (which === '2010') {
+function demoFixtures(params: URLSearchParams) {
+  if (params.get('fixture') === '2010') {
     return {
-      shell: { ...SHELL_2008, resources: { ...SHELL_2008.resources, capacity: 10000, current: [1469, 713, 271, 532, 0] as const, perHour: [0, 394, 96, 96, 0] as const } },
+      shell: {
+        ...SHELL_2008,
+        resources: {
+          ...SHELL_2008.resources,
+          capacity: 10000,
+          current: [1469, 713, 271, 532, 0] as const,
+          perHour: [0, 394, 96, 96, 0] as const,
+        },
+      },
       player: PLAYER_BODY_2010,
       mid: MID_2010,
       right: { ...RIGHT_2008, quests: [] },
@@ -34,15 +34,14 @@ function pick() {
   return { shell: SHELL_2008, player: PLAYER_2008, mid: MID_2008, right: RIGHT_2008 }
 }
 
-function boot(): void {
+function bootDemo(params: URLSearchParams): void {
   installGlobals()
   setPageResolver((url) => `<DIV class=middle style="padding:12px">（${url} 尚未接入）</DIV>`)
-
   const app = document.getElementById('app')
   if (!app) return
 
-  const f = pick()
-  const demo = renderDemoPage(new URLSearchParams(location.search), f.player)
+  const f = demoFixtures(params)
+  const demo = renderDemoPage(params, f.player)
   app.innerHTML = renderShell({
     ...f.shell,
     tab: demo.tab,
@@ -51,6 +50,18 @@ function boot(): void {
     right: renderRight(f.right),
   })
   startCountdowns(app)
+}
+
+function boot(): void {
+  const params = new URLSearchParams(location.search)
+  // 预览模式：有 demo 或 page 参数时走夹具渲染
+  if (params.has('demo') || params.has('page')) {
+    installGlobals()
+    bootDemo(params)
+    return
+  }
+  installGlobals()
+  bootGame()
 }
 
 if (typeof document !== 'undefined') {

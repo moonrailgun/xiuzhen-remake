@@ -88,7 +88,7 @@ const BODY_ANCHORS: readonly Anchor[] = [
 
 /** 法术：升到第 N 级的总消耗。 */
 const SKILL_ANCHORS: readonly Anchor[] = [
-  { level: 1, value: 120, source: 'reconstructed' },
+  { level: 1, value: 120, source: 'reconstructed（法术 Lv.1 无锚点；按炼丹之术 Lv.3→4 的量级往下外推）' },
   { level: 4, value: 623, source: 'reference/images/17173-live/20100603104231289/xcds1.jpg（#92：炼丹之术 Lv3→4 共 623）' },
   { level: 20, value: 900000, source: 'reconstructed（由「御剑术 0→20 约 73 小时」「铸剑之术 0→20 约 280 小时」约束）' },
 ]

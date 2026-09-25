@@ -8,6 +8,9 @@ import { moveDisplay, startMove } from './move.ts'
 import type { Artifact, GameState } from './state.ts'
 
 const base = (): GameState => newGame({ name: '修士', element: '金', gender: 'm', school: '蜀山', seed: 123, x: 5, y: 5 }, 0)
+/** 市场里本来就有 NPC 的挂单（建号时播种），所以只数自己的单。 */
+const myQi = (s: GameState) => s.market.qi.filter((o) => o.seller === s.player.name)
+const myArtifacts = (s: GameState) => s.market.artifacts.filter((o) => o.seller === s.player.name)
 const entry = (id: string) => ({ id, acceptedAt: 0, done: false })
 const sword: Artifact = { id: 'my-sword', name: '青龙伏魔剑', kind: 'sword', quality: '极品', refine: 0, status: '空闲', count: 1 }
 const localTown = (): town.Town => ({ id: 'town:1', kind: '小镇', name: '小镇', x: 5, y: 5, investments: [{ owner: '修士', silver: 1_000_000 }] })
@@ -80,7 +83,7 @@ test('法宝撤单完整归还原物，重复撤单不复制，NPC买入只能�
   assert.ok(due !== null)
   const sold = market.settleNpcPurchases({ ...listed, clock: { ...listed.clock, gameT: due } })
   assert.equal(sold.player.coin, listed.player.coin + 2)
-  assert.equal(sold.market.artifacts.length, 0)
+  assert.equal(myArtifacts(sold).length, 0, '自己那条挂单成交后应该没了')
   assert.deepEqual(market.settleNpcPurchases(sold), sold)
 })
 
@@ -138,7 +141,7 @@ test('玩家真气成交到账走注入计时，不合理标价不会被NPC收�
   assert.equal(due, ev.finishAt + 3600)
   current = { ...current, clock: { ...current.clock, gameT: due } }
   const sold = market.settleNpcPurchases(current)
-  assert.equal(sold.market.qi.length, 0)
+  assert.equal(myQi(sold).length, 0, '自己那条挂单成交后应该没了')
   assert.equal(sold.player.qi[1], current.player.qi[1])
   const injection = sold.timeline.events.find(e => e.payload['op'] === 'inject')!
   assert.equal(injection.finishAt, due + market.injectSecondsFor(current, 15))

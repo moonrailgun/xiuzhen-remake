@@ -24,6 +24,7 @@ import {
   type MarketCtx,
 } from './market.ts'
 import { createClock } from './clock.ts'
+import { newGame, tick } from './game.ts'
 import { advanceTo, emptyTimeline } from './timeline.ts'
 import { seedRng } from './rng.ts'
 import { BODY_DANTIAN } from './cultivate.ts'
@@ -373,4 +374,41 @@ test('自己的挂单不会被补货逻辑撤掉', () => {
   assert.ok(listed.ok)
   const after = refillNpcOrders({ ...listed.ctx.state, market: listed.ctx.market })
   assert.ok(after.market.qi.some((o) => o.id === 'me:1'))
+})
+
+// —— 离线与在线必须得到同一个市场 ——
+// 这是「惰性结算」的根本约定：结果只能由 gameT 决定，不能由「你什么时候调 tick」决定。
+
+test('★同一时刻的市场，离线一次推与在线分多次推必须完全相同', () => {
+  // 从**空市场**起步 —— 这正是 v3→v4 迁移过来的老存档的样子（migrate 给的是 emptyMarket）。
+  // 空市场时「第一次补货发生在哪个小时」最容易被 tick 节奏带偏，是这个 bug 的原始现场。
+  const fresh = (): GameState => ({
+    ...newGame({ name: '甲', gender: 'm', element: '木', school: '蜀山', x: 50, y: 50, seed: 20081028 }, 0),
+    market: emptyMarket(),
+  })
+
+  /** 分 n 段推到 ms 毫秒。 */
+  const stepTo = (ms: number, n: number): GameState => {
+    let s = fresh()
+    for (let i = 1; i <= n; i++) s = tick(s, Math.round((ms * i) / n)).state
+    return s
+  }
+
+  for (const hours of [1, 3, 25, 73]) {
+    const ms = hours * 3600 * 1000
+    const offline = stepTo(ms, 1)          // 一次推完（离线）
+    const online = stepTo(ms, hours * 6)   // 每 10 分钟一跳（在线 pulse）
+    assert.equal(offline.clock.gameT, online.clock.gameT, `${hours}h: gameT 不一致`)
+    assert.deepEqual(
+      offline.market.qi.map((o) => o.id),
+      online.market.qi.map((o) => o.id),
+      `${hours}h: 挂单批次不一致（补货时机被 tick 节奏影响了）`,
+    )
+    assert.deepEqual(offline.market, online.market, `${hours}h: 市场内容不一致`)
+  }
+})
+
+test('新号一进游戏市场里就有货（补货只在整点做，所以要播种）', () => {
+  const s = newGame({ name: '甲', gender: 'm', element: '木', school: '蜀山', x: 50, y: 50, seed: 7 }, 0)
+  assert.ok(s.market.qi.length > 0, '建号时应已播下第 0 小时那一批')
 })

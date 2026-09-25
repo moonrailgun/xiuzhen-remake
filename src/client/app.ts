@@ -1224,10 +1224,25 @@ export function installGameActions(): void {
       if (!file) return
       try {
         const loaded = importGame(await file.text())
-        state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
-        loadFailure = null   // 导入成功，解除「禁止写盘」
-        closeWindow('lwindow')
-        step()
+        const apply = () => {
+          state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
+          loadFailure = null   // 导入成功，解除「禁止写盘」
+          closeWindow('lwindow')
+          step()
+        }
+        // 读档失败时本来就没有能丢的东西，直接覆盖；
+        // 正常游戏中导入会**当场盖掉当前进度**（1 秒后 pulse 连备份一起换掉），
+        // 所以要先让玩家确认，并把两边的角色摆出来对照 —— 选错文件的代价太大。
+        if (!state) return apply()
+        const g2 = globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>
+        g2['MDialogOkCancel']!(
+          '导入存档',
+          `<DIV class=middle style="padding:10px">导入后<B>当前进度会被覆盖且无法撤销</B>。<BR><BR>` +
+          `当前：${esc(state.player.name)}　道行 ${esc(daoxingText(state.player.daoxing))}<BR>` +
+          `导入：${esc(loaded.player.name)}　道行 ${esc(daoxingText(loaded.player.daoxing))}<BR><BR>` +
+          `<SPAN class=smallred>建议先「导出」备份当前存档。</SPAN></DIV>`,
+          apply,
+        )
       } catch (e) {
         openWindow('mwindow', '导入失败', `<DIV class=middle style="padding:10px">${
           e instanceof Error ? esc(e.message) : '存档格式不对'

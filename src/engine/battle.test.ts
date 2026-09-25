@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { capacityOf, BODY_DANTIAN } from './cultivate.ts'
+import type { FiveQi } from './state.ts'
 import {
   launch,
   resolveBattleEvent,
@@ -204,7 +206,11 @@ test('离线期间的战斗会被一次性结算', () => {
 // —— 掠夺（打玩家时按固本培元暗仓规则）——
 
 test('打赢玩家时只抢走超出对方暗仓的部分（原文规则）', () => {
-  const s = state()
+  // 丹田气海拉高：这条考的是「从对方抢走多少」，别被赢家自己的丹田上限挡住
+  // （上限是另一条规则，由下面那条专门的测试守）
+  const s0 = state()
+  const body = [...s0.player.body]; body[BODY_DANTIAN] = 30
+  const s: GameState = { ...s0, player: { ...s0.player, body } }
   const victim: BattleTarget = {
     kind: 'player', name: '某羊', x: 101, y: 100,
     attack: 1, agility: 1, hp: 1, element: null,
@@ -414,4 +420,18 @@ test('怪物已被先发飞剑杀死时，迟到支援不能重复获得战利�
   const done = advanceTo(supported, supported.timeline, 10000, resolveBattleEvent)
   assert.equal(done.state.mail.length, 1)
   assert.deepEqual(done.state.player.qi, [90, 90, 90, 90, 90])
+})
+
+test('★吸回来的真气受丹田上限约束（不能先溢出再被静默抹掉）', () => {
+  const s0 = state()
+  const cap = capacityOf(s0)
+  const loot = [cap * 100, cap * 100, cap * 100, cap * 100, cap * 100] as unknown as FiveQi
+  const ev = {
+    id: 'b1', kind: 'battle' as const, finishAt: s0.clock.gameT,
+    payload: { phase: 'returning', target: { name: 'x', x: 1, y: 1 }, swords: [], loot },
+  }
+  const after = resolveBattleEvent(s0, ev).state
+  for (const v of after.player.qi) {
+    assert.ok(v <= cap, `真气 ${v} 超过了丹田上限 ${cap}——会在下次 tick 被静默抹掉`)
+  }
 })

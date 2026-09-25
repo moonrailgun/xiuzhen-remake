@@ -438,11 +438,9 @@ test('★v1 老存档一路迁到最新版：任务簿与市场都补齐', () =>
   assert.equal(loaded.player.name, '老角色')
   assert.ok(loaded.quests, 'v2→v3 补任务簿')
   assert.ok(loaded.market, 'v3→v4 补市场')
-  assert.deepEqual(loaded.market, { qi: [], artifacts: [] })
-
-  // 空市场读出来后，一次 tick 就该按世界种子把 NPC 单补上
-  const after = tick(loaded, loaded.clock.wallT + 1000).state
-  assert.ok(after.market.qi.length > 0, 'tick 后市场应有挂单')
+  // 迁移给的是空市场，但读档时会按存档自己的 gameT 播一次种，
+  // 免得玩家要等到下一个游戏整点才看得到挂单
+  assert.ok(loaded.market.qi.length > 0, '读档后市场应有挂单')
 })
 
 test('新档自带 NPC 世界', () => {

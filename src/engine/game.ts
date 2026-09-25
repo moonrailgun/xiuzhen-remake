@@ -100,7 +100,7 @@ export type NewGameOptions = {
 
 export function newGame(opts: NewGameOptions, nowWall: number): GameState {
   const startT = opts.startGameT ?? 0
-  return {
+  return refillNpcOrders({
     v: SAVE_VERSION,
     clock: { gameT: startT, wallT: nowWall, rate: 1 },
     timeline: emptyTimeline(),
@@ -108,6 +108,8 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
     worldSeed: opts.seed,
     npc: { bases: generateNpcs(opts.seed, 300), patches: {} },
     quests: emptyQuestLog(),
+    // 先给个空市场，下面用 refillNpcOrders 播第 0 小时那一批 ——
+    // 补货只在整点边界做，不播种的话新号头一个游戏小时市场是空的
     market: emptyMarket(),
     towns: {},
     mail: [],
@@ -133,7 +135,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
       vip: false,
       createdAt: startT,
     },
-  }
+  })
 }
 
 /** 所在地块的天地元气。 */
@@ -227,7 +229,12 @@ export function tick(
     if (at >= clock.gameT) break
   }
 
-  if (clock.gameT > state.clock.gameT || resolved.length > 0) current = refillNpcOrders(current)
+  // **不要在这里再补一次货。** 补货批次按「补货发生在第几个游戏小时」编号
+  // （`market.ts` 的 `npc:{hour}:{slot}`），在 tick 末尾用残缺小时补，
+  // 批次编号就取决于调用 tick 的节奏：离线一次推 1 小时 → 批次 hour=1，
+  // 在线先跳 10 分钟再推 → 批次 hour=0。NPC 单整批 24 小时轮换，
+  // 这个相位差会**永久保留**，直接违反「离线一个月 == 在线逐小时」。
+  // 补货只在上面的整点边界做（`at === nextHour`），那里是纯粹由 gameT 决定的。
   if (current.clock.wallT !== clock.wallT) current = { ...current, clock }
   return { state: current, resolved }
 }
@@ -270,7 +277,7 @@ export function saveGame(storage: Storage, state: GameState, nowWall: number): G
 
 export function loadGame(storage: Storage): GameState | null {
   const out = load(storage, MIGRATIONS, validateGameState)
-  return out ? { ...(out.state as GameState), v: SAVE_VERSION } : null
+  return out ? settleLoaded(out.state as GameState) : null
 }
 
 /** 导入与启动读档使用相同的迁移和游戏结构校验。 */
@@ -283,7 +290,21 @@ export function importGame(text: string): GameState {
     text = JSON.stringify({ v: old.v, savedAt: old.clock?.gameT, state: raw })
   }
   const state = importSave(text, MIGRATIONS, validateGameState) as GameState
-  return { ...state, v: SAVE_VERSION }
+  return settleLoaded(state)
+}
+
+/**
+ * 读进来的存档统一走这里。
+ *
+ * 老存档迁移过来时市场是空的（v3→v4 给的是 `emptyMarket`）。补货只在整点边界做，
+ * 不在这里播一次，玩家就要等到下一个游戏整点才看得到挂单。
+ * 播种时机由存档自己的 `gameT` 决定，不受 tick 节奏影响，所以依然是确定的。
+ *
+ * `loadGame` 与 `importGame` 必须走同一条路 —— 否则「导入一份存档」和
+ * 「读本地存档」会得到不同的市场。
+ */
+function settleLoaded(state: GameState): GameState {
+  return refillNpcOrders({ ...state, v: SAVE_VERSION })
 }
 
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */

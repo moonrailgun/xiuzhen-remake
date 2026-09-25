@@ -196,11 +196,12 @@ test('★被打时市场挂单自动取消（原文），真气退回丹田', ()
   })
   assert.ok(listed.ok)
   const s = applyCtx(listed.ctx)
-  assert.equal(s.market.qi.length, 1)
+  const mine = (st: GameState) => st.market.qi.filter((o) => o.seller === st.player.name)
+  assert.equal(mine(s).length, 1, '市场里还有 NPC 的单，这里只看自己的')
   assert.ok(s.player.qi[0]! < 50000, '挂单时真气先离开丹田')
 
   const after = resolveRaid({ ...s, player: { ...s.player, artifacts: [] } }, raidEvent(s, 1, 1))
-  assert.equal(after.market.qi.length, 0, '挂单应被取消')
+  assert.equal(mine(after).length, 0, '自己的挂单应被取消')
 })
 
 test('来袭会写一封受伤信（用原版逐字文案）', () => {

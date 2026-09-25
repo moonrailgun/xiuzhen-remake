@@ -16,7 +16,8 @@
 
 import { schedule, type GameEvent } from './timeline.ts'
 import { resolveBattle, tangleDuration, type CombatSword } from './combat.ts'
-import { addQi, totalQi, ZERO_QI, type FiveQi, type GameState, type MailItem } from './state.ts'
+import { addQi, totalQi, ZERO_QI, type FiveQi, type GameState, type MailItem, clampQi } from './state.ts'
+import { capacityOf } from './cultivate.ts'
 import { distance } from '../data/world.ts'
 import { lootFrom } from './loot.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
@@ -198,7 +199,16 @@ export function resolveBattleEvent(
   if (phase === 'returning') {
     const returned = swordStatus(state, swords, '空闲')
     const loot = (event.payload['loot'] as FiveQi | undefined) ?? ZERO_QI
-    return { state: { ...returned, player: { ...returned.player, qi: addQi(returned.player.qi, loot) } } }
+    // 吸回来的真气同样**受丹田上限约束**。不截断的话会先溢出到上限的几十倍、
+    // 而且那部分能立刻花掉（等于绕过丹田上限），下一次 gainQi 再把它悄悄抹平 ——
+    // 玩家只看到真气凭空蒸发。注入/挂单退回/任务奖励/产量四处都截断了，这里漏了。
+    const cap = capacityOf(returned)
+    return {
+      state: {
+        ...returned,
+        player: { ...returned.player, qi: clampQi(addQi(returned.player.qi, loot), cap) },
+      },
+    }
   }
 
   if (phase === 'outbound') {

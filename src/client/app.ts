@@ -24,6 +24,7 @@ import { renderPayment } from '../pages/payment.ts'
 import { renderFight } from '../pages/fight.ts'
 import { renderEstate } from '../pages/estate.ts'
 import { renderBattleEvent } from '../pages/battleevent.ts'
+import { renderHelp, HELP_TOPICS, HELP_ENTRIES } from '../pages/help.ts'
 import {
   skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel,
   townHere, townKey, sceneNpcNames,
@@ -667,6 +668,29 @@ export function installGameActions(): void {
     step()
   }
 
+  /**
+   * 游戏指南的后退 / 前进（面包屑右侧那两个黑色实心双三角）。
+   * 退回去时**不再往历史里追加**，否则「历史：」会自己长出重复项。
+   */
+  const showHelp = (topic: string) =>
+    openWindow('hwindow', '', renderHelp({ topic, history: helpHistory }))
+
+  g['helpBack'] = () => {
+    if (helpHistory.length < 2) return
+    const last = helpHistory[helpHistory.length - 1]!
+    helpForwardStack = [...helpForwardStack, last]
+    helpHistory = helpHistory.slice(0, -1)
+    showHelp(helpHistory[helpHistory.length - 1]!)
+  }
+
+  g['helpForward'] = () => {
+    const next = helpForwardStack[helpForwardStack.length - 1]
+    if (next === undefined) return
+    helpForwardStack = helpForwardStack.slice(0, -1)
+    helpHistory = [...helpHistory, next]
+    showHelp(next)
+  }
+
   g['selectAllSwords'] = (checked: boolean) => {
     for (const el of document.querySelectorAll<HTMLInputElement>('input[name=sword]')) {
       el.checked = checked
@@ -1043,6 +1067,16 @@ function resolvePage(url: string): string {
     case 'battlemap':
       return battleMapWindow(s, q.get('eventid') ?? '')
 
+    case 'help': {
+      // 词条名从 hlp('主题') 来；不认识的词条退回目录
+      const topic = q.get('topic') ?? '游戏指南'
+      const known = HELP_TOPICS.includes(topic) || topic in HELP_ENTRIES ? topic : '游戏指南'
+      // 历史是**线性访问记录，不去重**（05 §12.1 第 7 层，#111 实见重复项）
+      helpHistory = [...helpHistory, known].slice(-8)
+      helpForwardStack = []
+      return renderHelp({ topic: known, history: helpHistory })
+    }
+
     case 'estate':
       return renderEstate(estateVm(s))
 
@@ -1091,6 +1125,10 @@ const TURN_RES_COIN = 3
 let fightTarget: BattleTarget | null = null
 /** 支援/还击时对应的战斗事件 id；主动出击是 null。 */
 let reinforceEventId: string | null = null
+/** 游戏指南的访问记录。**线性、不去重**（原版截图里就有重复项）。 */
+let helpHistory: readonly string[] = []
+/** 点过「后退」之后能「前进」回去的那些词条。 */
+let helpForwardStack: readonly string[] = []
 
 /** 背包里空闲的飞剑 → 可出击的剑，面板值已算过品质与淬炼。 */
 function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly table: Sword }[] {

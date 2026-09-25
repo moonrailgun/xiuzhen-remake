@@ -354,3 +354,17 @@ table.tablebg td { line-height: 20px; }
 table.tablebg td img { vertical-align: middle; }
 /* 表头行略高一点（原版 17px + 渐变） */
 table.tablebg tr.titlebg td { line-height: 17px; }
+
+/* —— 游戏指南（H 窗）—— */
+/* 尺寸 ≈494×430 [截图 #111/#112，1:1]（05 §12.1）；内容超高时原版出现**原生滚动条**，
+   #111 右侧竖向 + 底部横向都有，所以这里用 auto 而不是裁掉。 */
+#hwindow { width: 494px; }
+#hwindowcontent { padding: 6px 8px; }
+/* 正文框：1px #CCC 边框、白底、12px 黑字（05 §12.1 第 4 层） */
+.helpbody {
+  border: 1px solid #ccc;
+  background: #fff;
+  padding: 6px;
+  max-height: 300px;
+  overflow: auto;
+}

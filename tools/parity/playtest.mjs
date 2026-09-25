@@ -339,7 +339,21 @@ const invested = await page.evaluate(() => {
 check('投资后银两扣除、城镇入档', invested.towns === 1 && invested.put === 5000 && invested.silver === 45000,
   JSON.stringify(invested))
 
-// 15. 产业页与排行榜浮窗能打开（原版 L 窗路由）
+// —— 15. 游戏指南（H 窗）——
+await page.click('#littlemenu a[onclick*="游戏指南"]')
+await page.waitForTimeout(350)
+check('顶栏「游戏指南」打开 H 窗目录',
+  ((await page.locator('#hwindowcontent').textContent()) ?? '').includes('属性'))
+await page.click('#hwindowcontent a[onclick="hlp(\'秘笈\')"]')
+await page.waitForTimeout(300)
+const helpText = (await page.locator('#hwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('秘笈词条是原版逐字的用途表',
+  helpText.includes('【御剑飞行】') && helpText.includes('有机会在炼器时获得极品法宝'),
+  helpText.slice(0, 60))
+check('底部有「历史：」访问记录', helpText.includes('历史：'))
+await page.evaluate(() => window.closeHWindow())
+
+// 16. 产业页与排行榜浮窗能打开（原版 L 窗路由）
 await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
 await page.waitForTimeout(300)
 check('排行榜浮窗列出 NPC',

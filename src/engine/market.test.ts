@@ -412,3 +412,22 @@ test('新号一进游戏市场里就有货（补货只在整点做，所以要�
   const s = newGame({ name: '甲', gender: 'm', element: '木', school: '蜀山', x: 50, y: 50, seed: 7 }, 0)
   assert.ok(s.market.qi.length > 0, '建号时应已播下第 0 小时那一批')
 })
+
+test('★NPC 挂单一律等量互换（三张截图 30 条挂单无一例外）', () => {
+  for (const seed of [1, 7, 42, 999, 20081028]) {
+    const s = refillNpcOrders({ ...state(), worldSeed: seed })
+    for (const o of s.market.qi.filter((x) => x.seller !== s.player.name)) {
+      assert.equal(o.want.amount, o.offer.amount, `${seed}: ${o.id} 不是 1:1`)
+      assert.notEqual(o.offer.element, o.want.element, `${seed}: ${o.id} 自己换自己`)
+    }
+  }
+})
+
+test('但玩家自己仍可挂非等量的单（界面不在程序上限制比例）', () => {
+  const r = listQi(ctxOf(), {
+    id: 'me:1',
+    offer: { element: '金', amount: 100 },
+    want: { element: '木', amount: 300 },   // 1:3，官方靠人工封号管，不是代码校验
+  })
+  assert.equal(r.ok, true, '程序不该拦比例')
+})

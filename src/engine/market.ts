@@ -432,20 +432,30 @@ const npcHourOf = (id: string): number | null => {
   return Number.isFinite(h) ? h : null
 }
 
-/** 一单的内容：随机两种不同的真气，数量 1000–50000，比例在 1:1–1:2 之间。 */
+/**
+ * 一单的内容：随机两种不同的真气，**等量互换（1:1）**。
+ *
+ * 为什么是 1:1：三张购买真气页截图里逐字转录的 **30 条挂单无一例外全是 1:1**
+ * —— #7（2008-12）`火25000→金25000`、#123（2008-10）`金45700→木45700`、
+ * #93（2010-06）`火1310000→金1310000` …… 跨两年 30 个独立观测
+ * （`docs/research/05-ui-items-market-pages.md` §7.1 的三行表）。
+ * `reference/02-RULES-EXTRACTED.md:134` 也直接写着「全部 **1:1** 挂单」。
+ *
+ * 这和「界面不在程序上限制比例」（`DECISIONS-rules.md` §6，依据是官方点名过
+ * 1000:1 的违规案例）**不矛盾**：玩家挂得出非等量的单（所以 `listQi` 不拦），
+ * 但**实际见到的挂单全是等量**。NPC 是在模拟「实际见到的市场」，所以走 1:1。
+ */
 function npcOrder(seed: number, hour: number, slot: number): QiOrder {
   const key = `${hour}:${slot}`
   const gi = randInt(5, seed, 'mkt-give', key)
   // 需求必须是另一种，所以在剩下 4 种里挑
   const wi = (gi + 1 + randInt(4, seed, 'mkt-want', key)) % 5
   const amount = 1000 + randInt(49, seed, 'mkt-amt', key) * 1000
-  // 比例 1.0–2.0，两位小数，向下取整到整点真气
-  const ratio = 1 + rand(seed, 'mkt-ratio', key)
   return {
     id: `${NPC_PREFIX}${hour}:${slot}`,
     seller: `散修${100 + randInt(900, seed, 'mkt-name', key)}`,
     offer: { element: ELEMENTS[gi]!, amount },
-    want: { element: ELEMENTS[wi]!, amount: Math.floor(amount * ratio) },
+    want: { element: ELEMENTS[wi]!, amount },
     listed: true,
   }
 }

@@ -116,9 +116,21 @@ export const addQi = (a: FiveQi, b: FiveQi): FiveQi =>
 export const subQi = (a: FiveQi, b: FiveQi): FiveQi =>
   [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3], a[4] - b[4]] as const
 
-/** 五行都够不够付。 */
+/**
+ * 五行都够不够付。
+ *
+ * 留一丝容差，因为真气是**逐段累加**出来的浮点数：同一时刻，离线一次推
+ * （按小时切段，30 天约 720 次加法）与在线逐秒推（约 260 万次加法）结果会差
+ * 约 1e-6 —— 实测 30 天后离线 `138240`、在线 `138239.99999910643`。
+ * 成本正好卡在 138240 时，就会出现「离线炼得动、在线炼不动」这种莫名其妙的差别。
+ *
+ * 数学上正确的值是离线那个；在线那个是累加误差。所以按「差得比一丝还少就算够」处理。
+ * 容差取相对值：真气上百万时绝对误差也会跟着变大。
+ */
+const AFFORD_EPSILON = (cost: number): number => Math.max(1e-6, Math.abs(cost) * 1e-9)
+
 export const canAfford = (have: FiveQi, cost: FiveQi): boolean =>
-  have.every((v, i) => v >= cost[i]!)
+  have.every((v, i) => v >= cost[i]! - AFFORD_EPSILON(cost[i]!))
 
 /** 按丹田上限截断（五行共用一个上限）。 */
 export const clampQi = (q: FiveQi, cap: number): FiveQi =>

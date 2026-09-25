@@ -249,3 +249,31 @@ test('易经20到500级的重建消耗单调且不超过最高丹田容量', () 
     previous = cost
   }
 })
+
+test('★结丹压缩不占修炼队列（原文只点名排除炼器，结丹无据可依）', () => {
+  const rich: GameState = {
+    ...state(),
+    player: { ...state().player, qi: [1e9, 1e9, 1e9, 1e9, 1e9] as unknown as FiveQi },
+  }
+  // 挂上一个结丹压缩事件（12 小时一轮，共 10 轮）
+  const compressing: GameState = {
+    ...rich,
+    timeline: { events: [{
+      id: 'quest:core:x', kind: 'cultivate', finishAt: rich.clock.gameT + 12 * 3600,
+      payload: { op: 'goldenCore', questId: 'x' },
+    }] },
+  }
+  const r = startCultivate(compressing, { system: 'meridian', index: 0 })
+  assert.equal(r.ok, true, '结丹期间仍应能升经脉')
+
+  // 但普通修炼事件照样占队列
+  const busy: GameState = {
+    ...rich,
+    timeline: { events: [{
+      id: 'cultivate:meridian:1', kind: 'cultivate', finishAt: rich.clock.gameT + 60, payload: {},
+    }] },
+  }
+  const r2 = startCultivate(busy, { system: 'meridian', index: 0 })
+  assert.equal(r2.ok, false)
+  assert.match((r2 as { reason: string }).reason, /队列已满/)
+})

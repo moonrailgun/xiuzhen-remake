@@ -381,17 +381,31 @@ function leftPane(s: GameState): string {
   }
 }
 
+/**
+ * 存储不可用时顶在页面最上方的横幅。
+ *
+ * 以前只在「怀旧版设置」里写一行小字，玩家根本看不到 —— 隐私模式下玩一整晚、
+ * 关掉页面全没。用横幅而不是浮窗：建号页不含浮窗骨架（那在 `renderShell` 里），
+ * 而这条警告恰恰在建号之前就该出现。
+ */
+const noStorageBanner = (): string =>
+  STORAGE_KEY_AVAILABLE ? '' :
+  `<DIV style="background:#ffe8e8;border-bottom:1px solid #cc0000;padding:6px 10px">
+<SPAN class=smallred><B>无法存档</B></SPAN>
+<SPAN class=small>：浏览器禁用了本地存储（常见于无痕/隐私模式），这局的进度关掉页面就没了。
+想留住进度请换普通窗口，或随时用「关于 → 导出存档」手动备份。</SPAN></DIV>`
+
 function render(live = false): void {
   const app = root()
   if (!app) return
 
   if (loadFailure) {
-    app.innerHTML = recoveryPage(loadFailure)
+    app.innerHTML = noStorageBanner() + recoveryPage(loadFailure)
     return
   }
 
   if (!state) {
-    app.innerHTML = renderCreatePlayer(draft)
+    app.innerHTML = noStorageBanner() + renderCreatePlayer(draft)
     return
   }
 
@@ -405,7 +419,8 @@ function render(live = false): void {
     mid: renderMid(midVm(s)),
     right: renderRight(rightVm(s)),
   })
-  if (!document.getElementById('gpage')) app.innerHTML = html
+  // 整页首绘：横幅要跟着一起进 DOM（它是 #gpage 的兄弟节点，之后的局部更新不会动它）
+  if (!document.getElementById('gpage')) app.innerHTML = noStorageBanner() + html
   else {
     const template = document.createElement('template')
     template.innerHTML = html

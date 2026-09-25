@@ -97,7 +97,14 @@ export function startCultivate(
     if (reason) return { ok: false, reason }
   }
   const slots = cultivateSlots(opts.hasVip ?? state.player.vip)
-  if (countByKind(state.timeline, 'cultivate') >= slots) {
+  // 结丹的「压缩真元」虽然也排成 cultivate 事件，但**不占修炼队列**。
+  // 队列规则的原文是「普通用户一次只能进行 1 项修炼事件……**不包括炼器事件**」
+  // （官方新手指南），明确点了炼器，对结丹只字未提 —— 结丹是 2009-01 才开的，
+  // 那句话写在它之前。占队列的话，非 VIP 结丹期间 10 轮 × 12 小时 = 120 游戏小时
+  // 连一条经脉都升不了，这个惩罚没有任何依据。[重建：按炼器同例处理]
+  const inQueue = state.timeline.events
+    .filter((e) => e.kind === 'cultivate' && e.payload['op'] !== 'goldenCore').length
+  if (inQueue >= slots) {
     return { ok: false, reason: '修炼队列已满' }
   }
 

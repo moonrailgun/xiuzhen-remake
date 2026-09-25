@@ -99,3 +99,15 @@ test('整个状态可 JSON 往返（存档要求）', () => {
   assert.ok(!json.includes('undefined'))
   assert.equal(typeof JSON.parse(json).qi[0], 'number')
 })
+
+test('★逐段累加的浮点误差不该让「够不够付」在离线/在线之间翻转', () => {
+  const cost = [138240, 0, 0, 0, 0] as unknown as FiveQi
+  // 离线：一次算出来，正好等于成本
+  assert.equal(canAfford([138240, 0, 0, 0, 0] as unknown as FiveQi, cost), true)
+  // 在线：两百多万次加法之后差了 1e-6，数学上应视为相等
+  assert.equal(canAfford([138239.99999910643, 0, 0, 0, 0] as unknown as FiveQi, cost), true,
+    '差 1e-6 就说付不起，会变成「离线炼得动、在线炼不动」')
+  // 真差一点还是要拦住
+  assert.equal(canAfford([138239.9, 0, 0, 0, 0] as unknown as FiveQi, cost), false)
+  assert.equal(canAfford([138239, 0, 0, 0, 0] as unknown as FiveQi, cost), false)
+})

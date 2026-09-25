@@ -40,10 +40,23 @@ export function advance(clock: Clock, nowWall: number): Clock {
 }
 
 /**
+ * 倍速上限。
+ *
+ * 界面只给 1/10/60/600 四档（`pages/settings.ts`），**更高的值游戏本身产生不出来**。
+ * 但导入存档是不受信边界：一份 `rate: 1e9` 的存档以前能过校验，随后第一次 `tick`
+ * 要按游戏小时切段循环约 1e9 次 —— 同步循环不返回，浏览器标签页直接冻死。
+ * 所以这里钉一个上限，`setRate` 与存档校验共用它。
+ *
+ * 取 600 而不是更大的数：超过它的倍速没有任何合法来源，放宽只会放大风险。
+ */
+export const MAX_RATE = 600
+
+/**
  * 改倍速。必须先结算再换 rate，否则历史时间会按新倍率重算，游戏时间整体跳变。
  */
 export function setRate(clock: Clock, nowWall: number, rate: number): Clock {
   if (!(rate > 0) || !Number.isFinite(rate)) throw new Error(`倍速必须是正数，收到 ${rate}`)
+  if (rate > MAX_RATE) throw new Error(`倍速最高 ${MAX_RATE}×，收到 ${rate}`)
   return { ...advance(clock, nowWall), rate }
 }
 

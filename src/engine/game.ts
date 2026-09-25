@@ -6,7 +6,7 @@
  * 离线一个月和离线一秒走的是同一条代码路径。
  */
 
-import { advance, setRate, DAY, HOUR, WEEK, weekOfServer, type Clock } from './clock.ts'
+import { advance, setRate, DAY, HOUR, WEEK, weekOfServer, type Clock, MAX_RATE } from './clock.ts'
 import { cancel, schedule, sorted, emptyTimeline, type GameEvent } from './timeline.ts'
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
@@ -361,7 +361,9 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const s = value as Record<string, unknown>
   const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
   if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
-      !object(c) || !numeric(c, ['gameT', 'wallT', 'rate']) || c.rate === 0 ||
+      // rate 必须落在 (0, MAX_RATE]：上限缺失时，一份 rate=1e9 的存档会让首次 tick 冻死标签页
+      !object(c) || !numeric(c, ['gameT', 'wallT', 'rate']) ||
+      !((c.rate as number) > 0) || (c.rate as number) > MAX_RATE ||
       !object(p) || !strings(p, ['name', 'gender', 'element', 'school', 'realm']) ||
       !['m', 'f'].includes(p.gender as string) || !ELEMENTS.includes(p.element as Element) ||
       !['蜀山', '昆仑', '通天'].includes(p.school as string) ||

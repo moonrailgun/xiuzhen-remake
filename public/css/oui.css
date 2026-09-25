@@ -6,46 +6,52 @@
  *  - 尺寸来自原版 DOM 的 width/cellspacing 等属性；
  *  - 颜色与字号只能从 1:1 截图取样，裁决见 docs/spec/DECISIONS-ui.md。
  *
- * 色值集中在 :root，裁决完成后只改这里。标 [待裁决] 的是各报告取值不一致、
- * 暂用其中一个的，不要在别处硬编码颜色。
+ * 色值集中在 :root，不要在别处硬编码颜色。
  */
 
+/* 下面的色值与字号全部来自 docs/spec/DECISIONS-ui.md 的裁决。
+   那份裁决先按 JPEG 量化表与色度抽样给截图分级，再用「正演模拟」验证估计量无偏，
+   并查出 2008-12 那批（#2/#3/#5–#8）在发稿前被媒体做过轻度曲线处理 ——
+   所以不要拿那一批的绝对色值去"修正"这里，它们只能作几何/结构证据。 */
 :root {
   /* —— 颜色 —— */
   --bg: #ffffff;
   --text: #000000;
-  /* 表格网格线：由 table.tablebg 的底色透过 cellspacing=1 形成 */
-  --line: #d1d1d1;           /* [待裁决] 04 测 #d1d1d1，05/07 说 #ccc */
+  /* 表格网格线：由 table.tablebg 的底色透过 border-spacing 漏出 */
+  --line: #cccccc;            /* 13 个独立来源众数 */
   --row-bg: #ffffff;          /* trbg */
   --row-bg-alt: #f7f7f7;      /* trbg2 */
   --row-bg-3: #f0f0f0;        /* trbg3（2010 才出现的斑马纹，基准版不用） */
-  --header-from: #fefefe;     /* titlebg 表头渐变 */
-  --header-to: #dddddd;
-  --link: #6db800;            /* [待裁决] skillup 草绿，04 #6db800 / 05 #66CC00 / 07 #006633 */
-  --link-hover: #009900;      /* [待裁决] 仅一处证据 */
-  --gray-small: #706c69;      /* [待裁决] smallgray：04 #706c69 / 05 #666 */
-  --gray-middle: #808080;     /* [待裁决] middlegray：04 ≈#808080 / 07 #666 */
-  --striking: #0000cc;        /* [待裁决] middlestriking：05 据 #83 定深蓝粗体 */
-  --warn: #ff0000;            /* [待裁决] 警告红：#FF0000 还是 #CC0000 */
-  --blue: #0000cc;            /* smallblue */
+  --header-from: #ffffff;     /* titlebg 表头渐变顶 */
+  --header-to: #dcdcdc;       /* 渐变底 */
+  --rule: #000000;            /* 顶栏下的 1px 黑线 */
+  --link: #74cc00;            /* skillup 草绿，实测中位 (116,205,0) */
+  --link-hover: #00b000;      /* 证据不足（单图单行最差画质），默认值 */
+  --gray: #808080;            /* smallgray / middlegray 同色 */
+  --striking: #0000cc;        /* middlestriking 深蓝粗体 */
+  --blue: #000099;            /* smallblue */
+  --warn: #cc0000;            /* 警示红，2008–2010 全程一致 */
+  --warn-inline: #ff0000;     /* 仅「角色正在删除中」那一处内联原文 */
+  --help-dash: #999999;       /* a.help 下方 1px 虚线 */
 
-  /* —— 字号 —— */
-  /* [待裁决] 三档：04 说 12/13/14，05 说 12/14/16 */
-  --fs-small: 12px;
-  --fs-middle: 13px;
-  --fs-big: 14px;
+  /* —— 字号（宋体点阵，勿开抗锯齿）—— */
+  --fs-small: 12px;   --lh-small: 14px;   /* 数字半宽 6px */
+  --fs-middle: 13px;  --lh-middle: 15px;  /* 数字半宽 7px */
+  --fs-big: 14px;     --lh-big: 16px;     /* .big 与 .title3 同字号 */
 
-  /* —— 尺寸（这些有原版 DOM 或 1:1 截图做依据，不是待裁决项）—— */
+  /* —— 尺寸 —— */
   --page-width: 1000px;
-  --top-height: 98px;         /* y0–97 是横幅，y98 是 1px 黑线，内容自 y99 起 */
-  --row-height: 22px;
-  --title-img-w: 150px;
+  --top-height: 98px;         /* 墨迹 98 + 1px 黑线 + 1px 白 = 总高 100 */
+  --row-height: 22px;         /* 主表数据行 = 21 内容 + 1 线 */
+  --title-img-w: 150px;       /* 页标题图元素框（墨迹 148×28 居中） */
   --title-img-h: 30px;
 }
 
-/* 原版是 XHTML 1.0 Transitional → almost-standards 模式：
-   表格单元格里的图片下方不留基线缝。用 HTML5 doctype 会让图标行高出几像素，
-   直接影响 17/19/22px 的行高断言，所以 index.html 必须保持同样的 doctype。 */
+/* 原版靠 XHTML 1.0 Transitional doctype 进入 almost-standards 模式，
+   表格单元格里的图片下方不留基线缝。Vite 不接受那个 doctype，
+   所以改用下面这条 CSS 显式达到同样效果 —— 留了基线缝，带图标的行会高出几像素，
+   17/19/22px 的行高与截图对齐都会失准。 */
+img { vertical-align: bottom; }
 
 body {
   margin: 0;
@@ -67,28 +73,40 @@ img { border: 0; }
 #gpage {
   width: var(--page-width);
   position: relative;
-  /* [待裁决] 07 说左对齐（原版无 align=center），INDEX 说居中 */
+  /* 左对齐：原版 DOM 里没有 align=center，截图左侧那 5px 是截图边缘 */
   margin: 0;
 }
 
 #top {
-  height: var(--top-height);
+  height: var(--top-height);          /* 98px 墨迹 */
   position: relative;
   background: url(../img/top/back2.jpg) no-repeat;
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid var(--rule);  /* y98 黑线 */
+  margin-bottom: 1px;                  /* y99 白，总高 100 */
 }
 
 #logo { position: absolute; left: 0; top: 0; }
 
-#littlemenu { position: absolute; right: 8px; top: 2px; }
-#littlemenu td { text-align: center; }
+/* 下面这些坐标是对着原生 1:1 截图 #2（xiuzhen801.jpg）量出来的。
+   量法：截图左留白 5px，所以「截图 x − 5 = 页面 x」；顶栏黑线实测在 y=98。 */
 
-#resource { position: absolute; left: 300px; top: 24px; }
-#resource .storage { }
+/* 右上按钮：原版 2008 版是 6 个（首页/游戏指南/排行榜/个人资料/付费功能/论坛），
+   占 x 604–985；我们按 2009 DOM 做 7 个（多一个「关于」），所以右对齐排布。 */
+#littlemenu { position: absolute; right: 10px; top: 3px; }
+#littlemenu table { border-collapse: collapse; }
+#littlemenu td { text-align: center; padding: 0 1px; }
 
-#bigmenu { position: absolute; left: 290px; top: 74px; width: 460px; }
+/* 资源条：图标格 16 + 数值格 100，cellPadding=1 → 每组步进 120。起点 x≈305。 */
+#resource { position: absolute; left: 305px; top: 26px; }
+#resource table { border-collapse: separate; border-spacing: 0; }
+#resource td { padding: 1px; }
 
-#avgres { position: absolute; right: 10px; top: 74px; }
+/* 主标签：60×20，步进 64，起点 x≈307，底边与 y=98 黑线重合。 */
+#bigmenu { position: absolute; left: 307px; top: 78px; width: 460px; }
+#bigmenu table { border-collapse: collapse; width: auto; }
+#bigmenu td { width: 64px; padding: 0; }
+
+#avgres { position: absolute; left: 891px; top: 74px; }
 
 #servertimebox { position: absolute; left: 6px; top: 0; text-align: left; }
 #version { position: absolute; left: 10px; top: 84px; }
@@ -101,14 +119,14 @@ img { border: 0; }
 
 /* —— 字号档 —— */
 
-.small  { font-size: var(--fs-small); }
-.middle { font-size: var(--fs-middle); }
-.big    { font-size: var(--fs-big); }
+.small  { font-size: var(--fs-small);  line-height: var(--lh-small); }
+.middle { font-size: var(--fs-middle); line-height: var(--lh-middle); }
+.big    { font-size: var(--fs-big);    line-height: var(--lh-big); }
 .smallbold  { font-size: var(--fs-small);  font-weight: bold; }
 .middlebold { font-size: var(--fs-middle); font-weight: bold; }
 .bigbold    { font-size: var(--fs-big);    font-weight: bold; }
-.smallgray  { font-size: var(--fs-small);  color: var(--gray-small); }
-.middlegray { font-size: var(--fs-middle); color: var(--gray-middle); }
+.smallgray  { font-size: var(--fs-small);  color: var(--gray); }
+.middlegray { font-size: var(--fs-middle); color: var(--gray); }
 .smallblue  { font-size: var(--fs-small);  color: var(--blue); }
 .smallred   { font-size: var(--fs-small);  color: var(--warn); }
 .middlestriking { font-size: var(--fs-middle); font-weight: bold; color: var(--striking); }
@@ -117,11 +135,12 @@ img { border: 0; }
 /* —— 表格 —— */
 /* 原版靠 table.tablebg 的底色 + cellspacing=1 透出 1px 网格线，不用 border */
 
-.tablebg { background: var(--line); }
+.tablebg { background: var(--line); border-collapse: separate; border-spacing: 1px; }
+.tablebg td { padding: 3px; background: var(--row-bg); }
 .trbg  { background: var(--row-bg); }
 .trbg2 { background: var(--row-bg-alt); }
 .trbg3 { background: var(--row-bg-3); }
-.titlebg {
+tr.titlebg td, .titlebg {
   background: linear-gradient(var(--header-from), var(--header-to));
   height: var(--row-height);
 }
@@ -141,7 +160,7 @@ a.skillup:hover { color: var(--link-hover); }
 a.help, .help {
   color: var(--text);
   font-weight: bold;
-  border-bottom: 1px dotted var(--gray-middle);
+  border-bottom: 1px dotted var(--help-dash);
 }
 
 /* 事件栏里的链接强制黑字（反直觉但原版如此） */
@@ -166,7 +185,7 @@ a.help, .help {
 #loading { z-index: 140; position: absolute; }
 
 .dlgclosebtn { position: absolute; right: 4px; top: 4px; }
-.title3 { font-size: var(--fs-big); font-weight: bold; }
+.title3 { font-size: var(--fs-big); line-height: var(--lh-big); font-weight: bold; }
 
 .mwindowok, .mwindow2ok, .mwindow2cancel { display: inline-block; margin: 6px; }
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<!--
+  原版用的是 XHTML 1.0 Transitional doctype（见 reference/raw/game-server/s1-createplayer.jsp-*.html），
+  它让浏览器进入 almost-standards 模式 —— 表格单元格里的图片下方不留基线缝。
+  但 Vite 的 HTML 解析器拒绝非标准 doctype，所以这里用标准 doctype，
+  改由 oui.css 里的 `img { vertical-align: bottom }` 显式达到同样效果。
+  这一步是必需的：留了基线缝会让带图标的行高出几像素，直接破坏 17/19/22px 的行高与截图对齐。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" type="text/css" href="/css/oui.css" />
+<title>修真</title>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="/src/client/main.ts"></script>
+</body>
+</html>

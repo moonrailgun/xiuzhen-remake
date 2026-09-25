@@ -256,3 +256,28 @@ test('★战报打印的攻击/耐久含相生，不会出现「伤害 > 同一�
   }
   assert.equal(r.attacker[1]!.durability, 150, '水剑有效耐久 = 100 + 金剑 100/2')
 })
+
+test('★相生加成带小数时，「受到伤害 == 耐久 ⇔ 惨被斩断」仍然成立', () => {
+  // 相生给的是「给方一半按被生剑数平分」，3 把被生剑就会除不尽：
+  // 金耐久 100000 → 每把水 +16666.666…，有效耐久 16766.666…
+  // 判定用小数、打印时才各自取整的话，会印出「耐久 16766 / 受到伤害 16766 / 完好无损」。
+  const s = (id: string, element: '金' | '水' | null, durability: number, attack = 0) =>
+    ({ id, name: id, element, attack, durability, agility: 1 })
+  const mine = [s('g', '金', 100000), s('w1', '水', 100), s('w2', '水', 100), s('w3', '水', 100)]
+
+  // 步长必须是 1：违例窗口只有 `frac(有效耐久) × 剑数 ≈ 2.7` 宽，
+  // 步长 7 正好跨过去，测试就成了摆设（实测步长 7 时带 bug 也全绿）。
+  let checked = 0
+  for (let total = 66000; total <= 68000; total += 1) {
+    const r = resolveBattle(mine, [s('e', null, 0, total)])
+    for (const o of r.attacker) {
+      assert.ok(o.damageTaken <= o.durability,
+        `总攻 ${total}：${o.id} 受到伤害 ${o.damageTaken} 超过耐久 ${o.durability}`)
+      assert.equal(o.damageTaken === o.durability, o.broken,
+        `总攻 ${total}：${o.id} 伤害 ${o.damageTaken} / 耐久 ${o.durability} / 断=${o.broken}`)
+      assert.ok(Number.isInteger(o.attack) && Number.isInteger(o.durability), '战报两列都得是整数')
+      checked++
+    }
+  }
+  assert.ok(checked > 8000, `扫得太少：${checked}`)
+})

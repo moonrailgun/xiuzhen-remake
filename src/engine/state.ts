@@ -150,7 +150,15 @@ export const canAfford = (have: FiveQi, cost: FiveQi): boolean =>
  *
  * 先按 `AFFORD_EPSILON` 同一把尺子往上推一丝再取整，误差就被吃掉了。
  */
-export const floorQi = (v: number): number => Math.floor(v + AFFORD_EPSILON(v))
+export const floorQi = (v: number): number => Math.floor(v + Math.min(AFFORD_EPSILON(v), MAX_FLOOR_NUDGE))
+
+/**
+ * 那「一丝」的上限。`AFFORD_EPSILON` 是相对值，`v` 大到 1e15 时它会超过 1 ——
+ * 那就不是抹平误差而是整个跳一格了（实测 `floorQi(1e15 - 1)` 会算出 `1e15 + 999999`）。
+ * 真气有丹田上限（36 级 = 557 万）压着，正常永远到不了那个量级，但这是个导出的公共函数，
+ * 钉死上限比指望调用方自觉便宜。0.01 足够覆盖 1e7 以内的累加误差。
+ */
+const MAX_FLOOR_NUDGE = 0.01
 
 /** 按丹田上限截断（五行共用一个上限）。 */
 export const clampQi = (q: FiveQi, cap: number): FiveQi =>

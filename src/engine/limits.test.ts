@@ -7,7 +7,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { newGame, validateGameState } from './game.ts'
+import { newGame } from './game.ts'
+import { isMyOrder, myOrders, cancelQiOrders, ctxOf, applyCtx } from './market.ts'
+import { validateName } from '../pages/createplayer.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { DAY } from './clock.ts'
 import { artifactCapacity, artifactSpaceUsed, canAcquireArtifacts, refineArtifact } from './craft.ts'
@@ -107,19 +109,27 @@ test('★淬炼只吃空闲的法宝', () => {
   assert.equal(refineArtifact({ ...s, player: { ...s.player, artifacts: idle } }, ['a', 'b']).ok, true)
 })
 
-test('★导入存档不能塞「自己挂的 npc: 单」：下次补货会把它当过期单撤掉且不退真气', () => {
-  const s = base()
-  const hostile: GameState = {
-    ...s,
-    market: { ...s.market, qi: [{
-      id: 'npc:0:0', seller: s.player.name, listed: true,
-      offer: { element: '金', amount: 100 }, want: { element: '木', amount: 100 },
-    }] },
-  }
-  assert.throws(() => validateGameState(JSON.parse(JSON.stringify(hostile))), /损坏|结构/)
-  // 正常的自己挂单（非 npc: 前缀）照旧通过
-  const fine = { ...hostile, market: { ...hostile.market, qi: [{ ...hostile.market.qi[0]!, id: 'mine:0' }] } }
-  validateGameState(JSON.parse(JSON.stringify(fine)))
+test('★挂单归属按 id 前缀 + 卖家名两条一起判，光比名字会被同名 NPC 坑到', () => {
+  // NPC 卖家名是「散修{100..999}」，而这正是玩家能给自己起的合法名字。
+  // 只比名字的话：叫「散修258」的玩家能「撤销」同名 NPC 的挂单，白拿一千点真气。
+  const probe = base()
+  const npcSeller = probe.market.qi[0]?.seller ?? ''
+  assert.ok(npcSeller?.startsWith('散修'), `前提：NPC 卖家名形如 散修NNN，实得 ${npcSeller}`)
+  assert.equal(validateName(npcSeller).ok, true, '前提：这个名字建号时是合法的')
+
+  const twin = { ...probe, player: { ...probe.player, name: npcSeller } }
+  const ctx = ctxOf(twin)
+  assert.deepEqual([...myOrders(ctx)], [], '同名 NPC 的单不算我的单')
+
+  const after = applyCtx(cancelQiOrders(ctx, twin.market.qi.map((o) => o.id)))
+  assert.deepEqual([...after.player.qi], [...twin.player.qi], '撤不动，也就退不出真气')
+  assert.equal(after.market.qi.length, twin.market.qi.length, '市场上的单一张都不该少')
+
+  // 反过来：正常的自己挂单照旧认得出来
+  const mine = { id: 'mine:0', seller: twin.player.name, listed: true,
+    offer: { element: '金' as const, amount: 100 }, want: { element: '木' as const, amount: 100 } }
+  assert.equal(isMyOrder(mine, twin.player.name), true)
+  assert.equal(isMyOrder({ ...mine, id: 'npc:0:9' }, twin.player.name), false, '伪造成 npc: 前缀的就不算我的')
 })
 
 test('★打赢但飞剑全断：不扣对方库存，真气不会凭空蒸发', () => {
@@ -149,4 +159,20 @@ test('★打赢但飞剑全断：不扣对方库存，真气不会凭空蒸发',
   assert.equal(out.follow?.length ?? 0, 0, '没有活着的剑就没有返航事件')
   assert.equal(out.state.npc.patches[npcBase.id]?.qiLost ?? 0, 0, '对方库存不该被扣')
   assert.deepEqual([...out.outcome!.loot], [0, 0, 0, 0, 0], '没人驮就没有战利品')
+})
+
+test('★修炼序号越界直接拒绝，不会排出一个存不进档的事件', () => {
+  const s = base({ qi: qi(9e9, 9e9, 9e9, 9e9, 9e9) })
+  for (const target of [
+    { system: 'body' as const, index: 8 },
+    { system: 'body' as const, index: -1 },
+    { system: 'meridian' as const, index: 12 },
+    { system: 'meridian' as const, index: 1.5 },
+  ]) {
+    const r = startCultivate(s, target)
+    assert.equal(r.ok, false, `${JSON.stringify(target)} 应当被拒`)
+  }
+  // 边界内照旧放行
+  assert.equal(startCultivate(s, { system: 'body', index: 7 }).ok, true)
+  assert.equal(startCultivate(s, { system: 'meridian', index: 11 }).ok, true)
 })

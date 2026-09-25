@@ -138,10 +138,29 @@ test('非法身份整份拒绝，不是悄悄改成别的', () => {
   assert.equal(s.player.name, '玩家甲')
 })
 
-test('空补丁是恒等：什么都不填就什么都不改', () => {
-  const s = fresh()
+test('★空补丁是恒等：什么都不填就什么都不改（真气是浮点，不能顺手取整）', () => {
+  // 夹具必须带小数。以前这条用的是新号（真气全 0），于是
+  // 「打开面板什么都不改直接点应用，每种真气少 1 点」这个 bug 一直没被抓到。
+  const s0 = fresh()
+  const s: GameState = {
+    ...s0,
+    player: { ...s0.player, body: [0, 0, 0, 0, 0, 36, 0, 0], qi: Array(5).fill(17279.99999999274) as unknown as GameState['player']['qi'] },
+  }
+  assert.ok(s.player.qi.every((v) => !Number.isInteger(v)), '前提：夹具的真气确实是小数')
+
   const out = unwrap(applyGm(s, {}))
   assert.deepEqual(JSON.parse(JSON.stringify(out)), JSON.parse(JSON.stringify(s)))
+  assert.deepEqual([...out.player.qi], [...s.player.qi], '真气一丝都不许动')
+
+  // 只改一个无关字段，真气同样不许动
+  const other = unwrap(applyGm(s, { silver: 999 }))
+  assert.deepEqual([...other.player.qi], [...s.player.qi])
+  assert.equal(other.player.silver, 999)
+
+  // 道行也是浮点累加出来的，同样不许被顺手取整
+  const frac: GameState = { ...s, player: { ...s.player, daoxing: 78840.75 } }
+  assert.equal(unwrap(applyGm(frac, {})).player.daoxing, 78840.75)
+  assert.equal(unwrap(applyGm(frac, { daoxing: 100 })).player.daoxing, 100, '给了就按给的来')
 })
 
 test('清空事件只清时间线，不动别的', () => {

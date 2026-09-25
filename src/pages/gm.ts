@@ -31,6 +31,7 @@ export type GmVm = {
   readonly realm: string
   readonly x: number
   readonly y: number
+  /** 已经取过整（`floorQi`），和顶栏资源条显示的是同一个数 */
   readonly qi: readonly number[]
   /** 当前丹田上限（改了丹田气海之后会变，这里显示的是应用前的值） */
   readonly qiCap: number
@@ -186,7 +187,7 @@ ${sectionHead('资源', `丹田上限 ${vm.qiCap}`)}
 <TR class="trbg middle"><TD colSpan=4>
 <TABLE cellSpacing=0 cellPadding=2 width="100%" border=0><TBODY><TR align=middle>${
     each(vm.elements, (e, i) => `<TD width="20%" class=small>${esc(e)}<BR>${
-      numInput(`gm-qi${i}`, Math.floor(vm.qi[i] ?? 0), undefined, 62)}</TD>`)}</TR></TBODY></TABLE>
+      numInput(`gm-qi${i}`, vm.qi[i] ?? 0, undefined, 62)}</TD>`)}</TR></TBODY></TABLE>
 <DIV align=middle style="padding-top:2px">
 <A class=skillup href="#" onclick="gmFillQi()">全部填到丹田上限</A>
 <SPAN class=smallgray>　|　</SPAN>

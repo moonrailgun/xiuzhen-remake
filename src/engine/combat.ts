@@ -125,10 +125,16 @@ export function resolveBattle(
   const aBonus = generationBonus(attackers)
   const dBonus = generationBonus(defenders)
 
+  // **取整要在判定之前做，不能判定完了再各取各的。**
+  // 相生加成会带小数（给方耐久的一半按被生剑数平分，100/2/3 = 16.67），
+  // 要是判定用小数、战报打印时才各自 `Math.floor`，就会出现
+  // 「耐久 16766 / 受到伤害 16766 / 完好无损」—— 两个不同的实数落到同一个整数上，
+  // 直接违反 6944 条真实战报零反例的「受到伤害 == 耐久 ⇔ 惨被斩断」。
+  // 原版战报里攻击与耐久两列**全是整数**，所以原版本来就是拿整数在算。
   const effAttack = (s: CombatSword, bonus: ReadonlyMap<string, { attack: number }>) =>
-    s.attack + (bonus.get(s.id)?.attack ?? 0)
+    Math.floor(s.attack + (bonus.get(s.id)?.attack ?? 0))
   const effDurability = (s: CombatSword, bonus: ReadonlyMap<string, { durability: number }>) =>
-    s.durability + (bonus.get(s.id)?.durability ?? 0)
+    Math.floor(s.durability + (bonus.get(s.id)?.durability ?? 0))
 
   const side = (
     mine: readonly CombatSword[],
@@ -170,8 +176,8 @@ export function resolveBattle(
       id: r.id,
       damageTaken: Math.floor(Math.min(r.incoming, r.dur)),
       broken: r.broken,
-      attack: Math.floor(effAttack(mine[i]!, myBonus)),
-      durability: Math.floor(r.dur),
+      attack: effAttack(mine[i]!, myBonus),
+      durability: r.dur,
     }))
   }
 

@@ -17,6 +17,7 @@
 import {
   REALMS,
   clampQi,
+  floorQi,
   type Artifact,
   type FiveQi,
   type GameState,
@@ -88,6 +89,16 @@ export const skillCaps = (): ReadonlyMap<string, number> =>
 const int = (v: unknown, fallback: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : fallback
 
+/**
+ * 补丁没给这个字段就**原样留着**，不要顺手取整。
+ *
+ * 真气、道行这些在正常游戏里是逐段累加出来的浮点（在线推 30 天会得到
+ * `17279.99999999274`）。以前不管补丁有没有给都走一遍 `Math.floor`，于是
+ * 「打开面板什么都不改、直接点应用」每种真气凭空少 1 点。
+ */
+const patched = (given: number | undefined, current: number): number =>
+  given === undefined ? current : int(given, current)
+
 /** 夹到 [lo, hi]，夹住了就记一笔。 */
 function clamp(value: number, lo: number, hi: number, label: string, notes: string[]): number {
   if (value < lo) { notes.push(`${label} 收到 ${lo}（不能小于 ${lo}）`); return lo }
@@ -148,14 +159,14 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
   const vip = patch.vip ?? p.vip
 
   // —— 3. 位置与数值 ——
-  const x = clamp(int(patch.x ?? p.x, p.x), 0, WORLD_SIZE - 1, '横坐标', notes)
-  const y = clamp(int(patch.y ?? p.y, p.y), 0, WORLD_SIZE - 1, '纵坐标', notes)
+  const x = clamp(patched(patch.x, p.x), 0, WORLD_SIZE - 1, '横坐标', notes)
+  const y = clamp(patched(patch.y, p.y), 0, WORLD_SIZE - 1, '纵坐标', notes)
   const MAX_MONEY = Number.MAX_SAFE_INTEGER
-  const silver = clamp(int(patch.silver ?? p.silver, p.silver), 0, MAX_MONEY, '银两', notes)
-  const coin = clamp(int(patch.coin ?? p.coin, p.coin), 0, MAX_MONEY, '普通仙石', notes)
-  const bonusCoin = clamp(int(patch.bonusCoin ?? p.bonusCoin, p.bonusCoin), 0, MAX_MONEY, '附加仙石', notes)
-  const daoxing = clamp(int(patch.daoxing ?? p.daoxing, p.daoxing), 0, MAX_MONEY, '道行', notes)
-  const experience = clamp(int(patch.experience ?? p.experience, p.experience), 0, MAX_MONEY, '阅历', notes)
+  const silver = clamp(patched(patch.silver, p.silver), 0, MAX_MONEY, '银两', notes)
+  const coin = clamp(patched(patch.coin, p.coin), 0, MAX_MONEY, '普通仙石', notes)
+  const bonusCoin = clamp(patched(patch.bonusCoin, p.bonusCoin), 0, MAX_MONEY, '附加仙石', notes)
+  const daoxing = clamp(patched(patch.daoxing, p.daoxing), 0, MAX_MONEY, '道行', notes)
+  const experience = clamp(patched(patch.experience, p.experience), 0, MAX_MONEY, '阅历', notes)
 
   // —— 4. 法宝 ——
   const rawArtifacts = patch.artifacts ?? p.artifacts
@@ -187,11 +198,18 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
   }
 
   const qiCap = capacityOf(draft)
-  const qiIn = patch.qi ?? p.qi
-  if (qiIn.length !== 5) return { ok: false, reason: '五行真气必须是 5 个数' }
-  const qi = clampQi(qiIn.map((v) => int(v, 0)) as unknown as FiveQi, qiCap)
+  if (patch.qi !== undefined && patch.qi.length !== 5) {
+    return { ok: false, reason: '五行真气必须是 5 个数' }
+  }
+  // 没给就原样带过去（正常游戏里它是浮点，取整会白丢将近 1 点）；
+  // 给了就用 `floorQi` —— 顶栏显示的也是它，面板填什么就该得到什么。
+  const qiIn: readonly number[] = patch.qi ?? p.qi
+  const qi = clampQi(
+    (patch.qi === undefined ? [...qiIn] : qiIn.map((v) => floorQi(int(v, 0)))) as unknown as FiveQi,
+    qiCap,
+  )
   for (let i = 0; i < 5; i++) {
-    if (int(qiIn[i], 0) > qiCap) { notes.push(`${ELEMENTS[i]}真气 收到丹田上限 ${qiCap}`); break }
+    if ((qiIn[i] ?? 0) > qiCap) { notes.push(`${ELEMENTS[i]}真气 收到丹田上限 ${qiCap}`); break }
   }
 
   // 法宝格：炼器队列里在炼的那些也占位置（`artifactSpaceUsed`）

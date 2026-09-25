@@ -202,20 +202,37 @@ export function listQi(
   }
 }
 
+/**
+ * 这一单是不是玩家自己的。
+ *
+ * **光比卖家名是不够的。** NPC 的卖家名是 `散修{100..999}`（见 `npcOrder`），
+ * 而这正是玩家能给自己起的合法名字（`createplayer.ts` 的 `validateName` 放行中文+数字）。
+ * 只比名字的话，一个叫「散修258」的玩家可以「撤销」同名 NPC 的挂单，白拿一千点真气；
+ * NPC 收购也会把 NPC 自己的单当成玩家的单来结算。
+ *
+ * 真正的身份标记是 **id 前缀** —— 补货与 24 小时过期一直是按它判的（`npcHourOf`）。
+ * 两套标准必须一致，所以这里两条都要满足。顺带也解掉了「导入存档伪造一张
+ * `npc:` 前缀的自己挂单」那条路：它压根不算玩家的单，玩家没有任何东西押在上面。
+ */
+export const isMyOrder = (
+  order: { readonly id: string; readonly seller: string },
+  playerName: string,
+): boolean => order.seller === playerName && !order.id.startsWith(NPC_PREFIX)
+
 /** 已上架、别人看得见的单。 */
 export const visibleOrders = (market: Market): readonly QiOrder[] =>
   market.qi.filter((o) => o.listed)
 
 /** 自己的单（含还在延迟中的）。 */
 export const myOrders = (ctx: MarketCtx): readonly QiOrder[] =>
-  ctx.market.qi.filter((o) => o.seller === ctx.state.player.name)
+  ctx.market.qi.filter((o) => isMyOrder(o, ctx.state.player.name))
 
 /**
  * 撤单 / 被攻击时自动取消。真气按丹田上限退回
  * （「被打时挂在市场的单自动取消并可被掠夺」`docs/research/02` §1.6）。
  */
 export function cancelQiOrders(ctx: MarketCtx, ids: readonly string[]): MarketCtx {
-  const cancelled = ctx.market.qi.filter((o) => ids.includes(o.id) && o.seller === ctx.state.player.name)
+  const cancelled = ctx.market.qi.filter((o) => ids.includes(o.id) && isMyOrder(o, ctx.state.player.name))
   if (!cancelled.length) return ctx
 
   const cap = capacityOf(ctx.state)
@@ -246,7 +263,7 @@ export function buyQi(ctx: MarketCtx, orderId: string): MarketResult {
   const order = ctx.market.qi.find((o) => o.id === orderId)
   if (!order) return { ok: false, reason: '挂单不存在' }
   if (!order.listed) return { ok: false, reason: '挂单尚未上架' }
-  if (order.seller === ctx.state.player.name) return { ok: false, reason: '不能买自己的挂单' }
+  if (isMyOrder(order, ctx.state.player.name)) return { ok: false, reason: '不能买自己的挂单' }
   if (!hasQi(ctx.state.player.qi, order.want)) return { ok: false, reason: '真气不足' }
 
   const event: GameEvent = {
@@ -335,7 +352,7 @@ const artifactOf = (order: ArtifactOrder): Artifact => order.artifact ?? {
 }
 
 export function cancelArtifactOrders(ctx: MarketCtx, ids: readonly string[]): MarketCtx {
-  const returned = ctx.market.artifacts.filter(o => ids.includes(o.id) && o.seller === ctx.state.player.name)
+  const returned = ctx.market.artifacts.filter(o => ids.includes(o.id) && isMyOrder(o, ctx.state.player.name))
   if (!returned.length) return ctx
   // 寄卖时法宝离开了背包，腾出的位置可能已经被一炉炼器占掉 —— 这时撤单会把占用顶出上限。
   // 撤不回来就原样不动，由调用方告诉玩家原因（`app.ts` 的 doMarketCancel）。
@@ -350,7 +367,7 @@ export function cancelArtifactOrders(ctx: MarketCtx, ids: readonly string[]): Ma
 export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
   const order = ctx.market.artifacts.find((o) => o.id === orderId)
   if (!order) return { ok: false, reason: '挂单不存在' }
-  if (order.seller === ctx.state.player.name) return { ok: false, reason: '不能买自己的挂单' }
+  if (isMyOrder(order, ctx.state.player.name)) return { ok: false, reason: '不能买自己的挂单' }
 
   if (!canAcquireArtifacts(ctx.state, 1)) return { ok: false, reason: '法宝携带数量已达上限' }
 
@@ -398,8 +415,8 @@ const purchaseAt = (order: { readonly listedAt?: number }): number => (order.lis
 
 export function nextNpcPurchaseAt(state: GameState): number | null {
   const times = [
-    ...state.market.qi.filter(o => o.seller === state.player.name && o.listed && isFairRatio(o)).map(purchaseAt),
-    ...state.market.artifacts.filter(o => o.seller === state.player.name && o.priceCoin <= npcArtifactPrice(o)).map(purchaseAt),
+    ...state.market.qi.filter(o => isMyOrder(o, state.player.name) && o.listed && isFairRatio(o)).map(purchaseAt),
+    ...state.market.artifacts.filter(o => isMyOrder(o, state.player.name) && o.priceCoin <= npcArtifactPrice(o)).map(purchaseAt),
   ]
   return times.length ? Math.min(...times) : null
 }
@@ -408,7 +425,7 @@ export function nextNpcPurchaseAt(state: GameState): number | null {
 export function settleNpcPurchases(state: GameState): GameState {
   let ctx = ctxOf(state)
   for (const o of state.market.qi) {
-    if (o.seller !== state.player.name || !o.listed || !isFairRatio(o) || purchaseAt(o) > state.clock.gameT) continue
+    if (!isMyOrder(o, state.player.name) || !o.listed || !isFairRatio(o) || purchaseAt(o) > state.clock.gameT) continue
     ctx = {
       state: { ...ctx.state, timeline: schedule(ctx.state.timeline, {
         id: injectEventId(o.id), kind: 'market',
@@ -419,7 +436,7 @@ export function settleNpcPurchases(state: GameState): GameState {
     }
   }
   for (const o of state.market.artifacts) {
-    if (o.seller !== state.player.name || o.priceCoin > npcArtifactPrice(o) || purchaseAt(o) > state.clock.gameT) continue
+    if (!isMyOrder(o, state.player.name) || o.priceCoin > npcArtifactPrice(o) || purchaseAt(o) > state.clock.gameT) continue
     const sold = settleArtifactSale(ctx, o.id)
     if (sold.ok) ctx = sold.ctx
   }

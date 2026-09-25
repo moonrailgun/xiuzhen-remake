@@ -14,6 +14,7 @@ import { schedule, countByKind, type GameEvent, type Timeline } from './timeline
 import { addQi, subQi, canAfford, clampQi, totalQi, REALMS, type FiveQi, type GameState } from './state.ts'
 import { upgradeCost, upgradeSeconds, dantianCapacity } from '../data/upgrade.ts'
 import {
+  MERIDIANS,
   MAX_LEVEL as MERIDIAN_MAX_LEVEL,
   MAX_LEVEL_BEFORE_XINDONG as MERIDIAN_MAX_BEFORE_XINDONG,
   type Element,
@@ -57,6 +58,13 @@ export const DANTIAN_MAX_LEVEL = 36
  */
 export function levelCapBlockReason(state: GameState, target: CultivateTarget): string | undefined {
   if (target.system === 'skill') return undefined
+  // 序号越界必须挡住：`levelOf` 会返回 0（`?? 0`），等级上限也就随便过，
+  // 于是排出一个 index=99 的修炼事件 —— `validateGameState` 不收它，
+  // 从那一刻起**每一次自动存档都会抛错**，客户端还会把它说成「浏览器空间不足」。
+  const slots = target.system === 'meridian' ? MERIDIANS.length : BODY_PARTS.length
+  if (!Number.isInteger(target.index) || target.index < 0 || target.index >= slots) {
+    return '没有这一项可以修炼'
+  }
   const now = levelOf(state, target)
   if (target.system === 'meridian') {
     const beforeXindong = REALMS.indexOf(state.player.realm) < REALMS.indexOf('心动期')

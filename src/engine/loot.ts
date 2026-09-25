@@ -61,7 +61,9 @@ export function lootFrom(
     // tick 节奏差 1 —— 受伤信里「失去的真气」就不该取决于玩家有没有开着页面。
     const got = floorQi(exposed * Math.max(0, Math.min(1, ratio)))
     taken.push(got)
-    left.push(v - got)
+    // `left` 夹在 0：`got` 是整数（战报和受伤信都按整数显示），而 `v` 是逐段累加出来的
+    // 浮点，99.9999999 这种值数学上就是 100 —— 减完会得到 -1e-7 这样的负真气。
+    left.push(Math.max(0, v - got))
   }
   return { taken: taken as unknown as FiveQi, left: left as unknown as FiveQi }
 }

@@ -41,7 +41,7 @@ import {
   escortDialog, townNpcDialog, DIALOG_VERBATIM_IDS, booksReadableIn, npcsIn,
   READ_BOOK_SILVER, STATION_COST_COIN, LI_YUANWAI_SILVER, BOOKS, type TownNpc,
 } from '../data/town.ts'
-import { daoxingText, REALMS, type Artifact } from '../engine/state.ts'
+import { daoxingText, floorQi, REALMS, type Artifact } from '../engine/state.ts'
 import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
@@ -1476,7 +1476,9 @@ function gmVm(s: GameState): GmVm {
     realm: s.player.realm,
     x: s.player.x,
     y: s.player.y,
-    qi: [...s.player.qi],
+    // 用 floorQi 而不是 Math.floor：真气是浮点累加出来的，17279.99999999 数学上就是
+    // 17280，顶栏显示的也是 17280 —— 面板里不能比顶栏少 1。
+    qi: s.player.qi.map(floorQi),
     qiCap: capacityOf(s),
     silver: s.player.silver,
     coin: s.player.coin,

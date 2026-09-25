@@ -154,12 +154,12 @@ function buyQi(vm: TradeVm): string {
 <TD width=137><A href="${esc(href(null))}&order=1">提供</A></TD>
 <TD width=137><A href="${esc(href(null))}&order=2">需求</A></TD>
 <TD width=138>需要时间</TD>
-<TD>操作</TD></TR>
+<TD width=47 noWrap>操作</TD></TR>
 ${each(vm.qiOffers, (o) => `<TR class="trbg middle" align=middle>
 <TD>${qiCell(o.give, o.amount)}</TD>
 <TD>${qiCell(o.want, o.amount)}</TD>
 <TD>${hms(o.seconds)}</TD>
-<TD><A class=skillup onclick="${confirmBuy('buyqi', o.sheet)}" href="#">购买</A></TD></TR>`)}
+<TD noWrap><A class=skillup onclick="${confirmBuy('buyqi', o.sheet)}" href="#">购买</A></TD></TR>`)}
 ${pagerRow(href, vm.pager, 4)}
 </TBODY></TABLE>`
 }

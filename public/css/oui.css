@@ -346,3 +346,11 @@ textarea { font-family: inherit; font-size: var(--fs-small); }
 
 /* 读信正文区：外壳给了 height=200，正文再高就顺着表格长，不滚动（原版如此）。 */
 #msgcontent { width: 100%; }
+
+/* —— 表格行高 —— */
+/* 原版数据行 pitch 实测 27px（9-交易.jpg 的横线间距）：内容 26 + 1px 网格线。
+   cellpadding=3 上下各 3，所以内容区 20px。不约束的话，16px 图标 + 行高会把行撑到 37px。 */
+table.tablebg td { line-height: 20px; }
+table.tablebg td img { vertical-align: middle; }
+/* 表头行略高一点（原版 17px + 渐变） */
+table.tablebg tr.titlebg td { line-height: 17px; }

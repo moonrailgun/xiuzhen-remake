@@ -141,6 +141,17 @@ const AFFORD_EPSILON = (cost: number): number => Math.max(1e-6, Math.abs(cost) *
 export const canAfford = (have: FiveQi, cost: FiveQi): boolean =>
   have.every((v, i) => v >= cost[i]! - AFFORD_EPSILON(cost[i]!))
 
+/**
+ * 真气取整。**凡是把真气变成整数给人看或按整数结算的地方都要走这里。**
+ *
+ * 同一个浮点累加误差：数学上正好 138240 的真气，在线逐秒推出来是 138239.99999910643，
+ * 直接 `Math.floor` 就成了 138239 —— 于是顶栏显示的数、以及被掠夺走的数量，
+ * 会取决于这段时间玩家开没开着页面。而「离线一个月 == 在线逐小时」是这个项目的核心不变量。
+ *
+ * 先按 `AFFORD_EPSILON` 同一把尺子往上推一丝再取整，误差就被吃掉了。
+ */
+export const floorQi = (v: number): number => Math.floor(v + AFFORD_EPSILON(v))
+
 /** 按丹田上限截断（五行共用一个上限）。 */
 export const clampQi = (q: FiveQi, cap: number): FiveQi =>
   q.map((v) => Math.max(0, Math.min(cap, v))) as unknown as FiveQi

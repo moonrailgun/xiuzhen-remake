@@ -18,6 +18,7 @@ import { launch } from './battle.ts'
 import { startCultivate, capacityOf } from './cultivate.ts'
 import { DAY, HOUR, WEEK } from './clock.ts'
 import { isOutOfProtection } from './state.ts'
+import { lootFrom } from './loot.ts'
 import type { FiveQi, GameState } from './state.ts'
 import { serialize, SAVE_KEYS, SAVE_VERSION, type Storage } from './save.ts'
 
@@ -513,4 +514,49 @@ test('新版与旧版出击、返航载荷均可保存，旧返航不会重新�
   ] } }
   const saved = importGame(serialize(returning, 0))
   assert.equal(tick(saved, outbound.finishAt * 1000).state.player.qi[0], 100)
+})
+
+test('★顶栏与掠夺量只由 gameT 决定，不受 tick 节奏影响', () => {
+  // 真气是逐段累加出来的浮点：同一个 30 天，离线一次推与在线每分钟推，
+  // 数学上相等但浮点上差约 1e-6。以前这两处直接 Math.floor，于是
+  // 「受伤信里失去多少真气」取决于玩家开没开着页面。
+  const s: GameState = {
+    ...fresh(),
+    // 清掉 NPC：来袭会打乱真气，这条不变量要在「只有产出」的干净场景里验
+    npc: { bases: [], patches: {} },
+    player: { ...fresh().player, meridians: Array(12).fill(1), body: [0, 0, 0, 0, 0, 36, 0, 0] },
+  }
+  const terrain = () => qi(4, 4, 4, 4, 4)
+  const days = 30
+  const offline = tick(s, days * DAY * 1000, terrain).state
+  let online = s
+  for (let t = 60; t <= days * DAY; t += 60) online = tick(online, t * 1000, terrain).state
+
+  assert.notDeepEqual([...online.player.qi], [...offline.player.qi], '前提：浮点累加确实有差')
+  assert.deepEqual(
+    [...resourceBarOf(online, terrain).current],
+    [...resourceBarOf(offline, terrain).current],
+    '顶栏显示的整数必须一致',
+  )
+  assert.deepEqual(
+    [...lootFrom(online.player.qi, 0).taken],
+    [...lootFrom(offline.player.qi, 0).taken],
+    '被掠夺走的量必须一致',
+  )
+})
+
+test('★存档往返是恒等：市场被买空过几张也不会读一次多几张', () => {
+  const s = fresh()
+  // 推到第 2 个游戏小时内（不在整点上），让市场有单
+  let cur = tick(s, 4000 * 1000).state
+  const before = cur.market.qi.length
+  assert.ok(before > 0, '前提：市场里有 NPC 单')
+  // 买走 3 张（直接删，重点是「少了几张、还没到补货时刻」这个局面）
+  cur = { ...cur, market: { ...cur.market, qi: cur.market.qi.slice(3) } }
+
+  const store = memStorage()
+  saveGame(store, cur, cur.clock.wallT)
+  const back = loadGame(store)
+  assert.ok(back)
+  assert.equal(back.market.qi.length, cur.market.qi.length, '读档不该凭空补货')
 })

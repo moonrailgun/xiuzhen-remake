@@ -223,11 +223,17 @@ export function goalMet(q: Quest, entry: QuestEntry, state: GameState): boolean 
 /**
  * 任务怪的落点。[重建]
  * 原版只说试剑石在「附近的山顶」、三尸「满地图随机」，生成规则没有存档。
- * 这里：新手任务的靶子落在身边 8 格内，其余满地图；三尸按**周**变位置（每周六换一处）。
+ * 这里：新手任务的靶子落在身边 8 格内，其余满地图；**只有三尸**按周变位置（每周六换一处）。
+ *
+ * 周次自己从 `state.clock` 算，不再由调用方传 —— 以前 `accept` 传当前周、详情页预览
+ * 用默认 0，于是「百妖记第一回」详情页显示 (141,120)、领完变成 (1,27)，
+ * 玩家照着坐标飞过去目标不在那儿；同一份存档里位置还会每游戏周搬一次家。
  */
-export function questLocation(state: GameState, q: Quest, weekKey = 0): readonly [number, number] {
+export function questLocation(state: GameState, q: Quest): readonly [number, number] {
   if (q.at) return q.at
   const seed = state.worldSeed
+  // 三尸「只在周六现身」，所以它每周换一处；其余任务的落点只由 worldSeed + 任务 id 决定。
+  const weekKey = q.series === '斩却三尸' ? Math.floor(state.clock.gameT / (7 * DAY)) : 0
   if (q.category === 'newbie') {
     const dx = randInt(17, seed, 'questnear', q.id, 'x') - 8
     const dy = randInt(17, seed, 'questnear', q.id, 'y') - 8
@@ -250,12 +256,11 @@ export function accept(log: QuestLog, state: GameState, id: string): QuestResult
   const blocker = acceptBlocker(q, state)
   if (blocker) return fail(blocker)
 
-  const week = Math.floor(state.clock.gameT / (7 * DAY))
   const entry: QuestEntry = {
     id,
     acceptedAt: state.clock.gameT,
     done: false,
-    ...(q.goal.kind === 'slay' ? { at: questLocation(state, q, week) } : {}),
+    ...(q.goal.kind === 'slay' ? { at: questLocation(state, q) } : {}),
   }
   return ok({ ...log, entries: [...log.entries, entry] })
 }

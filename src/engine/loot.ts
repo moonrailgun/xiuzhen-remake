@@ -14,7 +14,7 @@
 import { rand, randInt } from './rng.ts'
 import { makeCurve, type Anchor } from '../data/curve.ts'
 import { WORLD_SIZE } from '../data/world.ts'
-import type { FiveQi } from './state.ts'
+import { floorQi, type FiveQi } from './state.ts'
 
 /**
  * 固本培元的暗仓容量（每种真气）。[按推断 —— 5 个锚点插值]
@@ -57,7 +57,9 @@ export function lootFrom(
   const left: number[] = []
   for (const v of theirQi) {
     const exposed = Math.max(0, v - vault)
-    const got = Math.floor(exposed * Math.max(0, Math.min(1, ratio)))
+    // floorQi 而不是 Math.floor：exposed 是逐段累加出来的浮点，直接取整会因
+    // tick 节奏差 1 —— 受伤信里「失去的真气」就不该取决于玩家有没有开着页面。
+    const got = floorQi(exposed * Math.max(0, Math.min(1, ratio)))
     taken.push(got)
     left.push(v - got)
   }

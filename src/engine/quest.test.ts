@@ -489,3 +489,22 @@ test('金丹大道：结丹是「点一下就算数」的条件，天劫按打�
   assert.equal(target.attack, 9999)
   assert.equal(target.hp, 9999)
 })
+
+test('★非三尸任务的落点不随周次变，详情页预览与领取后一致', () => {
+  const q = BEAST_QUESTS[0]! // 百妖记第一回
+  const day0 = makeState()
+  const preview = questLocation(day0, q)
+  for (const days of [7, 30, 200]) {
+    const later = { ...day0, clock: { ...day0.clock, gameT: days * DAY } }
+    assert.deepEqual(questLocation(later, q), preview, `第 ${days} 天不该搬家`)
+    const log = unwrap(accept(emptyQuestLog(), later, 'beast:1'))
+    assert.deepEqual(entryOf(log, 'beast:1')!.at, preview, '领取后的坐标要与预览一致')
+  }
+})
+
+test('★三尸仍然每周换一处（只在周六现身，所以按周变是有依据的）', () => {
+  const q = SANSHI_CHAIN[0]!
+  const s = makeState()
+  const week1 = { ...s, clock: { ...s.clock, gameT: 7 * DAY } }
+  assert.notDeepEqual(questLocation(week1, q), questLocation(s, q))
+})

@@ -19,7 +19,7 @@ import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, se
 import { scheduleRaid, resolveRaid } from './raid.ts'
 import { seedRng } from './rng.ts'
 import { save, load, importSave, SaveError, SAVE_VERSION, type Storage, type Migration } from './save.ts'
-import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
+import { ZERO_QI, floorQi, type GameState, type Player, type FiveQi } from './state.ts'
 import {
   hourlyQi,
   groupElement,
@@ -304,7 +304,11 @@ export function importGame(text: string): GameState {
  * 「读本地存档」会得到不同的市场。
  */
 function settleLoaded(state: GameState): GameState {
-  return refillNpcOrders({ ...state, v: SAVE_VERSION })
+  const next = { ...state, v: SAVE_VERSION }
+  // **只在市场是空的时候播种。** 无条件补货会让存档往返不是恒等：市场被买空过几张、
+  // 还没到下一个游戏整点时存盘，读回来会凭空多出几张单（实测 9 → 12）。
+  // 那正是 `tick` 末尾那段注释拒绝做的事，settleLoaded 不该开后门。
+  return next.market.qi.length === 0 ? refillNpcOrders(next) : next
 }
 
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */
@@ -392,7 +396,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
 /** 顶栏要显示的资源条数据。 */
 export function resourceBarOf(state: GameState, terrain?: TerrainProvider) {
   return {
-    current: state.player.qi.map((v) => Math.floor(v)) as unknown as FiveQi,
+    current: state.player.qi.map(floorQi) as unknown as FiveQi,
     capacity: capacityOf(state),
     perHour: currentQiPerHour(state, terrain),
     coin: state.player.coin,

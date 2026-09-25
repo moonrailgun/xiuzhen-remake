@@ -50,11 +50,13 @@ test('购买真气页：红字提示与「我用…换…搜索」筛选条（�
   assert.ok(h.includes('>全部</OPTION>'), '两个下拉默认都是「全部」')
 })
 
-test('购买真气页：四列 提供/需求/需要时间/操作，列宽 137/137/138（05 §7.3 实测）', () => {
+test('购买真气页：四列 提供/需求/需要时间/操作，列宽 137/137/138/47（原图竖线实测）', () => {
   const h = renderTrade(vm())
   assert.ok(h.includes('width=137><A'), '「提供」列宽 137 且是排序链接')
   assert.ok(h.includes('<TD width=138>需要时间</TD>'))
-  assert.ok(h.includes('<TD>操作</TD>'))
+  // 第四列宽 47：原图 9-交易.jpg 的竖线在 x=25/162/299/437/484。
+  // 不给宽度的话「购买」会换行，把行高从 27px 撑到 46px。
+  assert.ok(h.includes('<TD width=47 noWrap>操作</TD>'))
   assert.ok(h.includes('>提供</A>') && h.includes('>需求</A>'), '前两列表头可点排序')
   assert.ok(h.includes('width=460'), '表宽 460，与原版 DOM 的 width 属性一致')
 })

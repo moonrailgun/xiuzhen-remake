@@ -24,8 +24,7 @@
 
 import { DAY, weekdayOf } from './clock.ts'
 import { randInt } from './rng.ts'
-import { schedule, cancel, type GameEvent } from './timeline.ts'
-import { resolveBattle, type CombatSword } from './combat.ts'
+import type { GameEvent } from './timeline.ts'
 import { capacityOf } from './cultivate.ts'
 import {
   addQi,
@@ -343,69 +342,52 @@ export function paySilver(
 // 打怪：与 timeline 配合
 // ===========================================================================
 
-export const QUEST_BATTLE_PREFIX = 'quest-battle:'
-
-/** 把任务怪转成一张战斗卡（护身/飞剑共用的结构）。 */
-export const monsterAsSword = (m: Monster): CombatSword => ({
-  id: `monster:${m.name}`,
-  name: m.name,
-  element: m.element,
-  attack: m.attack,
-  durability: m.life,
-  agility: m.agility,
-})
-
 /**
- * 对任务怪出击：排一个 `battle` 事件。
- *
- * 结果在**创建事件时**就算好写进 payload —— `timeline.ts` 要求结算是纯函数，
- * 离线重放两次必须得到同一结果。缠斗时长 = 双方敏捷之和（`combat.ts`）。
+ * 出击本身由 `battle.ts` 负责（它管飞行耗时、在外上限、断剑与战报）。
+ * 任务这边只出两样东西：**打谁**（`questTarget`）和**打赢了之后**（`recordSlain`）。
+ * 刻意不引 `battle.ts`，两边只靠这个结构对上 —— 出击流程改了不会牵动任务表。
  */
-export function attackQuestMonster(
-  state: GameState,
-  log: QuestLog,
-  id: string,
-  swords: readonly CombatSword[],
-  travelSeconds: number,
-): QuestResult<GameState> {
-  const entry = entryOf(log, id)
-  const q = questOf(log, id)
-  if (!entry || entry.done || !q) return fail('没有这个进行中的任务')
-  if (q.goal.kind !== 'slay') return fail('该任务不是斩妖任务')
-  if (swords.length === 0) return fail('没有可用的飞剑')
-  const eventId = `${QUEST_BATTLE_PREFIX}${id}`
-  if (state.timeline.events.some((e) => e.id === eventId)) return fail('已经有飞剑在路上了')
-
-  const monster = monsterAsSword(q.goal.monster)
-  const result = resolveBattle(swords, [monster])
-  const win = result.defender.every((d) => d.broken)
-
-  const event: GameEvent = {
-    id: eventId,
-    kind: 'battle',
-    finishAt: state.clock.gameT + travelSeconds + result.tangleSeconds,
-    payload: {
-      quest: id,
-      monster: q.goal.monster.name,
-      win,
-      broken: result.attacker.filter((a) => a.broken).map((a) => a.id),
-    },
-  }
-  return ok({ ...state, timeline: schedule(state.timeline, event) })
+export type QuestBattleTarget = {
+  readonly kind: 'monster'
+  readonly name: string
+  readonly x: number
+  readonly y: number
+  readonly attack: number
+  readonly agility: number
+  readonly hp: number
+  readonly element: Monster['element']
 }
 
-/** 取消出击（原版事件栏的红 ×）。 */
-export const cancelQuestBattle = (state: GameState, id: string): GameState => ({
-  ...state,
-  timeline: cancel(state.timeline, `${QUEST_BATTLE_PREFIX}${id}`),
+export const targetOfMonster = (
+  m: Monster,
+  at: readonly [number, number],
+): QuestBattleTarget => ({
+  kind: 'monster',
+  name: m.name,
+  x: at[0],
+  y: at[1],
+  attack: m.attack,
+  agility: m.agility,
+  hp: m.life,
+  element: m.element,
 })
 
-/** 战斗事件到点：赢了就把任务标成「已斩」。在 `game.ts` 的 resolver 里调。 */
-export function resolveQuestBattle(log: QuestLog, event: GameEvent): QuestLog {
-  if (!event.id.startsWith(QUEST_BATTLE_PREFIX)) return log
-  if (event.payload['win'] !== true) return log
-  const id = event.payload['quest']
-  return typeof id === 'string' ? markCleared(log, id) : log
+/** 已领取的斩妖任务的出击目标；不是斩妖任务或没领取时返回 null。 */
+export function questTarget(log: QuestLog, id: string): QuestBattleTarget | null {
+  const entry = entryOf(log, id)
+  const goal = questOf(log, id)?.goal
+  if (!entry || entry.done || goal?.kind !== 'slay' || !entry.at) return null
+  return targetOfMonster(goal.monster, entry.at)
+}
+
+/**
+ * 战斗事件结算完之后调一次：赢了就把盯着这只怪的任务标成「已斩」。
+ * 按 `payload.target.name` 认怪，与 `battle.ts` 的事件载荷对得上，但不依赖它的类型。
+ */
+export function resolveQuestBattle(log: QuestLog, event: GameEvent, won: boolean): QuestLog {
+  if (event.kind !== 'battle' || !won) return log
+  const target = event.payload['target'] as { readonly name?: unknown } | undefined
+  return typeof target?.name === 'string' ? recordSlain(log, target.name) : log
 }
 
 // ===========================================================================

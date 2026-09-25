@@ -11,6 +11,7 @@ import { advanceTo, emptyTimeline, type GameEvent } from './timeline.ts'
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
+import { resolveCraft } from './craft.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -139,7 +140,8 @@ export function tick(
     if (ev.kind === 'cultivate') return { state: resolveCultivate(st, ev) }
     if (ev.kind === 'move') return resolveMove(st, ev)
     if (ev.kind === 'battle') return resolveBattleEvent(st, ev)
-    // 炼器队列在下一步接上
+    if (ev.kind === 'craft') return { state: resolveCraft(st, ev) }
+    // market 类事件由市场模块自己的上下文结算
     return { state: st }
   })
 

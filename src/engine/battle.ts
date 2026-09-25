@@ -232,9 +232,12 @@ export function resolveBattleEvent(
   const result = resolveBattle(swords.map(toCombat), [targetToCombat(target)])
   const lost = result.attacker.filter((outcome) => outcome.broken).map((outcome) => outcome.id)
   const won = result.defender.every((outcome) => outcome.broken)
+  // 战利品是**飞剑驮回来的**：一把都没活着回来就没有返航事件，也就没有东西能入账。
+  // 这时还照样去扣 NPC 的库存，那点真气就凭空蒸发了（对方少了，玩家没多）。
+  const anySurvivor = swords.some((sword) => !lost.includes(sword.id))
   let loot: FiveQi = ZERO_QI
   let npc = state.npc
-  if (won && target.kind === 'player') {
+  if (won && anySurvivor && target.kind === 'player') {
     const matches = state.npc.bases.filter((base) => target.npcId !== undefined ? base.id === target.npcId : base.name === target.name)
     const base = matches.length === 1 ? matches[0] : undefined
     if (base) {
@@ -249,7 +252,7 @@ export function resolveBattleEvent(
       loot = lootFrom((event.payload['targetQi'] as FiveQi) ?? ZERO_QI,
         (event.payload['targetRootLevel'] as number) ?? 0).taken
     }
-  } else if (won) {
+  } else if (won && anySurvivor) {
     // 怪物没有暗仓，按生命折算战利品 [重建]。
     loot = Array(5).fill(target.hp * 2) as unknown as FiveQi
   }

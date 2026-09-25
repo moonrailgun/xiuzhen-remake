@@ -337,6 +337,9 @@ const artifactOf = (order: ArtifactOrder): Artifact => order.artifact ?? {
 export function cancelArtifactOrders(ctx: MarketCtx, ids: readonly string[]): MarketCtx {
   const returned = ctx.market.artifacts.filter(o => ids.includes(o.id) && o.seller === ctx.state.player.name)
   if (!returned.length) return ctx
+  // 寄卖时法宝离开了背包，腾出的位置可能已经被一炉炼器占掉 —— 这时撤单会把占用顶出上限。
+  // 撤不回来就原样不动，由调用方告诉玩家原因（`app.ts` 的 doMarketCancel）。
+  if (!canAcquireArtifacts(ctx.state, returned.reduce((n, o) => n + artifactOf(o).count, 0))) return ctx
   return {
     state: { ...ctx.state, player: { ...ctx.state.player, artifacts: [...ctx.state.player.artifacts, ...returned.map(artifactOf)] } },
     market: { ...ctx.market, artifacts: ctx.market.artifacts.filter(o => !returned.includes(o)) },

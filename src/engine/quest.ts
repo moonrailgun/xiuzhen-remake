@@ -22,6 +22,7 @@ import { DAY, weekdayOf } from './clock.ts'
 import { randInt } from './rng.ts'
 import { schedule, type GameEvent } from './timeline.ts'
 import { capacityOf } from './cultivate.ts'
+import { canAcquireArtifacts } from './craft.ts'
 import {
   addQi,
   clampQi,
@@ -477,6 +478,11 @@ export function claim(
   if (!entry || !q) return fail('没有这个任务')
   if (entry.done) return fail('奖励已经领过了')
   if (!goalMet(q, entry, state)) return fail('任务尚未完成')
+  // 炼制、购买都查袖里乾坤上限，发奖这条路以前没查 —— 满背包领奖会把占用顶到 6/5，
+  // 之后任何炼制/购买都被拒，玩家还不知道为什么。挡在领取这一步，奖励留着不丢。
+  if (q.reward.items?.length && !canAcquireArtifacts(state, q.reward.items.length)) {
+    return fail('法宝携带数量已达上限，请先提升袖里乾坤或腾出空位')
+  }
 
   const r = q.reward
   const nextLog: QuestLog = {

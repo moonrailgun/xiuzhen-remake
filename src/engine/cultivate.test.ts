@@ -210,11 +210,32 @@ test('加速不影响炼器事件（只作用于修炼队列）', () => {
   const s = state()
   const withCraft: GameState = {
     ...s,
-    timeline: { events: [{ id: 'c1', kind: 'craft', finishAt: 10000, payload: {} }] },
+    timeline: { events: [
+      { id: 'c1', kind: 'craft', finishAt: 10000, payload: {} },
+      { id: 'cultivate:body:0', kind: 'cultivate', finishAt: 10000, payload: { system: 'body', index: 0, toLevel: 1 } },
+    ] },
   }
   const r = speedUp(withCraft, 'finish')
   const after = (r as { state: GameState }).state
   assert.equal(after.timeline.events[0]!.finishAt, 10000, '炼器事件不受影响')
+  assert.equal(after.timeline.events[1]!.finishAt, s.clock.gameT, '修炼事件立即完成')
+})
+
+test('★加速：队列空着不扣仙石，结丹压缩也不在加速范围内', () => {
+  const s = state()
+  const empty = speedUp({ ...s, timeline: { events: [] } }, 'finish')
+  assert.equal(empty.ok, false, '没有修炼事件时应当拒绝')
+  assert.equal((empty as { reason: string }).reason, '没有正在进行的修炼事件')
+
+  // 结丹的「压缩真元」借用了 cultivate 这个 kind，但 startCultivate 已把它排除在
+  // 修炼队列之外；10 仙石不该顺手跳过整套结丹。
+  const core: GameState = {
+    ...s,
+    timeline: { events: [{ id: 'quest:core:x', kind: 'cultivate', finishAt: 43200, payload: { op: 'goldenCore' } }] },
+  }
+  const r = speedUp(core, 'finish')
+  assert.equal(r.ok, false, '只有结丹压缩时同样拒绝')
+  assert.equal(core.player.coin, s.player.coin, '拒绝时一枚仙石都不扣')
 })
 
 test('离线很久：一次推进把积压的修炼全结算', () => {

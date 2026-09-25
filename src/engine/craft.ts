@@ -168,6 +168,12 @@ export function refineArtifact(
   if (a.name !== b.name || a.quality !== b.quality || a.refine !== b.refine) {
     return { ok: false, reason: '只能淬炼两件完全相同的法宝' }
   }
+  // 状态也要查。在外面打架的剑被淬掉，时间线上的 swordIds 就指向一个不存在的法宝，
+  // 返航时状态永远卡在「斩杀中」；反过来「空闲」+「损坏」淬出来继承第一件的状态，
+  // 等于一次免费修理。UI 只列空闲的，所以这道守只对引擎/存档这条路生效。
+  if (a.status !== '空闲' || b.status !== '空闲') {
+    return { ok: false, reason: '只能淬炼空闲的法宝' }
+  }
 
   const protect = opts.protect ?? 'none'
   const target = a.refine + 1

@@ -14,6 +14,7 @@ import { schedule, cancel, type GameEvent } from './timeline.ts'
 import type { Artifact, GameState } from './state.ts'
 import { spendCoin, type StartResult } from './cultivate.ts'
 import { activeQuests, paySilver } from './quest.ts'
+import { canAcquireArtifacts } from './craft.ts'
 import { inWorld } from '../data/world.ts'
 import {
   BANK_NOTES,
@@ -201,6 +202,8 @@ export function exchangeNote(state: GameState, noteName: string): StartResult {
   const note = findNote(noteName)
   if (!note) return { ok: false, reason: '没有这种面额的银票' }
   if (state.player.silver < note.value) return { ok: false, reason: '银两不足' }
+  // 银票也是 `artifacts` 里的一件（`artifactSpaceUsed` 连 count 一起数），所以同样占格子。
+  if (!canAcquireArtifacts(state, 1)) return { ok: false, reason: '法宝携带数量已达上限，请先提升袖里乾坤或腾出空位' }
 
   const id = `note:${note.value}`
   const held = state.player.artifacts.find((a) => a.id === id)

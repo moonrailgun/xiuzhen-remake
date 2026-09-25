@@ -58,7 +58,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { startCraft, refineArtifact, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { startCraft, refineArtifact, canAcquireArtifacts, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, PASSIVE_SWORD_ARTS, type Quality } from '../data/artifacts.ts'
 import {
@@ -2032,6 +2032,9 @@ function doMarketCancel(action: 'unsellqi' | 'unsellitem', sheet: number): void 
   if (!state) return
   const id = sheetId(sheet)
   if (!id) return
+  if (action === 'unsellitem' && !canAcquireArtifacts(state, 1)) {
+    return openWindow('mwindow', '无法撤销', '<DIV class=middle style="padding:10px">法宝携带数量已达上限，请先提升袖里乾坤或腾出空位</DIV>')
+  }
   state = applyCtx((action === 'unsellitem' ? cancelArtifactOrders : cancelQiOrders)(ctxOf(state), [id]))
   step()
 }

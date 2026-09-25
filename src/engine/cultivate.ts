@@ -11,9 +11,13 @@
  */
 
 import { schedule, countByKind, type GameEvent, type Timeline } from './timeline.ts'
-import { addQi, subQi, canAfford, clampQi, totalQi, type FiveQi, type GameState } from './state.ts'
+import { addQi, subQi, canAfford, clampQi, totalQi, REALMS, type FiveQi, type GameState } from './state.ts'
 import { upgradeCost, upgradeSeconds, dantianCapacity } from '../data/upgrade.ts'
-import type { Element } from '../data/meridian.ts'
+import {
+  MAX_LEVEL as MERIDIAN_MAX_LEVEL,
+  MAX_LEVEL_BEFORE_XINDONG as MERIDIAN_MAX_BEFORE_XINDONG,
+  type Element,
+} from '../data/meridian.ts'
 import { SKILL_TREES } from '../data/skills.ts'
 
 export type CultivateTarget =
@@ -36,6 +40,35 @@ export const BODY_PARTS = [
 export const BODY_STEEL = 1 // 炼体成钢：提升经脉与本体升级速度
 export const BODY_CALM = 2 // 心静通灵：提升法术修炼速度
 export const BODY_DANTIAN = 5 // 丹田气海：真气容量
+
+/**
+ * 丹田气海的等级上限。其余 7 项本体按经脉的满级 20 处理
+ * （`upgrade.ts` 的 `dantianCurve` 就夹在 36，本体成本曲线也只重建到 20）。
+ */
+export const BODY_MAX_LEVEL = 20
+export const DANTIAN_MAX_LEVEL = 36
+
+/**
+ * 这一项还能不能再升。
+ *
+ * 以前只有法术查上限，经脉和本体直接放行 —— 升到 21 级要花上百万真气、几十游戏天，
+ * 而 `multiplier()` / `vaultCapacity()` 都在 20 级夹住，**收益整整是零**。
+ * 经脉另有一条原文规则：心动期之前封顶 13 级（`meridian.ts` 的 MAX_LEVEL_BEFORE_XINDONG）。
+ */
+export function levelCapBlockReason(state: GameState, target: CultivateTarget): string | undefined {
+  if (target.system === 'skill') return undefined
+  const now = levelOf(state, target)
+  if (target.system === 'meridian') {
+    const beforeXindong = REALMS.indexOf(state.player.realm) < REALMS.indexOf('心动期')
+    const cap = beforeXindong ? MERIDIAN_MAX_BEFORE_XINDONG : MERIDIAN_MAX_LEVEL
+    if (now >= cap) {
+      return beforeXindong ? `经脉在心动期之前最高 ${cap} 级` : `经脉已修炼至上限 ${cap} 级`
+    }
+    return undefined
+  }
+  const cap = target.index === BODY_DANTIAN ? DANTIAN_MAX_LEVEL : BODY_MAX_LEVEL
+  return now >= cap ? `${BODY_PARTS[target.index] ?? '该项本体'}已修炼至上限 ${cap} 级` : undefined
+}
 
 /** 当前等级。 */
 export function levelOf(state: GameState, target: CultivateTarget): number {
@@ -96,6 +129,8 @@ export function startCultivate(
     const reason = skillUpgradeBlockReason(state, target.id)
     if (reason) return { ok: false, reason }
   }
+  const capped = levelCapBlockReason(state, target)
+  if (capped) return { ok: false, reason: capped }
   const slots = cultivateSlots(opts.hasVip ?? state.player.vip)
   // 结丹的「压缩真元」虽然也排成 cultivate 事件，但**不占修炼队列**。
   // 队列规则的原文是「普通用户一次只能进行 1 项修炼事件……**不包括炼器事件**」
@@ -222,12 +257,18 @@ export function speedUp(
   mode: 'half' | 'finish',
 ): StartResult {
   const cost = mode === 'half' ? SPEEDUP_HALF_COST : SPEEDUP_FINISH_COST
+  // 「所有修炼事件」是原版逐字（付费页 pay=10/11 的说明），所以确实是一次加速全部。
+  // 但结丹的「压缩真元」只是借用了 cultivate 这个 kind，`startCultivate` 已经把它
+  // 排除在修炼队列之外，这里同样排除 —— 否则 10 仙石就跳过整套 10 轮结丹。
+  const affected = (e: GameEvent): boolean => e.kind === 'cultivate' && e.payload['op'] !== 'goldenCore'
+  // 队列空着也照扣仙石是纯亏，先查再付。
+  if (!state.timeline.events.some(affected)) return { ok: false, reason: '没有正在进行的修炼事件' }
   const paid = spendCoin(state, cost)
   if (!paid.ok) return paid
 
   const now = paid.state.clock.gameT
   const events = paid.state.timeline.events.map((e) =>
-    e.kind === 'cultivate'
+    affected(e)
       ? {
           ...e,
           finishAt: mode === 'finish' ? now : now + Math.max(0, (e.finishAt - now) / 2),

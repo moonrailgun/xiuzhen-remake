@@ -113,8 +113,17 @@ export type MailItem = {
 export const addQi = (a: FiveQi, b: FiveQi): FiveQi =>
   [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3], a[4] + b[4]] as const
 
+/**
+ * 扣真气。**夹在 0**：`canAfford` 为了抹平浮点累加误差留了一丝容差
+ * （见下面的 `AFFORD_EPSILON`），正好卡在成本上时扣完会剩 -5e-7 —— 顶栏显示 -1，
+ * 而 `validateGameState` 要求真气 ≥ 0，这时存盘直接抛错，客户端还会把它说成
+ * 「浏览器空间不足」。容差本来就是为了「算够了就算够」，那扣完就该是 0。
+ */
 export const subQi = (a: FiveQi, b: FiveQi): FiveQi =>
-  [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3], a[4] - b[4]] as const
+  [
+    Math.max(0, a[0] - b[0]), Math.max(0, a[1] - b[1]), Math.max(0, a[2] - b[2]),
+    Math.max(0, a[3] - b[3]), Math.max(0, a[4] - b[4]),
+  ] as const
 
 /**
  * 五行都够不够付。

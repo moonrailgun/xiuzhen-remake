@@ -241,3 +241,115 @@ function buildReport(
     body: { intro: BATTLE_INTRO, rows, won, target: target.name },
   }
 }
+
+// ===========================================================================
+// 求援与支援
+// ===========================================================================
+//
+// 原文（17173 老专区《战斗扫盲》）：
+//   「求援」就是输入一个朋友的名字，把这个战斗事件通过消息发送给他，
+//   他收到消息后就也可以看见这个战斗事件，这样他就可以点选「支援」来帮助你。
+//   「支援」就是继续丢飞剑过去帮忙……如果支援的飞剑可以及时赶到，
+//   那就能够和那把飞剑一起战斗。
+//   只要两把剑还在缠斗，第三把飞剑赶到，缠斗的时间就会根据第三把剑的敏捷延长，
+//   而且第三把剑也会加入缠斗，在计算伤害的时候一起计算。
+//   如果支援的剑赶不及，就会根据战斗的结果决定是否返回（败了就直接回来了，
+//   赢了的话还会继续赶过去）。
+//
+// 「自己支援自己」是原版明确提到的玩法：「一开始打百妖老是失败的同学
+// 不妨多造几把剑自己支援自己」。
+
+/** 求援：把战斗事件发给某人，对方就能看到并支援。 */
+export function requestHelp(
+  state: GameState,
+  eventId: string,
+  friendName: string,
+): { state: GameState; ok: boolean; reason?: string } {
+  const ev = state.timeline.events.find((e) => e.id === eventId && e.kind === 'battle')
+  if (!ev) return { state, ok: false, reason: '这场战斗已经结束了' }
+
+  const mail: MailItem = {
+    id: `help:${state.clock.gameT}:${eventId}`,
+    // 原版求援是把事件通过消息发过去
+    subject: `${state.player.name}请求援手`,
+    from: state.player.name,
+    at: state.clock.gameT,
+    read: false,
+    kind: 'player',
+    body: {
+      kind: '求援',
+      eventId,
+      target: (ev.payload['target'] as BattleTarget).name,
+      to: friendName,
+    },
+  }
+  return { state: { ...state, mail: [mail, ...state.mail].slice(0, 200) }, ok: true }
+}
+
+/**
+ * 支援：往已有的战斗里再丢几把剑。
+ *
+ * 赶得上（在缠斗结束前到）就一起结算，并按新剑的敏捷延长缠斗时间；
+ * 赶不上则按战斗结果决定去留。
+ */
+export function reinforce(
+  state: GameState,
+  eventId: string,
+  swords: readonly LaunchSword[],
+  opts: { readonly wanjianLevel?: number } = {},
+): LaunchResult {
+  if (swords.length === 0) return { ok: false, reason: '请选择支援的飞剑' }
+
+  const ev = state.timeline.events.find((e) => e.id === eventId && e.kind === 'battle')
+  if (!ev) return { ok: false, reason: '这场战斗已经结束了' }
+  if ((ev.payload['phase'] as BattlePhase) === 'returning') {
+    return { ok: false, reason: '飞剑已经在返回途中' }
+  }
+
+  const limit = swordsOutLimit(opts.wanjianLevel ?? 0)
+  if (swordsOut(state) + swords.length > limit) {
+    return { ok: false, reason: `最多只能同时控制 ${limit} 把飞剑` }
+  }
+
+  const target = ev.payload['target'] as BattleTarget
+  const dist = distance(state.player.x, state.player.y, target.x, target.y)
+  const arriveAt =
+    state.clock.gameT + flightSeconds(dist, Math.min(...swords.map((s) => s.speed)))
+
+  // 赶得上：并进原事件，并按新剑的敏捷延长缠斗
+  if (arriveAt <= ev.finishAt) {
+    const merged = [...(ev.payload['swords'] as LaunchSword[]), ...swords]
+    const extraTangle = swords.reduce((sum, s) => sum + s.agility, 0)
+    const events = state.timeline.events.map((e) =>
+      e.id === eventId
+        ? {
+            ...e,
+            finishAt: e.finishAt + extraTangle,
+            payload: { ...e.payload, swords: merged, swordIds: merged.map((s) => s.id) },
+          }
+        : e,
+    )
+    return { ok: true, state: { ...state, timeline: { events } } }
+  }
+
+  // 赶不上：单独排一个事件，到点时那场已经结束，按结果处理
+  const seq = state.timeline.events.filter((e) => e.kind === 'battle').length
+  return {
+    ok: true,
+    state: {
+      ...state,
+      timeline: schedule(state.timeline, {
+        id: `battle:${state.clock.gameT}:${seq}:${target.name}`,
+        kind: 'battle',
+        finishAt: arriveAt,
+        payload: {
+          phase: 'outbound' satisfies BattlePhase,
+          target,
+          swords,
+          swordIds: swords.map((s) => s.id),
+          lateReinforce: true,
+        },
+      }),
+    },
+  }
+}

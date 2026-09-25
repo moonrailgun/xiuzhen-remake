@@ -8,6 +8,8 @@ import {
   flightSeconds,
   BASE_SWORDS_OUT,
   BATTLE_INTRO,
+  requestHelp,
+  reinforce,
   type BattleTarget,
   type LaunchSword,
 } from './battle.ts'
@@ -241,4 +243,77 @@ test('对方真气都在暗仓里时一点也抢不到', () => {
   }
   const out = advanceTo(withInfo, withInfo.timeline, 1e9, (st, ev) => resolveBattleEvent(st, ev))
   assert.equal(out.state.player.qi[0], 0, '全在暗仓里，抢不到')
+})
+
+// —— 求援与支援（《战斗扫盲》原文）——
+
+test('求援：把战斗事件通过消息发给朋友', () => {
+  const s = state()
+  const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
+  const eventId = started.timeline.events[0]!.id
+  const r = requestHelp(started, eventId, '某友')
+  assert.equal(r.ok, true)
+  const mail = r.state.mail[0]!
+  assert.equal(mail.subject, '173小鱼请求援手')
+  assert.equal((mail.body as { kind: string }).kind, '求援')
+  assert.equal((mail.body as { eventId: string }).eventId, eventId)
+})
+
+test('战斗已结束时无法求援', () => {
+  const r = requestHelp(state(), 'nope', '某友')
+  assert.equal(r.ok, false)
+  assert.match(r.reason ?? '', /已经结束/)
+})
+
+test('支援赶得上：并进同一场，并按新剑敏捷延长缠斗（原文）', () => {
+  const s = state()
+  // 先打一个远目标，留出足够的飞行时间
+  const started = (launch(s, skeleton(140, 140), [qinglong('a')]) as { state: GameState }).state
+  const before = started.timeline.events[0]!
+  const beforeFinish = before.finishAt
+
+  const r = reinforce(started, before.id, [qinglong('b')])
+  assert.equal(r.ok, true)
+  const after = (r as { state: GameState }).state
+  assert.equal(after.timeline.events.length, 1, '并进同一场，不新开事件')
+  const ev = after.timeline.events[0]!
+  assert.equal((ev.payload['swords'] as unknown[]).length, 2, '两把剑一起战斗')
+  assert.ok(ev.finishAt > beforeFinish, '缠斗时间应按新剑的敏捷延长')
+})
+
+test('自己支援自己（原文明确提到的玩法）', () => {
+  const s = state()
+  const started = (launch(s, skeleton(140, 140), [qinglong('a')]) as { state: GameState }).state
+  const r = reinforce(started, started.timeline.events[0]!.id, [qinglong('b'), qinglong('c')])
+  assert.equal(r.ok, true)
+  const ev = (r as { state: GameState }).state.timeline.events[0]!
+  assert.equal((ev.payload['swords'] as unknown[]).length, 3)
+})
+
+test('支援也受「同时在外 5 把」的限制', () => {
+  const s = state()
+  const started = (launch(s, skeleton(140, 140), [
+    qinglong('a'), qinglong('b'), qinglong('c'), qinglong('d'), qinglong('e'),
+  ]) as { state: GameState }).state
+  const r = reinforce(started, started.timeline.events[0]!.id, [qinglong('f')])
+  assert.equal(r.ok, false)
+  assert.match((r as { reason: string }).reason, /最多只能同时控制 5 把飞剑/)
+})
+
+test('飞剑已在返回途中时不能再支援', () => {
+  const s = state()
+  const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
+  const flight = started.timeline.events[0]!.finishAt
+  const arrived = advanceTo(started, started.timeline, flight, (st, ev) => resolveBattleEvent(st, ev))
+  const back = { ...arrived.state, timeline: arrived.timeline }
+  const r = reinforce(back, back.timeline.events[0]!.id, [qinglong('x')])
+  assert.equal(r.ok, false)
+  assert.match((r as { reason: string }).reason, /返回途中/)
+})
+
+test('不选飞剑无法支援', () => {
+  const s = state()
+  const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
+  const r = reinforce(started, started.timeline.events[0]!.id, [])
+  assert.equal(r.ok, false)
 })

@@ -353,6 +353,37 @@ check('秘笈词条是原版逐字的用途表',
 check('底部有「历史：」访问记录', helpText.includes('历史：'))
 await page.evaluate(() => window.closeHWindow())
 
+// —— 15b. 淬炼：两件合一，走的是淬炼规则而不是炼制 ——
+await page.evaluate(() => {
+  const env = JSON.parse(localStorage.getItem('xiuzhen.save'))
+  env.state.player.artifacts = [
+    { id: 'r1', kind: 'sword', name: '玉虚桃木剑', quality: '上品', refine: 0, status: '空闲', count: 1 },
+    { id: 'r2', kind: 'sword', name: '玉虚桃木剑', quality: '上品', refine: 0, status: '空闲', count: 1 },
+  ]
+  env.state.player.skills = { ...env.state.player.skills, 百炼之法: 20 }
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(300)
+await page.click('#bigmenu a[href="item.jsp"]')
+await page.waitForTimeout(250)
+await page.click('#gleft a[href="item.jsp?tab=4"]')
+await page.waitForTimeout(300)
+const refineText = (await page.locator('#gleft').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('淬炼页列出可淬的那一对', refineText.includes('→ +1'), refineText.slice(0, 60))
+
+await page.click('#gleft a[onclick^="sendMakeItem"]')
+await page.waitForTimeout(300)
+await page.click('#mwindow2 .mwindow2ok a, #mwindow2 a.mwindow2ok, #mwindow2ok')
+  .catch(async () => { await page.evaluate(() => window.OnMDialog2OK()) })
+await page.waitForTimeout(400)
+const afterRefine = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return { n: st.player.artifacts.length, refine: st.player.artifacts[0]?.refine ?? -1 }
+})
+check('★淬炼后两件变一件 +1（不是炼出第三把新剑）',
+  afterRefine.n === 1 && afterRefine.refine === 1, JSON.stringify(afterRefine))
+
 // —— 16. 五行互化：表单提交不能把游戏页跳走 ——
 const beforeTurn = await page.evaluate(() => {
   const env = JSON.parse(localStorage.getItem('xiuzhen.save'))

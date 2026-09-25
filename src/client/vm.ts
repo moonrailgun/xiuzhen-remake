@@ -180,6 +180,35 @@ export function guardCraftRows(s: GameState): readonly CraftRow[] {
 
 /** 淬炼页：手上凑得出一对（同名同品质同淬炼数）的法宝才能淬。 */
 export function refineRows(s: GameState): readonly CraftRow[] {
+  return refinePairs(s)
+    .map((list, i) => {
+      const a = list[0]!
+      return {
+        name: `${artifactLabel(a)} → +${a.refine + 1}`,
+        // 淬炼页的 itemId 是**行号**，不是物品号 —— 点「淬炼」时靠它反查这一对
+        // （这一页零证据，原版参数名未知，见 item.ts 的注释）
+        itemId: REFINE_ROW_BASE + i,
+        owned: list.length,
+        craftSeconds: 0,
+        craftable: Math.floor(list.length / 2),
+      }
+    })
+}
+
+/** 淬炼页行号的基址。挑一个不会和飞剑(501xx)/护身(601xx)/丹药(3 位)撞的区间。 */
+export const REFINE_ROW_BASE = 70000
+
+/** 按淬炼页的行号取那一对法宝的 id。 */
+export function refinePairAt(s: GameState, itemId: number): readonly [string, string] | null {
+  const idx = itemId - REFINE_ROW_BASE
+  const rows = refinePairs(s)
+  const list = rows[idx]
+  if (!list || list.length < 2) return null
+  return [list[0]!.id, list[1]!.id]
+}
+
+/** 淬炼页的分组：同名同品质同淬炼数、且都空闲的法宝。 */
+function refinePairs(s: GameState): readonly (readonly Artifact[])[] {
   const pairs = new Map<string, Artifact[]>()
   for (const a of s.player.artifacts) {
     if (a.kind !== 'sword' && a.kind !== 'guard') continue
@@ -187,18 +216,7 @@ export function refineRows(s: GameState): readonly CraftRow[] {
     const key = `${a.name}|${a.quality}|${a.refine}`
     pairs.set(key, [...(pairs.get(key) ?? []), a])
   }
-  return [...pairs.entries()]
-    .filter(([, list]) => list.length >= 2)
-    .map(([, list]) => {
-      const a = list[0]!
-      return {
-        name: `${artifactLabel(a)} → +${a.refine + 1}`,
-        itemId: artifactItemId(a),
-        owned: list.length,
-        craftSeconds: 0,
-        craftable: Math.floor(list.length / 2),
-      }
-    })
+  return [...pairs.values()].filter((l) => l.length >= 2)
 }
 
 /** 「正在炼制中 / 正在淬炼中」：直接读时间线上的炼器事件。 */

@@ -23,6 +23,8 @@ import {
   townHere,
   townKey,
   sceneNpcNames,
+  refinePairAt,
+  REFINE_ROW_BASE,
 } from './vm.ts'
 import { newGame } from '../engine/game.ts'
 import { refillNpcOrders } from '../engine/market.ts'
@@ -274,4 +276,30 @@ test('城镇一旦入档就不再重新生成（投资不会被抹掉）', () =>
     assert.equal(here.fresh, false)
     assert.equal(here.town.investments.length, 1)
   }
+})
+
+// —— 淬炼的行号反查 ——
+
+test('★淬炼页的行号能反查回那一对法宝（不能当成炼制的物品号）', () => {
+  const s = withItems(base(), [
+    item({ id: 'a1' }),
+    item({ id: 'a2' }),
+    item({ id: 'b1', name: '青龙伏魔剑' }),
+    item({ id: 'b2', name: '青龙伏魔剑' }),
+  ])
+  const rows = refineRows(s)
+  assert.equal(rows.length, 2)
+  // 行号落在专用区间，不会和飞剑(501xx)/护身(601xx)/丹药(3 位)撞
+  assert.ok(rows.every((r) => r.itemId >= REFINE_ROW_BASE))
+
+  assert.deepEqual(refinePairAt(s, rows[0]!.itemId), ['a1', 'a2'])
+  assert.deepEqual(refinePairAt(s, rows[1]!.itemId), ['b1', 'b2'])
+  assert.equal(refinePairAt(s, REFINE_ROW_BASE + 99), null, '越界要返回 null')
+})
+
+test('淬炼行号与炼制物品号不会互相误认', () => {
+  const s = withItems(base(), [item({ id: 'a1' }), item({ id: 'a2' })])
+  const swordIds = swordCraftRows(s).map((r) => r.itemId)
+  const refineIds = refineRows(s).map((r) => r.itemId)
+  for (const id of refineIds) assert.ok(!swordIds.includes(id), `${id} 与炼制页撞号`)
 })

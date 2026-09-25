@@ -27,7 +27,7 @@ import { renderBattleEvent } from '../pages/battleevent.ts'
 import { renderHelp, HELP_TOPICS, HELP_ENTRIES } from '../pages/help.ts'
 import {
   skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel,
-  townHere, townKey, sceneNpcNames,
+  townHere, townKey, sceneNpcNames, refinePairAt,
 } from './vm.ts'
 import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
 import { ranking } from '../engine/npc.ts'
@@ -58,7 +58,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { startCraft, type CraftOrder } from '../engine/craft.ts'
+import { startCraft, refineArtifact, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, panelStat, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
 import {
@@ -817,6 +817,8 @@ export function installGameActions(): void {
   /** 炼制法宝（炼制页的「炼制」按钮）。数量从原版那个 `craft{id}` 输入框读。 */
   g['sendMakeItem'] = (itemId: number, count?: number) => {
     if (!state) return
+    // 淬炼页共用这个按钮，但走的是完全不同的规则（两件合一、失败俱毁）
+    if (itemTab === 'refine') return doRefine(itemId)
     const box = document.getElementById(`craft${itemId}`) as HTMLInputElement | null
     const n = Math.max(1, Math.floor(Number(box?.value) || count || 1))
     const order = craftOrderFor(state, itemId, n)
@@ -1510,6 +1512,44 @@ function craftQuality(s: GameState): '废品' | '凡品' | '上品' | '极品' {
 }
 
 // —— 市场 ——
+
+/**
+ * 淬炼：两件完全相同的法宝合成一件 +1，**失败俱毁**。
+ * 满级百炼之法能稳定淬到 +10，+11 起要花仙石保（1 石保不毁、2 石保必成）。
+ */
+function doRefine(rowId: number): void {
+  if (!state) return
+  const pair = refinePairAt(state, rowId)
+  if (!pair) {
+    openWindow('mwindow', '淬炼', '<DIV class=middle style="padding:10px">凑不出两件完全相同的法宝。</DIV>')
+    return
+  }
+  const s = state
+  const [idA] = pair
+  const item = s.player.artifacts.find((a) => a.id === idA)!
+  const next = item.refine + 1
+  const g2 = globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>
+  g2['MDialogOkCancel']!(
+    '淬炼',
+    `<DIV class=middle style="padding:10px">用两件 ${esc(artifactLabel(item))} 淬炼成 +${next}？<BR>` +
+    `<SPAN class=smallred>失败则两件俱毁。</SPAN></DIV>`,
+    () => {
+      if (!state) return
+      const r = refineArtifact(state, pair, {
+        baihuanLevel: state.player.skills['百炼之法'] ?? 0,
+      })
+      if (!r.ok) {
+        openWindow('mwindow', '淬炼失败', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+        return
+      }
+      state = r.state
+      openWindow('mwindow', '淬炼', `<DIV class=middle style="padding:10px">${
+        r.success ? `淬炼成功，得到 +${next}。` : `${REFINE_FAIL_TEXT}。`
+      }</DIV>`)
+      step()
+    },
+  )
+}
 
 /** 领取任务奖励（任务窗底部那个「领取奖励」按钮）。 */
 function doClaimQuest(id: string): void {

@@ -234,7 +234,9 @@ a.help, .help {
 /* —— 地图 —— */
 /* 视口 448×245，地块图 64×120（菱形占底部 64×35），行距 17.5px。
    自成层叠上下文，避免格子的高 z-index 盖住浮窗。 */
-#mapdiv, #mapbg {
+/* 地图可视区：448×245（06 §69 由 mapData 的 113 格反推，与墨框内沿实测吻合）。
+   自成层叠上下文，避免格子的高 z-index 盖住浮窗。 */
+#mapdiv {
   position: relative;
   width: 448px;
   height: 245px;
@@ -329,7 +331,11 @@ a.help, .help {
 /* —— 地图页 —— */
 /* 地图区：448×245 可视窗，外面一圈留给 8 个滚屏箭头（约 480×280）。
    .mapdiv 自成层叠上下文，避免地块高达 565 的 z-index 盖住浮窗。 */
-#mapbg { position: relative; width: 480px; height: 460px; }
+/* 地图外层：要容下环绕视口的 8 个方向箭头（map.ts 的 ARROWS，left 0..463、top 154..414），
+   所以比 448 的视口宽。墨框背景本身实测 ≈458×253（06 §107），箭头在框外。
+   右缘 20+480=500，中栏从 509 起 —— 不相撞。
+   **别再把 #mapbg 并进上面那条 #mapdiv 规则**：以前两处都声明，宽高互相覆盖，很难查。 */
+#mapbg { position: relative; width: 480px; height: 460px; overflow: hidden; }
 #mapbg .maparrow { position: absolute; z-index: 2; }
 .mapdiv {
   position: absolute; left: 16px; top: 170px;

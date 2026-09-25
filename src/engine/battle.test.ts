@@ -198,3 +198,47 @@ test('离线期间的战斗会被一次性结算', () => {
   assert.equal(countByKind(out.timeline, 'battle'), 0, '全部结算完')
   assert.ok(out.state.mail.length > 0)
 })
+
+// —— 掠夺（打玩家时按固本培元暗仓规则）——
+
+test('打赢玩家时只抢走超出对方暗仓的部分（原文规则）', () => {
+  const s = state()
+  const victim: BattleTarget = {
+    kind: 'player', name: '某羊', x: 101, y: 100,
+    attack: 1, agility: 1, hp: 1, element: null,
+  }
+  // 对方丹田 5000/各，固本 12 级 → 每种护住 1800 → 可抢 3200
+  const r = launch(s, victim, [qinglong()], { sightRange: 10 })
+  const started = (r as { state: GameState }).state
+  const withVictimInfo: GameState = {
+    ...started,
+    timeline: {
+      events: started.timeline.events.map((e) => ({
+        ...e,
+        payload: { ...e.payload, targetQi: [5000, 5000, 5000, 5000, 5000], targetRootLevel: 12 },
+      })),
+    },
+  }
+  const out = advanceTo(withVictimInfo, withVictimInfo.timeline, 1e9, (st, ev) => resolveBattleEvent(st, ev))
+  assert.equal(out.state.player.qi[0], 3200, '5000 − 1800 = 3200')
+})
+
+test('对方真气都在暗仓里时一点也抢不到', () => {
+  const s = state()
+  const victim: BattleTarget = {
+    kind: 'player', name: '某羊', x: 101, y: 100,
+    attack: 1, agility: 1, hp: 1, element: null,
+  }
+  const started = (launch(s, victim, [qinglong()], { sightRange: 10 }) as { state: GameState }).state
+  const withInfo: GameState = {
+    ...started,
+    timeline: {
+      events: started.timeline.events.map((e) => ({
+        ...e,
+        payload: { ...e.payload, targetQi: [500, 500, 500, 500, 500], targetRootLevel: 12 },
+      })),
+    },
+  }
+  const out = advanceTo(withInfo, withInfo.timeline, 1e9, (st, ev) => resolveBattleEvent(st, ev))
+  assert.equal(out.state.player.qi[0], 0, '全在暗仓里，抢不到')
+})

@@ -18,6 +18,7 @@ import { schedule, type GameEvent } from './timeline.ts'
 import { resolveBattle, type CombatSword } from './combat.ts'
 import { addQi, subQi, type FiveQi, type GameState, type MailItem } from './state.ts'
 import { distance } from '../data/world.ts'
+import { lootFrom } from './loot.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
 
 /** 战斗事件的四种状态，对应原版事件栏的四种句式。 */
@@ -163,10 +164,16 @@ export function resolveBattleEvent(
   const lost = result.attacker.filter((o) => o.broken).map((o) => o.id)
   const won = result.defender.every((o) => o.broken)
 
-  // 赢了抢真气：怪物按生命值折算一份战利品 [重建：原版掠夺是抢玩家丹田里的真气]
-  const loot: FiveQi = won && target.kind === 'monster'
-    ? ([target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2] as unknown as FiveQi)
-    : ([0, 0, 0, 0, 0] as unknown as FiveQi)
+  // 赢了抢真气。打玩家时照原版规则：**只有超出对方固本培元暗仓的部分**抢得走；
+  // 打怪没有暗仓，按生命值折算一份战利品 [重建]。
+  const loot: FiveQi = !won
+    ? ([0, 0, 0, 0, 0] as unknown as FiveQi)
+    : target.kind === 'player'
+      ? lootFrom(
+          (event.payload['targetQi'] as FiveQi) ?? ([0, 0, 0, 0, 0] as unknown as FiveQi),
+          (event.payload['targetRootLevel'] as number) ?? 0,
+        ).taken
+      : ([target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2, target.hp * 2] as unknown as FiveQi)
 
   const report = buildReport(state, target, swords, result, won)
 

@@ -60,7 +60,8 @@ const LITTLE_MENU: readonly { img: string; onclick?: string; href?: string; titl
   { img: 'playerdir.gif', onclick: "openLWindow('', 'playerinfo.jsp')", title: '个人资料' },
   { img: 'vip.gif', onclick: "openLWindow('', 'payment.jsp')", title: '付费功能' },
   { img: 'bbs.gif', href: '#', title: '论坛' },
-  { img: 'about.gif', onclick: "openLWindow('', 'about.jsp')", title: '关于' },
+  // 本地版把「关于」接到怀旧版设置（倍速、存档导入导出）
+  { img: 'about.gif', onclick: 'openSettings()', title: '关于' },
 ]
 
 const RES_ICONS = ['gold', 'wood', 'water', 'fire', 'earth'] as const

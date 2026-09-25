@@ -10,13 +10,17 @@ import { renderPlayer, type PlayerVm } from '../pages/player.ts'
 import { renderMap, screenCells, type MapVm, type MapCell } from '../pages/map.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
-import { newGame, tick, saveGame, loadGame, resourceBarOf } from '../engine/game.ts'
+import { newGame, tick, saveGame, loadGame, resourceBarOf, MIGRATIONS } from '../engine/game.ts'
 import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation } from '../engine/quest.ts'
 import { questTitle } from '../data/quests.ts'
+import { renderSettings } from '../pages/settings.ts'
+import { changeRate } from '../engine/game.ts'
+import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
+import { dayOfServer } from '../engine/clock.ts'
 import { startCultivate, planUpgrade, speedUp, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
 import { sorted } from '../engine/timeline.ts'
@@ -24,6 +28,7 @@ import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
 import { openWindow, closeWindow, setPageResolver, startCountdowns } from './windows.ts'
+import { esc } from '../pages/html.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
   try {
@@ -399,6 +404,65 @@ export function installGameActions(): void {
     }
     state = { ...state, quests: r.value }
     step()
+  }
+
+  /** 顶栏「关于」→ 怀旧版设置。 */
+  g['openSettings'] = () => {
+    if (!state) return
+    let bytes = 0
+    try {
+      bytes = (localStorage.getItem(SAVE_KEYS.main) ?? '').length
+    } catch { /* 存储不可用 */ }
+    openWindow('lwindow', '怀旧版设置', renderSettings({
+      rate: state.clock.rate,
+      dayOfServer: dayOfServer(state.clock),
+      saveBytes: bytes,
+      storageOk: STORAGE_KEY_AVAILABLE,
+    }))
+  }
+
+  g['setRate'] = (rate: number) => {
+    if (!state) return
+    state = changeRate(state, Date.now(), rate)
+    step()
+    ;(globalThis as unknown as Record<string, () => void>)['openSettings']!()
+  }
+
+  g['importSavePrompt'] = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'application/json,.json'
+    input.onchange = async () => {
+      const file = input.files?.[0]
+      if (!file) return
+      try {
+        const loaded = importSave(await file.text(), MIGRATIONS) as GameState
+        state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
+        closeWindow('lwindow')
+        step()
+      } catch (e) {
+        openWindow('mwindow', '导入失败', `<DIV class=middle style="padding:10px">${
+          e instanceof Error ? esc(e.message) : '存档格式不对'
+        }</DIV>`)
+      }
+    }
+    input.click()
+  }
+
+  g['resetGame'] = () => {
+    const g2 = globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>
+    g2['MDialogOkCancel']!(
+      '重新开始',
+      '<DIV class=middle style="padding:10px">这会清空当前进度，重新建号。<BR>建议先导出存档。</DIV>',
+      () => {
+        try {
+          clearSave(localStorage)
+        } catch { /* 忽略 */ }
+        state = null
+        closeWindow('lwindow')
+        render()
+      },
+    )
   }
 
   g['exportSave'] = () => {

@@ -30,6 +30,7 @@ import {
   townHere, townKey, sceneNpcNames, refinePairAt,
 } from './vm.ts'
 import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
+import { SKILL_TREES } from '../data/skills.ts'
 import { ranking } from '../engine/npc.ts'
 import {
   MAX_INVESTMENTS, commerceLevel, totalInvested, shareOf, hourlyIncomeOf,
@@ -38,9 +39,9 @@ import {
 } from '../engine/town.ts'
 import {
   escortDialog, townNpcDialog, DIALOG_VERBATIM_IDS, booksReadableIn, npcsIn,
-  READ_BOOK_SILVER, STATION_COST_COIN, LI_YUANWAI_SILVER, type TownNpc,
+  READ_BOOK_SILVER, STATION_COST_COIN, LI_YUANWAI_SILVER, BOOKS, type TownNpc,
 } from '../data/town.ts'
-import { daoxingText } from '../engine/state.ts'
+import { daoxingText, REALMS, type Artifact } from '../engine/state.ts'
 import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
@@ -53,14 +54,16 @@ import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
+import { renderGm, type GmVm } from '../pages/gm.ts'
+import { applyGm, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { startCraft, refineArtifact, canAcquireArtifacts, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
-import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
-import { DEFENSIVE_ARTIFACTS, PASSIVE_SWORD_ARTS, type Quality } from '../data/artifacts.ts'
+import { startCraft, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS, ITEM_STATUSES } from '../pages/item.ts'
+import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
   ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
 } from '../engine/market.ts'
@@ -69,7 +72,7 @@ import { changeRate } from '../engine/game.ts'
 import { exportSave as serializeExport, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
 import { purchase } from '../engine/payment.ts'
-import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
+import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, capacityOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
 import { roll, type RngState } from '../engine/rng.ts'
@@ -124,6 +127,9 @@ let mapSelected: { x: number; y: number } | null = null
  * 「将来改了 state 结构忘了加迁移」这种纯代码失误。
  */
 let loadFailure: { readonly reason: string; readonly main: string | null; readonly backup: string | null } | null = null
+
+/** GM 面板上一次「应用修改」的结果（收拢说明或错误），只在面板里显示一次。 */
+let gmNotice: GmVm['notice'] = undefined
 
 /**
  * 把上面这些模块级的界面状态复位。
@@ -1286,6 +1292,149 @@ export function installGameActions(): void {
     )
   }
 
+
+  // ===========================================================================
+  // GM 面板（本地版工具，非原版）
+  // ===========================================================================
+
+  /** 表单里一个字段的原始值。面板上的 NAME 全部以 `gm-` 开头。 */
+  const field = (name: string): string | undefined => {
+    const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(
+      `#gmform [name="${CSS.escape(name)}"]`)
+    return el === null ? undefined : el.value
+  }
+  const fieldNum = (name: string, fallback: number): number => {
+    const raw = field(name)
+    const v = raw === undefined || raw.trim() === '' ? NaN : Number(raw)
+    return Number.isFinite(v) ? v : fallback
+  }
+  const checked = (name: string): boolean =>
+    document.querySelector<HTMLInputElement>(`#gmform [name="${CSS.escape(name)}"]`)?.checked === true
+
+  /**
+   * 把整张表读成一份补丁。
+   *
+   * 每个动作（应用 / 加法宝 / 删法宝 / 填满真气）都先读一遍完整表单再动手，
+   * 这样「改了一堆数字还没应用，顺手删了一件法宝」不会把那堆数字丢掉。
+   */
+  function readGmForm(s: GameState): GmPatch {
+    const p = s.player
+    const items: Artifact[] = []
+    for (let i = 0; ; i++) {
+      const id = field(`gm-item-id:${i}`)
+      if (id === undefined) break
+      const original = p.artifacts.find((a) => a.id === id)
+      if (!original) continue
+      items.push({
+        ...original,
+        quality: (field(`gm-item-quality:${i}`) ?? original.quality) as Artifact['quality'],
+        refine: fieldNum(`gm-item-refine:${i}`, original.refine),
+        status: field(`gm-item-status:${i}`) ?? original.status,
+        count: fieldNum(`gm-item-count:${i}`, original.count),
+      })
+    }
+    const skills: Record<string, number> = {}
+    for (const name of skillCaps().keys()) {
+      const v = fieldNum(`gm-skill:${name}`, p.skills[name] ?? 0)
+      if (v > 0) skills[name] = v
+    }
+    return {
+      name: field('gm-name') ?? p.name,
+      gender: field('gm-gender') === '女' ? 'f' : 'm',
+      element: (field('gm-element') ?? p.element) as Element,
+      school: (field('gm-school') ?? p.school) as GameState['player']['school'],
+      realm: (field('gm-realm') ?? p.realm) as GameState['player']['realm'],
+      x: fieldNum('gm-x', p.x),
+      y: fieldNum('gm-y', p.y),
+      qi: ELEMENTS.map((_, i) => fieldNum(`gm-qi${i}`, p.qi[i] ?? 0)),
+      silver: fieldNum('gm-silver', p.silver),
+      coin: fieldNum('gm-coin', p.coin),
+      bonusCoin: fieldNum('gm-bonusCoin', p.bonusCoin),
+      daoxing: fieldNum('gm-daoxing', p.daoxing),
+      experience: fieldNum('gm-experience', p.experience),
+      meridians: MERIDIANS.map((_, i) => fieldNum(`gm-meridian${i}`, p.meridians[i] ?? 0)),
+      body: BODY_PARTS.map((_, i) => fieldNum(`gm-body${i}`, p.body[i] ?? 0)),
+      skills,
+      vip: checked('gm-vip'),
+      artifacts: items,
+      clearEvents: checked('gm-clearEvents'),
+    }
+  }
+
+  /** 落一份补丁，记下收拢说明，重开面板。 */
+  function commitGm(patch: GmPatch): void {
+    if (!state) return
+    const r = applyGm(state, patch)
+    if (!r.ok) {
+      gmNotice = { ok: false, lines: [`没有改动：${r.reason}`] }
+    } else {
+      state = r.state
+      gmNotice = {
+        ok: true,
+        lines: r.notes.length === 0
+          ? ['已应用。']
+          : ['已应用，其中这些被收拢到了上限：', ...r.notes],
+      }
+      step()
+    }
+    ;(globalThis as unknown as Record<string, () => void>)['openGm']!()
+  }
+
+  g['openGm'] = () => {
+    if (!state) return
+    // 标题传空：面板自己有大标题，而浮窗的 `#lwindowtitle` 现在会掉到窗口最底下
+    // （壳子里它排在 #lwindowcontent **之后**，见 UNCERTAIN.md §9）。
+    openWindow('lwindow', '', resolvePage('gm.jsp'))
+  }
+
+  g['gmApply'] = () => {
+    if (!state) return
+    commitGm(readGmForm(state))
+  }
+
+  g['gmFillQi'] = () => {
+    if (!state) return
+    const patch = readGmForm(state)
+    // 上限按**表单里的**丹田气海算，不是按当前的 —— 一次就能「丹田拉满 + 真气拉满」
+    const draftState: GameState = {
+      ...state,
+      player: { ...state.player, body: patch.body ?? state.player.body },
+    }
+    const cap = capacityOf(draftState)
+    commitGm({ ...patch, qi: [cap, cap, cap, cap, cap] })
+  }
+
+  g['gmZeroQi'] = () => {
+    if (!state) return
+    commitGm({ ...readGmForm(state), qi: [0, 0, 0, 0, 0] })
+  }
+
+  g['gmDropItem'] = (id: string) => {
+    if (!state) return
+    const patch = readGmForm(state)
+    commitGm({ ...patch, artifacts: (patch.artifacts ?? []).filter((a) => a.id !== id) })
+  }
+
+  g['gmAddItem'] = () => {
+    if (!state) return
+    const name = field('gm-add-name')
+    if (!name) return
+    const patch = readGmForm(state)
+    const quality = (field('gm-add-quality') ?? '极品') as Artifact['quality']
+    const refine = Math.max(0, fieldNum('gm-add-refine', 0))
+    const item: Artifact = {
+      // 时间戳做 id：GM 加的东西不参与任何按 id 推导的逻辑，只要不撞车
+      id: `gm:${Date.now().toString(36)}:${Math.floor(performance.now() * 1000).toString(36)}`,
+      kind: gmItemKind(name),
+      name,
+      quality,
+      refine,
+      status: '空闲',
+      count: 1,
+    }
+    commitGm({ ...patch, artifacts: [...(patch.artifacts ?? []), item] })
+  }
+
   g['exportSave'] = () => {
     if (!state) return
     const blob = new Blob([serializeExport(state, Date.now())], { type: 'application/json' })
@@ -1294,6 +1443,73 @@ export function installGameActions(): void {
     a.download = `xiuzhen-${state.player.name}.json`
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 0)
+  }
+}
+
+
+/** 目录里的名字 → 法宝类别。GM 加的东西也要能被物品页正确分类。 */
+function gmItemKind(name: string): Artifact['kind'] {
+  if (swordByName(name)) return 'sword'
+  if (DEFENSIVE_ARTIFACTS.some((d) => d.name === name) || DEFENSIVE_ARTIFACT_NAMES_KNOWN.includes(name)) return 'guard'
+  if (PILL_NAMES.some((p) => name.endsWith(p))) return 'pill'
+  if (BOOKS.some((b) => b.name === name)) return 'book'
+  return 'misc'
+}
+
+/** GM 面板可加入的法宝目录。 */
+const GM_CATALOG: readonly { readonly group: string; readonly names: readonly string[] }[] = [
+  { group: '飞剑', names: SWORDS.map((s) => s.name) },
+  { group: '护身', names: DEFENSIVE_ARTIFACT_NAMES_KNOWN },
+  { group: '丹药', names: PILL_TIERS.flatMap((t) => PILL_NAMES.map((n) => `${t}${n}`)) },
+  { group: '书', names: BOOKS.map((b) => b.name) },
+  { group: '银票', names: BANK_NOTES.map((n) => n.name) },
+]
+
+function gmVm(s: GameState): GmVm {
+  const caps = skillCaps()
+  const slots = artifactCapacity(s)
+  return {
+    name: s.player.name,
+    gender: s.player.gender,
+    element: s.player.element,
+    school: s.player.school,
+    realm: s.player.realm,
+    x: s.player.x,
+    y: s.player.y,
+    qi: [...s.player.qi],
+    qiCap: capacityOf(s),
+    silver: s.player.silver,
+    coin: s.player.coin,
+    bonusCoin: s.player.bonusCoin,
+    daoxing: s.player.daoxing,
+    daoxingText: daoxingText(s.player.daoxing),
+    experience: s.player.experience,
+    vip: s.player.vip,
+    meridians: MERIDIANS.map((m, i) => ({
+      name: m.name, level: s.player.meridians[i] ?? 0, cap: meridianCapFor(s.player.realm),
+    })),
+    body: BODY_PARTS.map((name, i) => ({ name, level: s.player.body[i] ?? 0, cap: bodyCapFor(i) })),
+    skills: (['produce', 'sword', 'math'] as const).flatMap((tree) =>
+      SKILL_TREES[tree].map((n) => ({
+        tree: { produce: '炼器', sword: '剑诀', math: '术数' }[tree],
+        name: n.name,
+        level: s.player.skills[n.name] ?? 0,
+        cap: caps.get(n.name) ?? n.cap,
+      }))),
+    artifacts: s.player.artifacts.map((a) => ({
+      id: a.id, kind: a.kind, name: a.name, quality: a.quality,
+      refine: a.refine, status: a.status, count: a.count,
+    })),
+    used: artifactSpaceUsed(s),
+    slots,
+    catalog: GM_CATALOG,
+    qualities: [...QUALITIES],
+    statuses: [...ITEM_STATUSES],
+    elements: [...ELEMENTS],
+    schools: [...SCHOOLS],
+    realms: [...REALMS],
+    events: s.timeline.events.length,
+    notice: gmNotice,
   }
 }
 
@@ -1310,6 +1526,13 @@ function resolvePage(url: string): string {
   const page = /(\w+)\.jsp$/.exec(path ?? '')?.[1]
 
   switch (page) {
+    // 本地版工具，不是原版的页面（见 pages/gm.ts）
+    case 'gm': {
+      const html = renderGm(gmVm(s))
+      gmNotice = undefined   // 提示只显示一次
+      return html
+    }
+
     case 'msg':
       msgPage = Number(q.get('page') ?? 1) || 1
       return renderMsg(msgVm(s, msgPage))

@@ -67,6 +67,12 @@ ${row(
         `<A class=skillup href="#" onclick="resetGame()">重新开始</A>`
       : `<SPAN class=smallred>浏览器禁用了本地存储，进度不会被保存。请用导出功能手动备份。</SPAN>`,
   )}
+${row(
+    'GM 面板',
+    '<A class=skillup href="#" onclick="openGm()">打开</A><BR>' +
+    '<SPAN class=smallgray>直接改角色数据：属性、真气、经脉、本体、法术、法宝、银两仙石。' +
+    '本地版工具，原版没有这种东西。</SPAN>',
+  )}
 </TBODY></TABLE>
 
 <DIV class=smallgray style="padding:8px 2px">

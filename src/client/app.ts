@@ -502,7 +502,7 @@ export function installGameActions(): void {
     const target = system === 'skill'
       ? { system: 'skill' as const, id: skillNodeById(index)?.name ?? '' }
       : { system: system as 'meridian' | 'body', index }
-    const r = startCultivate(state, target)
+    const r = startCultivate(state, target, { hasVip: state.player.vip })
     if (!r.ok) {
       const box = document.getElementById('upgradeMsg')
       if (box) box.innerHTML = `<SPAN class=smallred>${r.reason}</SPAN>`
@@ -829,6 +829,7 @@ export function installGameActions(): void {
   g['postForm'] = (action: string) => {
     if (action === 'sellqi') return doListQi()
     if (action === 'sellitem') return doListArtifact()
+    if (action === 'sendmsg') return doSendMsg()
     openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
 
@@ -979,7 +980,16 @@ export function installGameActions(): void {
       dayOfServer: dayOfServer(state.clock),
       saveBytes: bytes,
       storageOk: STORAGE_KEY_AVAILABLE,
+      vip: state.player.vip,
     }))
+  }
+
+  /** 怀旧版设置里的 VIP 开关。规则照原版：多一条修炼队列、多 5 个法宝格。 */
+  g['toggleVip'] = () => {
+    if (!state) return
+    state = { ...state, player: { ...state.player, vip: !state.player.vip } }
+    step()
+    ;(globalThis as unknown as Record<string, () => void>)['openSettings']!()
   }
 
   g['setRate'] = (rate: number) => {
@@ -1640,6 +1650,53 @@ function divineContext(s: GameState, target: NpcState) {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10),
   }
+}
+
+/**
+ * 发消息。
+ *
+ * 原版是投进对方的收件箱；单机版没有真人收件箱，所以**记进自己的收件箱存底**
+ * （标明是寄出的），这样至少「写了、寄了、留了底」这条链是通的，
+ * 而不是点一下弹「尚未接入」。收信人若是感应范围内的 NPC，会认下这个名字。
+ */
+function doSendMsg(): void {
+  if (!state) return
+  const val = (id: string) =>
+    (document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? ''
+  const to = val('msgreceiver').trim()
+  const subject = val('msgsubject').trim()
+  const content = val('msgtext').trim()
+
+  if (!to) {
+    openWindow('mwindow', '写消息', '<DIV class=middle style="padding:10px">请填写收件人。</DIV>')
+    return
+  }
+
+  const known = allNpcsAt(state.npc, state.clock.gameT, state.worldSeed)
+    .some((n) => n.base.name === to)
+
+  const sent = {
+    id: `sent:${state.clock.gameT}:${to}`,
+    subject: `寄给${to}：${subject || '（无主题）'}`,
+    from: state.player.name,
+    at: state.clock.gameT,
+    read: true,
+    kind: 'player' as const,
+    body: {
+      kind: 'text',
+      paragraphs: [
+        ...(content ? [`　　${content}`] : ['　　（正文为空）']),
+        '',
+        known
+          ? `　　此信已寄出。${to}是个 NPC，单机版里不会有人回信。`
+          : `　　此信已寄出，但感应范围内没有叫「${to}」的人。`,
+      ],
+    },
+  }
+  state = { ...state, mail: [sent, ...state.mail].slice(0, 200) }
+  openWindow('mwindow', '写消息',
+    `<DIV class=middle style="padding:10px">已寄给 ${esc(to)}，副本留在你的收件箱里。</DIV>`)
+  step()
 }
 
 /** 领取任务奖励（任务窗底部那个「领取奖励」按钮）。 */

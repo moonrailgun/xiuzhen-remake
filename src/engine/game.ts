@@ -56,6 +56,14 @@ export const MIGRATIONS: readonly Migration[] = [
     from: 4,
     migrate: (old) => ({ ...(old as object), towns: {} }),
   },
+  {
+    // v5 → v6：VIP 开关进存档。老档默认关（和原版没充值一样）。
+    from: 5,
+    migrate: (old) => {
+      const s = old as { player?: object }
+      return { ...(old as object), player: { ...(s.player ?? {}), vip: false } }
+    },
+  },
 ]
 
 const MERIDIAN_GROUPS: readonly MeridianGroup[] = ['手三阴', '手三阳', '足三阴', '足三阳']
@@ -105,6 +113,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
       // 进游戏送 100 附加仙石（官方指南原文）
       bonusCoin: 100,
       artifacts: [],
+      vip: false,
       createdAt: startT,
     },
   }

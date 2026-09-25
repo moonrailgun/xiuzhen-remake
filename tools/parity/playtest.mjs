@@ -460,6 +460,32 @@ check('来袭事件的操作是「还击 / 战斗地图」，没有求援',
 check('来犯者的剑看不穿（整行 ???）', raidB.includes('???'))
 await page.evaluate(() => window.closeBWindow())
 
+// —— 17c. VIP 开关与写消息：两个以前点了没反应的按钮 ——
+await page.evaluate(() => window.openSettings())
+await page.waitForTimeout(300)
+const beforeVip = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('xiuzhen.save')).state.player.vip)
+await page.click('#lwindowcontent a[onclick="toggleVip()"]')
+await page.waitForTimeout(400)
+const afterVip = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return st.player.vip
+})
+check('VIP 开关能打开（第二条修炼队列才摸得到）', afterVip === !beforeVip, `${beforeVip} → ${afterVip}`)
+await page.evaluate(() => window.closeLWindow())
+
+await page.evaluate(() => window.openLWindow('写消息', 'writemsg.jsp?receiver=张三'))
+await page.waitForTimeout(300)
+await page.fill('#msgsubject', '借剑一用')
+await page.fill('#msgtext', '道友，可否借飞剑一观？')
+await page.click('#lwindowcontent input[value=发送]')
+await page.waitForTimeout(400)
+const sentOk = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return st.mail.filter((m) => m.subject.startsWith('寄给张三')).length
+})
+check('★写消息发送后留底（不再弹「尚未接入」）', sentOk === 1, `留底 ${sentOk} 封`)
+
 // 18. 产业页与排行榜浮窗能打开（原版 L 窗路由）
 await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
 await page.waitForTimeout(300)

@@ -229,3 +229,16 @@ test('存档体积：带 300 个 NPC 仍远小于 1.5MB 预算', () => {
   saveGame(store, fresh(), 0)
   assert.ok(store.size() < 200_000, `存档 ${store.size()} 字节`)
 })
+
+test('★v5 老存档迁到 v6：补上 VIP 开关，默认关（等同原版没充值）', () => {
+  const store = memStorage()
+  const s = fresh()
+  const { vip: _drop, ...playerWithoutVip } = s.player
+  store.setItem(
+    'xiuzhen.save',
+    JSON.stringify({ v: 5, savedAt: 0, state: { ...s, v: 5, player: playerWithoutVip } }),
+  )
+  const loaded = loadGame(store)!
+  assert.equal(loaded.player.vip, false, '老档默认没 VIP')
+  assert.equal(loaded.player.name, s.player.name, '其余进度不受影响')
+})

@@ -236,7 +236,7 @@ export function itemVm(s: GameState, tab: ItemTab): ItemVm {
     return {
       tab: 'list',
       used: s.player.artifacts.reduce((n, a) => n + a.count, 0),
-      capacity: artifactSlots(s.player.body[BODY_SLEEVE] ?? 0),
+      capacity: artifactSlots(s.player.body[BODY_SLEEVE] ?? 0, s.player.vip),
       groups: itemListGroups(s),
     }
   }

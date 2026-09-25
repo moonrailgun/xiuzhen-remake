@@ -66,6 +66,11 @@ export type Player = {
   readonly coin: number
   readonly bonusCoin: number
   readonly artifacts: readonly Artifact[]
+  /**
+   * VIP。原版是充值功能（多一条修炼队列、多 5 个法宝格）；
+   * 单机版做成「怀旧版设置」里的开关，规则本身照原版。
+   */
+  readonly vip: boolean
   /** 建号时刻（游戏秒），用于保护期「建号 10 天」 */
   readonly createdAt: number
 }

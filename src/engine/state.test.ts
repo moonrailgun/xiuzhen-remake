@@ -71,6 +71,7 @@ const player = (o: Partial<Player> = {}): Player => ({
   coin: 0,
   bonusCoin: 100,
   artifacts: [],
+  vip: false,
   createdAt: 0,
   ...o,
 })

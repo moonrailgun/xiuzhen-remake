@@ -60,6 +60,7 @@ function makeState(patch: Partial<Player> = {}, gameT = 0): GameState {
     coin: 0,
     bonusCoin: 100,
     artifacts: [],
+    vip: false,
     createdAt: 0,
     ...patch,
   }

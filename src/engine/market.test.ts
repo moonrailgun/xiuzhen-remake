@@ -68,6 +68,7 @@ const state = (over: Partial<GameState['player']> = {}): GameState => ({
     coin: 0,
     bonusCoin: 0,
     artifacts: [],
+    vip: false,
     createdAt: 0,
     ...over,
   },

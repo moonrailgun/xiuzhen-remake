@@ -1,0 +1,186 @@
+/*
+ * oui.css —— 原版样式表的重建。
+ *
+ * 原版的 css/oui.css 没有任何存档（已用 CDX 复查确认），所以这份是**反推**的：
+ *  - class 名与用法来自玩家粘贴的游戏内 DOM（约 25 个 class，见 docs/research/09 §5）；
+ *  - 尺寸来自原版 DOM 的 width/cellspacing 等属性；
+ *  - 颜色与字号只能从 1:1 截图取样，裁决见 docs/spec/DECISIONS-ui.md。
+ *
+ * 色值集中在 :root，裁决完成后只改这里。标 [待裁决] 的是各报告取值不一致、
+ * 暂用其中一个的，不要在别处硬编码颜色。
+ */
+
+:root {
+  /* —— 颜色 —— */
+  --bg: #ffffff;
+  --text: #000000;
+  /* 表格网格线：由 table.tablebg 的底色透过 cellspacing=1 形成 */
+  --line: #d1d1d1;           /* [待裁决] 04 测 #d1d1d1，05/07 说 #ccc */
+  --row-bg: #ffffff;          /* trbg */
+  --row-bg-alt: #f7f7f7;      /* trbg2 */
+  --row-bg-3: #f0f0f0;        /* trbg3（2010 才出现的斑马纹，基准版不用） */
+  --header-from: #fefefe;     /* titlebg 表头渐变 */
+  --header-to: #dddddd;
+  --link: #6db800;            /* [待裁决] skillup 草绿，04 #6db800 / 05 #66CC00 / 07 #006633 */
+  --link-hover: #009900;      /* [待裁决] 仅一处证据 */
+  --gray-small: #706c69;      /* [待裁决] smallgray：04 #706c69 / 05 #666 */
+  --gray-middle: #808080;     /* [待裁决] middlegray：04 ≈#808080 / 07 #666 */
+  --striking: #0000cc;        /* [待裁决] middlestriking：05 据 #83 定深蓝粗体 */
+  --warn: #ff0000;            /* [待裁决] 警告红：#FF0000 还是 #CC0000 */
+  --blue: #0000cc;            /* smallblue */
+
+  /* —— 字号 —— */
+  /* [待裁决] 三档：04 说 12/13/14，05 说 12/14/16 */
+  --fs-small: 12px;
+  --fs-middle: 13px;
+  --fs-big: 14px;
+
+  /* —— 尺寸（这些有原版 DOM 或 1:1 截图做依据，不是待裁决项）—— */
+  --page-width: 1000px;
+  --top-height: 98px;         /* y0–97 是横幅，y98 是 1px 黑线，内容自 y99 起 */
+  --row-height: 22px;
+  --title-img-w: 150px;
+  --title-img-h: 30px;
+}
+
+/* 原版是 XHTML 1.0 Transitional → almost-standards 模式：
+   表格单元格里的图片下方不留基线缝。用 HTML5 doctype 会让图标行高出几像素，
+   直接影响 17/19/22px 的行高断言，所以 index.html 必须保持同样的 doctype。 */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  /* 原版是 2008 年 Windows 上的中易宋体位图。macOS 没有，退到系统宋体。
+     字体实验见 docs/PROGRESS.md 阶段 1 第 2 步。 */
+  font-family: SimSun, 'Songti SC', STSong, serif;
+  font-size: var(--fs-small);
+  -webkit-font-smoothing: none;  /* 关抗锯齿，靠近当年的点阵观感 */
+}
+
+a { text-decoration: none; }
+img { border: 0; }
+
+/* —— 整页框架 —— */
+
+#gpage {
+  width: var(--page-width);
+  position: relative;
+  /* [待裁决] 07 说左对齐（原版无 align=center），INDEX 说居中 */
+  margin: 0;
+}
+
+#top {
+  height: var(--top-height);
+  position: relative;
+  background: url(../img/top/back2.jpg) no-repeat;
+  border-bottom: 1px solid #000;
+}
+
+#logo { position: absolute; left: 0; top: 0; }
+
+#littlemenu { position: absolute; right: 8px; top: 2px; }
+#littlemenu td { text-align: center; }
+
+#resource { position: absolute; left: 300px; top: 24px; }
+#resource .storage { }
+
+#bigmenu { position: absolute; left: 290px; top: 74px; width: 460px; }
+
+#avgres { position: absolute; right: 10px; top: 74px; }
+
+#servertimebox { position: absolute; left: 6px; top: 0; text-align: left; }
+#version { position: absolute; left: 10px; top: 84px; }
+
+#gmain { position: relative; }
+/* 三栏：起止 20–480 / 509–761 / 768–988，内容表宽 460 / 240 / 220 */
+#gleft  { position: absolute; left: 20px;  top: 0; width: 460px; }
+#gmid   { position: absolute; left: 509px; top: 0; width: 252px; }
+#gright { position: absolute; left: 768px; top: 0; width: 220px; }
+
+/* —— 字号档 —— */
+
+.small  { font-size: var(--fs-small); }
+.middle { font-size: var(--fs-middle); }
+.big    { font-size: var(--fs-big); }
+.smallbold  { font-size: var(--fs-small);  font-weight: bold; }
+.middlebold { font-size: var(--fs-middle); font-weight: bold; }
+.bigbold    { font-size: var(--fs-big);    font-weight: bold; }
+.smallgray  { font-size: var(--fs-small);  color: var(--gray-small); }
+.middlegray { font-size: var(--fs-middle); color: var(--gray-middle); }
+.smallblue  { font-size: var(--fs-small);  color: var(--blue); }
+.smallred   { font-size: var(--fs-small);  color: var(--warn); }
+.middlestriking { font-size: var(--fs-middle); font-weight: bold; color: var(--striking); }
+.fontmid { font-size: var(--fs-middle); }
+
+/* —— 表格 —— */
+/* 原版靠 table.tablebg 的底色 + cellspacing=1 透出 1px 网格线，不用 border */
+
+.tablebg { background: var(--line); }
+.trbg  { background: var(--row-bg); }
+.trbg2 { background: var(--row-bg-alt); }
+.trbg3 { background: var(--row-bg-3); }
+.titlebg {
+  background: linear-gradient(var(--header-from), var(--header-to));
+  height: var(--row-height);
+}
+/* 墨迹标题条 458×20，背景是一道横向墨迹笔触 */
+.titlebg2 {
+  background: url(../img/titlebg2.gif) no-repeat;
+  height: 20px;
+}
+
+/* —— 链接 —— */
+
+/* 草绿粗体、无下划线，是全站最常见的可点文字 */
+a.skillup, .skillup { color: var(--link); font-weight: bold; }
+a.skillup:hover { color: var(--link-hover); }
+
+/* 术语链接：黑色粗体 + 1px 灰虚线下划线，点开游戏指南（hlp()） */
+a.help, .help {
+  color: var(--text);
+  font-weight: bold;
+  border-bottom: 1px dotted var(--gray-middle);
+}
+
+/* 事件栏里的链接强制黑字（反直觉但原版如此） */
+#gmid a:not(.skillup) { color: var(--text); }
+
+/* —— 浮窗 —— */
+/* 六种：L 内容表 460、R 230、B 900、H 帮助无标题条、M 单按钮、M2 确定取消。
+   外观只有 R 窗有 1:1 截图（252×452，双线暖灰框 + 回纹角花），其余按同一套推。 */
+
+#lwindow, #rwindow, #bwindow, #hwindow, #mwindow, #mwindow2 {
+  position: absolute;
+  background: var(--bg);
+  border: 1px solid #b5a98f;
+  outline: 1px solid #efe8d8;
+  z-index: 100;
+}
+#lwindow { z-index: 100; }
+#rwindow { z-index: 100; }
+#bwindow { z-index: 110; }
+#hwindow { z-index: 120; }
+#mwindow, #mwindow2 { z-index: 130; }
+#loading { z-index: 140; position: absolute; }
+
+.dlgclosebtn { position: absolute; right: 4px; top: 4px; }
+.title3 { font-size: var(--fs-big); font-weight: bold; }
+
+.mwindowok, .mwindow2ok, .mwindow2cancel { display: inline-block; margin: 6px; }
+
+/* —— 地图 —— */
+/* 视口 448×245，地块图 64×120（菱形占底部 64×35），行距 17.5px。
+   自成层叠上下文，避免格子的高 z-index 盖住浮窗。 */
+#mapdiv, #mapbg {
+  position: relative;
+  width: 448px;
+  height: 245px;
+  overflow: hidden;
+  isolation: isolate;
+  z-index: 1;
+}
+
+/* —— 倒计时 —— */
+.countdown { }

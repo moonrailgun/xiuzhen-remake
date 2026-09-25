@@ -18,6 +18,9 @@ import {
   resolveMarketEvent,
   settleArtifactSale,
   visibleOrders,
+  refillNpcOrders,
+  NPC_ORDER_TARGET,
+  NPC_ORDER_TTL,
   type MarketCtx,
 } from './market.ts'
 import { createClock } from './clock.ts'
@@ -42,6 +45,7 @@ const state = (over: Partial<GameState['player']> = {}): GameState => ({
   worldSeed: 1,
   npc: { bases: [], patches: {} },
   quests: { entries: [], line: 'qi' as const, dantianBonus: 0 },
+  market: { qi: [], artifacts: [] },
   mail: [],
   player: {
     name: '逆神猪',
@@ -295,4 +299,66 @@ test('买法宝只能用普通仙石，附加仙石不认', () => {
   assert.equal(yes.ctx.state.player.artifacts[0]!.name, '古纹青石剑')
   assert.equal(yes.ctx.state.player.artifacts[0]!.quality, '极品')
   assert.equal(yes.ctx.state.player.artifacts[0]!.refine, 4)
+})
+
+// —— NPC 补货（单机版的「别人」）——
+
+test('NPC 补货把市场补满，且同种子同时刻可重放', () => {
+  const s = state()
+  const a = refillNpcOrders(s)
+  const b = refillNpcOrders(s)
+  assert.equal(a.market.qi.length, NPC_ORDER_TARGET)
+  assert.deepEqual(a.market.qi, b.market.qi, '同一存档重放要得到同一批单子')
+})
+
+test('★买走的 NPC 单不会在同一小时里原样复活', () => {
+  const s = refillNpcOrders(state())
+  const bought = s.market.qi[3]!
+  const r = buyQi({ state: s, market: s.market }, bought.id)
+  assert.ok(r.ok, r.ok ? '' : r.reason)
+
+  const after = refillNpcOrders({ ...r.ctx.state, market: r.ctx.market })
+  assert.equal(after.market.qi.length, NPC_ORDER_TARGET, '补回到目标单数')
+  assert.ok(
+    !after.market.qi.some((o) => o.id === bought.id),
+    `刚买走的 ${bought.id} 又出现了`,
+  )
+})
+
+test('NPC 单挂满 TTL 后撤下', () => {
+  const s = refillNpcOrders(state())
+  const later = refillNpcOrders({
+    ...s,
+    clock: { ...s.clock, gameT: s.clock.gameT + NPC_ORDER_TTL + 3600 },
+  })
+  assert.equal(later.market.qi.length, NPC_ORDER_TARGET)
+  assert.equal(
+    later.market.qi.filter((o) => s.market.qi.some((old) => old.id === o.id)).length,
+    0,
+    '旧的一批应该全部换掉',
+  )
+})
+
+test('NPC 单的提供与需求必是两种不同的真气，比例在 1:1–1:2 之间', () => {
+  // 多跑几个世界种子，保证不是某一个种子碰巧对
+  for (const seed of [1, 7, 42, 999]) {
+    const s = refillNpcOrders({ ...state(), worldSeed: seed })
+    for (const o of s.market.qi) {
+      assert.notEqual(o.offer.element, o.want.element, `${seed}: ${o.id} 自己换自己`)
+      const r = o.want.amount / o.offer.amount
+      assert.ok(r >= 1 && r <= 2, `${seed}: ${o.id} 比例 ${r} 越界`)
+    }
+  }
+})
+
+test('自己的挂单不会被补货逻辑撤掉', () => {
+  const s = refillNpcOrders(state())
+  const listed = listQi({ state: s, market: s.market }, {
+    id: 'me:1',
+    offer: { element: '金', amount: 100 },
+    want: { element: '木', amount: 100 },
+  })
+  assert.ok(listed.ok)
+  const after = refillNpcOrders({ ...listed.ctx.state, market: listed.ctx.market })
+  assert.ok(after.market.qi.some((o) => o.id === 'me:1'))
 })

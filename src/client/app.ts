@@ -8,6 +8,25 @@
 import { renderShell, type MainTab } from '../pages/shell.ts'
 import { renderPlayer, type PlayerVm } from '../pages/player.ts'
 import { renderMap, screenCells, type MapVm, type MapCell } from '../pages/map.ts'
+import { renderSkill, type SkillTab } from '../pages/skill.ts'
+import { renderItem, type ItemTab } from '../pages/item.ts'
+import { renderTrade, type TradeView } from '../pages/trade.ts'
+import { renderAlly, type AllyTab } from '../pages/ally.ts'
+import { renderMsg } from '../pages/msg.ts'
+import { renderMsgDetail } from '../pages/msgdetail.ts'
+import { renderWriteMsg } from '../pages/writemsg.ts'
+import { renderItemMid } from '../pages/itemmid.ts'
+import { renderQuest } from '../pages/quest.ts'
+import { renderRank } from '../pages/rank.ts'
+import { renderPlayerInfo } from '../pages/playerinfo.ts'
+import { renderTurnres } from '../pages/turnres.ts'
+import { renderPayment } from '../pages/payment.ts'
+import { skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel } from './vm.ts'
+import { SWORDS, swordByName, craftCostFor, isComplete } from '../data/swords.ts'
+import { ranking } from '../engine/npc.ts'
+import { daoxingText } from '../engine/state.ts'
+import { formatGameDate } from '../engine/clock.ts'
+import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
 import { newGame, tick, saveGame, loadGame, resourceBarOf, MIGRATIONS } from '../engine/game.ts'
@@ -20,7 +39,13 @@ import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import { launch, type LaunchSword } from '../engine/battle.ts'
-import { startCraft } from '../engine/craft.ts'
+import { startCraft, type CraftOrder } from '../engine/craft.ts'
+import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
+import { DEFENSIVE_ARTIFACTS } from '../data/artifacts.ts'
+import {
+  ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders,
+} from '../engine/market.ts'
+import type { FiveQi } from '../engine/state.ts'
 import { changeRate } from '../engine/game.ts'
 import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
@@ -48,6 +73,18 @@ let draft: CreatePlayerVm = { gender: 1, attr: 5, school: 0, posi: 0 }
 let state: GameState | null = null
 /** 当前主标签 */
 let tab: MainTab = 'player'
+/** 各页的子标签（原版是 `?tab=N`，本地版拦下来记在这里） */
+let skillTab: SkillTab = 'produce'
+let itemTab: ItemTab = 'list'
+let tradeView: TradeView = 'buyqi'
+let allyTab: AllyTab = 'overview'
+/** 分页与筛选 */
+let tradePage = 1
+let tradeFilter: { give: Element | ''; want: Element | '' } = { give: '', want: '' }
+let allyPage = 1
+let msgPage = 1
+/** 当前交易页那一屏的挂单 id（原版界面用数字 sheet，这里反查回真 id） */
+let tradeSheets: readonly string[] = []
 /** 地图视图中心（可以跳到别处看，不等于人物所在） */
 let mapCenter: { x: number; y: number } | null = null
 /** 地图上选中的格子 */
@@ -192,6 +229,29 @@ function rightVm(s: GameState) {
   return { quests, guardingMe: 0, guardingOthers: 0, guardCap: 7 }
 }
 
+/** 左栏：按主标签选页面。七个标签全部接真实状态。 */
+function leftPane(s: GameState): string {
+  switch (tab) {
+    case 'map':
+      return renderMap(mapVm(s))
+    case 'skill':
+      return renderSkill(skillVm(s, skillTab))
+    case 'item':
+      return renderItem(itemVm(s, itemTab))
+    case 'trade': {
+      const { vm, sheets } = tradeVm(s, tradeView, tradePage, tradeFilter)
+      tradeSheets = sheets.ids
+      return renderTrade(vm)
+    }
+    case 'ally':
+      return renderAlly(allyVm(s, allyTab, allyPage))
+    // 消息是右侧浮窗，不占左栏；点它时左栏停在人物页（原版同样不换页）
+    case 'msg':
+    case 'player':
+      return renderPlayer(playerVm(s))
+  }
+}
+
 function render(): void {
   const app = root()
   if (!app) return
@@ -207,11 +267,73 @@ function render(): void {
     resources: resourceBarOf(s),
     serverTime: formatServerTime(s.clock),
     version: '版本号:1.2.1-yyge',
-    left: tab === 'map' ? renderMap(mapVm(s)) : renderPlayer(playerVm(s)),
+    left: leftPane(s),
     mid: renderMid(midVm(s)),
     right: renderRight(rightVm(s)),
   })
   startCountdowns(app)
+}
+
+/**
+ * 原版页面里的子标签、分页、筛选全是 `xxx.jsp?tab=N` 这样的普通链接。
+ * 页面模块是照原版逐字复刻的，不能为了接数据去改它们的 href，
+ * 所以在这里统一拦一次：认识的路由换成切页，不认识的照旧交给浮窗解析器。
+ *
+ * 返回 true 表示已处理（调用方要 `preventDefault`）。
+ */
+export function routeJsp(href: string): boolean {
+  const m = /(?:^|\/)(\w+)\.jsp(?:\?(.*))?$/.exec(href.replace(/&amp;/g, '&'))
+  if (!m) return false
+  const page = m[1]!
+  const q = new URLSearchParams(m[2] ?? '')
+  const n = (key: string, dflt = 0) => Number(q.get(key) ?? dflt) || dflt
+
+  switch (page) {
+    case 'player': tab = 'player'; break
+    case 'map': tab = 'map'; break
+    case 'skill': {
+      tab = 'skill'
+      // 原版编号：炼器 2 / 剑术 1 / 术数 3 / 秘笈 6
+      const byNum: Record<number, SkillTab> = { 1: 'sword', 2: 'produce', 3: 'math', 6: 'book' }
+      skillTab = byNum[n('tab', 2)] ?? 'produce'
+      break
+    }
+    case 'item': {
+      tab = 'item'
+      const byNum: Record<number, ItemTab> = { 1: 'sword', 2: 'guard', 3: 'pill', 4: 'refine' }
+      itemTab = q.has('tab') ? (byNum[n('tab')] ?? 'list') : 'list'
+      break
+    }
+    case 'trade': {
+      tab = 'trade'
+      const byNum: Record<number, TradeView> = { 2: 'sellqi', 3: 'buyitem', 4: 'sellitem' }
+      tradeView = q.has('tab') ? (byNum[n('tab')] ?? 'buyqi') : 'buyqi'
+      // 尾页在原版写成 page=0
+      tradePage = q.has('page') ? (n('page') || Number.MAX_SAFE_INTEGER) : 1
+      if (q.has('give') || q.has('want')) {
+        tradeFilter = {
+          give: (q.get('give') ?? '') as Element | '',
+          want: (q.get('want') ?? '') as Element | '',
+        }
+      }
+      break
+    }
+    case 'ally': {
+      tab = 'ally'
+      const byNum: Record<number, AllyTab> = { 1: 'attack', 2: 'member', 3: 'news', 4: 'feature' }
+      allyTab = q.has('tab') ? (byNum[n('tab')] ?? 'overview') : 'overview'
+      allyPage = n('page', 1)
+      break
+    }
+    case 'msg':
+      msgPage = n('page', 1)
+      openWindow('rwindow', '消息', renderMsg(msgVm(state!, msgPage)))
+      return true
+    default:
+      return false
+  }
+  render()
+  return true
 }
 
 /** 推进到现在 → 重渲染 → 存档。所有交互都走这一条路径。 */
@@ -282,29 +404,23 @@ export function installGameActions(): void {
     img.src = s ? `img/avatar/${s}${draft.gender === 2 ? 'f' : 'm'}.gif` : 'img/avatar/random.gif'
   }
 
-  /** 点经脉/本体节点：打开右窗显示升级说明。 */
-  g['openRWindow'] = (title: string, url: string) => {
-    if (!state) return
-    const m = /type=(\w+)&idx=(\d+)/.exec(url)
-    if (!m) return
-    const system = m[1] === 'body' ? 'body' : 'meridian'
-    const index = Number(m[2])
-    const target = { system, index } as const
-    const plan = planUpgrade(state, target)
-    const name = system === 'meridian' ? MERIDIANS[index]?.name : BODY_PARTS[index]
-    openWindow('rwindow', `${name} Lv.${plan.fromLevel}`, upgradePanel(name ?? '', plan, target))
-  }
+  // 经脉/本体节点、法术格、物品名都走 `openRWindow(title, url)`，
+  // 全部由 `resolvePage` 按 url 分发（见下），这里不再覆盖 `windows.ts` 的实现。
 
-  /** 升级按钮。 */
+  /** 升级按钮。法术走名字（存档按名字存），经脉/本体走序号。 */
   g['doUpgrade'] = (system: string, index: number) => {
     if (!state) return
-    const r = startCultivate(state, { system: system as 'meridian' | 'body', index })
+    const target = system === 'skill'
+      ? { system: 'skill' as const, id: skillNodeById(index)?.name ?? '' }
+      : { system: system as 'meridian' | 'body', index }
+    const r = startCultivate(state, target)
     if (!r.ok) {
       const box = document.getElementById('upgradeMsg')
       if (box) box.innerHTML = `<SPAN class=smallred>${r.reason}</SPAN>`
       return
     }
     state = r.state
+    closeWindow('rwindow')
     step()
   }
 
@@ -431,36 +547,124 @@ export function installGameActions(): void {
   /** 原版的通用 ajax 提交入口。本地版没有服务端，按 action 分发。 */
   g['ajaxPost'] = (action: string, params: string) => {
     const g2 = globalThis as unknown as Record<string, (...a: unknown[]) => void>
+    const p = new URLSearchParams(params ?? '')
     if (action === 'paycoin') {
       const m = /pay=(\d+)/.exec(params ?? '')
       if (m) g2['paycoin']!(Number(m[1]))
+      return
+    }
+    if (action === 'buyqi' || action === 'buyitem') {
+      doMarketBuy(action, Number(p.get('sheet') ?? -1))
+      return
+    }
+    if (action === 'unsellqi' || action === 'unsellitem') {
+      doMarketCancel(Number(p.get('sheet') ?? -1))
       return
     }
     openWindow('mwindow', '提示',
       `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
   g['postForm'] = (action: string) => {
+    if (action === 'sellqi') return doListQi()
+    if (action === 'sellitem') return doListArtifact()
     openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
   }
 
-  /** 炼制法宝（炼制页的「炼制」按钮）。 */
-  g['sendMakeItem'] = (itemId: number, count: number) => {
+  /** 炼制法宝（炼制页的「炼制」按钮）。数量从原版那个 `craft{id}` 输入框读。 */
+  g['sendMakeItem'] = (itemId: number, count?: number) => {
     if (!state) return
-    const n = Math.max(1, Math.floor(count || 1))
-    // 夹具期先用玉虚桃木剑的原版消耗；阶段 5 接真实配方表
-    const r = startCraft(state, {
-      kind: 'sword',
-      name: '玉虚桃木剑',
-      count: n,
-      cost: [140, 144, 71, 48, 95] as never,
-      baseSeconds: 667,
-      quality: '凡品',
-    })
+    const box = document.getElementById(`craft${itemId}`) as HTMLInputElement | null
+    const n = Math.max(1, Math.floor(Number(box?.value) || count || 1))
+    const order = craftOrderFor(state, itemId, n)
+    if (!order) {
+      openWindow('mwindow', '无法炼制',
+        '<DIV class=middle style="padding:10px">这件法宝没有留下炼制配方。</DIV>')
+      return
+    }
+    const r = startCraft(state, order)
     if (!r.ok) {
       openWindow('mwindow', '无法炼制', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
     }
     state = r.state
+    step()
+  }
+
+  /** 法宝一览的各操作。radio 的 value 是 `itemsn`（1 起），0 表示忙碌中不可选。 */
+  const selected = (group: number): number => {
+    const el = document.querySelector<HTMLInputElement>(`input[name=selectitem${group}]:checked`)
+    return Number(el?.value ?? 0)
+  }
+  const tell = (title: string, text: string) =>
+    openWindow('mwindow', title, `<DIV class=middle style="padding:10px">${esc(text)}</DIV>`)
+
+  const destroy = (group: number) => {
+    if (!state) return
+    const sn = selected(group)
+    if (!sn) return tell('销毁', '请先选中一件法宝。')
+    const item = state.player.artifacts[sn - 1]
+    if (!item) return
+    ;(globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>)
+      ['MDialogOkCancel']!('销毁',
+        `<DIV class=middle style="padding:10px">确定销毁 ${esc(artifactLabel(item))} 吗?</DIV>`,
+        () => {
+          if (!state) return
+          state = {
+            ...state,
+            player: {
+              ...state.player,
+              artifacts: state.player.artifacts.filter((_, i) => i !== sn - 1),
+            },
+          }
+          step()
+        })
+  }
+  for (const gid of [1, 2, 3, 5]) {
+    g[`sendDestroyItem${gid}`] = () => destroy(gid)
+    g[`sendSellItem${gid}`] = () => {
+      if (!state) return
+      const sn = selected(gid)
+      const item = sn ? state.player.artifacts[sn - 1] : undefined
+      if (!item) return tell('出售', '请先选中一件法宝。')
+      // 卖给系统：极品才值钱，其余按原版只能销毁或挂市场
+      if (item.quality !== '极品') return tell('出售', '只有极品法宝可以出售。')
+      tradeView = 'sellitem'
+      tab = 'trade'
+      render()
+    }
+  }
+  g['sendDestroyAllItem'] = () => {
+    if (!state) return
+    state = {
+      ...state,
+      player: { ...state.player, artifacts: state.player.artifacts.filter((a) => a.kind !== 'misc') },
+    }
+    step()
+  }
+  g['sendUseItem2'] = () => usePill()
+  g['sendUseItem3'] = () => tell('秘笈', '秘笈的效果没有存档，本地版暂不开放学习。')
+  g['sendUseItem5'] = () => tell('任务物品', '任务物品在对应任务完成时自动消耗。')
+  g['sendRepairItem'] = () => tell('修理', '损坏的法宝会在返回后自动修理。')
+  g['sendUpgradeItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
+  g['sendUpgradeAllItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
+
+  /** 服丹：把丹药换成真气。丹药的具体加成没有存档，按「一炼 = 各 1000」线性推。 */
+  function usePill(): void {
+    if (!state) return
+    const sn = selected(2)
+    const item = sn ? state.player.artifacts[sn - 1] : undefined
+    if (!item || item.kind !== 'pill') return tell('服食', '请先选中一颗丹药。')
+    const tier = PILL_TIERS.findIndex((t) => item.name.startsWith(t)) + 1
+    const gain = 1000 * Math.max(1, tier)
+    const cap = resourceBarOf(state).capacity
+    state = {
+      ...state,
+      player: {
+        ...state.player,
+        qi: state.player.qi.map((v) => Math.min(cap, v + gain)) as unknown as typeof state.player.qi,
+        artifacts: state.player.artifacts.filter((_, i) => i !== sn - 1),
+      },
+    }
     step()
   }
 
@@ -568,6 +772,339 @@ export function installGameActions(): void {
   }
 }
 
+/**
+ * 浮窗内容解析器。原版这些浮窗是去服务端取 `xxx.jsp` 的片段，
+ * 本地版按同样的 URL 分发到各页面模块（见 `windows.ts` 的 `setPageResolver`）。
+ */
+function resolvePage(url: string): string {
+  const s = state
+  if (!s) return ''
+  const [path, query] = url.replace(/&amp;/g, '&').split('?')
+  const q = new URLSearchParams(query ?? '')
+  const page = /(\w+)\.jsp$/.exec(path ?? '')?.[1]
+
+  switch (page) {
+    case 'msg':
+      msgPage = Number(q.get('page') ?? 1) || 1
+      return renderMsg(msgVm(s, msgPage))
+
+    case 'msgdetail':
+      return mailDetail(s, Number(q.get('msg') ?? 0))
+
+    case 'writemsg':
+      return renderWriteMsg({
+        receiver: q.get('receiver') ?? '',
+        subject: q.get('remsg') ? `Re:${s.mail[Number(q.get('remsg')) - 1]?.subject ?? ''}` : '',
+        replyTo: q.has('remsg') ? Number(q.get('remsg')) : null,
+      })
+
+    case 'itemmid':
+      return itemWindow(s, Number(q.get('item') ?? 0), q.get('itemsn'))
+
+    case 'skillmid': {
+      // 同一个路由承载三种升级面板：人物页的经脉/本体节点带 `type=&idx=`，
+      // 法术树的格子带 `skill=`（都是原版写法，见 player.ts / skill.ts）
+      const type = q.get('type')
+      if (type === 'meridian' || type === 'body') {
+        const index = Number(q.get('idx') ?? 0)
+        const target = { system: type, index } as const
+        const plan = planUpgrade(s, target)
+        const name = (type === 'meridian' ? MERIDIANS[index]?.name : BODY_PARTS[index]) ?? ''
+        return upgradePanel(name, plan, target)
+      }
+      return skillWindow(s, Number(q.get('skill') ?? 0))
+    }
+
+    case 'quest':
+      return questWindow(s, q.get('quest') ?? '')
+
+    case 'rank':
+      return renderRank(rankVm(s, (q.get('tab') as 'power' | 'estate' | 'exp' | null) ?? 'power'))
+
+    case 'playerinfo':
+      return playerInfoWindow(s, Number(q.get('playerid') ?? 0))
+
+    case 'turnres':
+      return renderTurnres({
+        current: resourceBarOf(s).current as unknown as [number, number, number, number, number],
+        capacity: resourceBarOf(s).capacity,
+        cost: TURN_RES_COIN,
+        from: s.player.element,
+        to: generates(s.player.element),
+      })
+
+    case 'payment':
+      return renderPayment({ remaining: {} })
+
+    default:
+      return `<DIV class=middle style="padding:12px">（${esc(url)} 尚未接入）</DIV>`
+  }
+}
+
+/** 「五行互化」的仙石开销。付费页原文「自由分配…比例」是 3 仙石。 */
+const TURN_RES_COIN = 3
+
+// —— 炼制配方 ——
+
+/** 按炼制页的 itemId 反查配方。飞剑 501xx、护身 601xx、丹药三位数。 */
+function craftOrderFor(s: GameState, itemId: number, count: number): CraftOrder | null {
+  if (itemId >= 50100 && itemId < 60000) {
+    const sw = SWORDS[Math.floor((itemId - 50100) / 100)]
+    const cost = sw ? craftCostFor(sw.craftCost, s.player.element) : null
+    // 转录不全的剑没有配方，宁可不给炼
+    if (!sw || !cost || sw.craftSeconds === null) return null
+    return {
+      kind: 'sword',
+      name: sw.name,
+      count,
+      cost,
+      baseSeconds: sw.craftSeconds,
+      quality: craftQuality(s),
+    }
+  }
+  if (itemId >= 60100 && itemId < 60900) {
+    const g = DEFENSIVE_ARTIFACTS[Math.floor((itemId - 60100) / 100)]
+    const gcost = g?.craftCost ? craftCostFor(g.craftCost, s.player.element) : null
+    if (!g || !gcost) return null
+    return {
+      kind: 'guard',
+      name: g.name,
+      count,
+      cost: gcost,
+      baseSeconds: g.craftSeconds,
+      quality: craftQuality(s),
+    }
+  }
+  // 丹药：百位 = 丹种，个位 = 炼数（09 §1.16 的 id 规律）
+  if (itemId >= 100 && itemId <= 609) {
+    const kindIdx = Math.floor(itemId / 100) - 1
+    const tierIdx = (itemId % 100) - 1
+    const kind = PILL_NAMES[kindIdx]
+    const tier = PILL_TIERS[tierIdx]
+    if (!kind || !tier) return null
+    return {
+      kind: 'pill',
+      name: `${tier}${kind}`,
+      count,
+      // 丹药的五行消耗原版页面就不显示（05 §5.2），这里按炼数取一个量级
+      cost: [0, 0, 0, 0, 0].map(() => 500 * (tierIdx + 1)) as unknown as FiveQi,
+      baseSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
+      quality: '凡品',
+    }
+  }
+  return null
+}
+
+/**
+ * 出品品质。原版由「炼器总纲」（昆仑专属，上品率 50%→70%）与「物理通明」秘笈决定；
+ * 没有总纲时的基础上品率零存档，这里按 50% 起步 [重建]。
+ */
+function craftQuality(s: GameState): '废品' | '凡品' | '上品' | '极品' {
+  const zonggang = s.player.skills['炼器总纲'] ?? 0
+  const rate = 0.5 + 0.05 * zonggang
+  return Math.random() < rate ? '上品' : '凡品'
+}
+
+// —— 市场 ——
+
+/** 交易页的 sheet 号 → 真实挂单 id（那一屏渲染时记下来的）。 */
+const sheetId = (sheet: number): string | undefined => tradeSheets[sheet]
+
+function doMarketBuy(action: 'buyqi' | 'buyitem', sheet: number): void {
+  if (!state) return
+  const id = sheetId(sheet)
+  if (!id) return
+  const r = action === 'buyqi' ? buyQi(ctxOf(state), id) : buyArtifact(ctxOf(state), id)
+  if (!r.ok) {
+    openWindow('mwindow', '无法购买', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+    return
+  }
+  state = applyCtx(r.ctx)
+  step()
+}
+
+function doMarketCancel(sheet: number): void {
+  if (!state) return
+  const id = sheetId(sheet)
+  if (!id) return
+  state = applyCtx(cancelQiOrders(ctxOf(state), [id]))
+  step()
+}
+
+/** 出售真气页的表单：我用 X 数量 换 Y。 */
+function doListQi(): void {
+  if (!state) return
+  const v = (name: string) =>
+    document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${name}]`)?.value ?? ''
+  const offer = { element: v('give') as Element, amount: Number(v('amount')) || 0 }
+  const want = { element: v('want') as Element, amount: Number(v('wantamount')) || Number(v('amount')) || 0 }
+  const r = listQi(ctxOf(state), { id: `me:${state.clock.gameT}:${state.market.qi.length}`, offer, want })
+  if (!r.ok) {
+    openWindow('mwindow', '无法挂单', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+    return
+  }
+  state = applyCtx(r.ctx)
+  step()
+}
+
+/** 出售法宝页的表单：选一件极品法宝 + 标价。 */
+function doListArtifact(): void {
+  if (!state) return
+  const idx = Number(document.querySelector<HTMLSelectElement>('[name=item]')?.value ?? -1)
+  const price = Number(document.querySelector<HTMLInputElement>('[name=price]')?.value ?? 0)
+  const item = state.player.artifacts[idx]
+  if (!item) {
+    openWindow('mwindow', '无法挂单', '<DIV class=middle style="padding:10px">请先选一件法宝。</DIV>')
+    return
+  }
+  const r = listArtifact(ctxOf(state), item.id, price)
+  if (!r.ok) {
+    openWindow('mwindow', '无法挂单', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+    return
+  }
+  state = applyCtx(r.ctx)
+  step()
+}
+
+function mailDetail(s: GameState, oneBased: number): string {
+  const m = s.mail[oneBased - 1]
+  if (!m) return '<DIV class=middle style="padding:12px">这封信已经不在了。</DIV>'
+  // 读过就标已读（下次打开收件箱不再加粗）
+  state = { ...s, mail: s.mail.map((x, i) => (i === oneBased - 1 ? { ...x, read: true } : x)) }
+  const body = m.body as { kind?: string; paragraphs?: readonly string[]; text?: string }
+  return renderMsgDetail({
+    id: oneBased,
+    subject: m.subject,
+    sender: m.from,
+    avatar: m.from === '系统' ? null : null,
+    sentAt: formatGameDate(m.at),
+    body: {
+      kind: 'text',
+      paragraphs: body.paragraphs ?? [body.text ?? JSON.stringify(m.body)],
+    },
+  })
+}
+
+/** 物品窗。飞剑走 `swords.ts` 的原版数值表，护身走 `artifacts.ts`。 */
+function itemWindow(s: GameState, itemId: number, itemsn: string | null): string {
+  const owned = itemsn === null ? undefined : s.player.artifacts[Number(itemsn) - 1]
+  const idx = Math.floor((itemId - 50100) / 100)
+  const sw = owned ? swordByName(owned.name) : SWORDS[idx]
+  if (!sw) return '<DIV class=middle style="padding:12px">没有这件法宝的记载。</DIV>'
+
+  const forge = s.player.skills['铸剑之术'] ?? 0
+  const wield = s.player.skills['御剑术'] ?? 0
+  const quality = owned?.quality ?? null
+  const refine = owned?.refine ?? 0
+  const cost = craftCostFor(sw.craftCost, s.player.element)
+  return renderItemMid({
+    name: sw.name,
+    flavor: sw.flavor,
+    // 三阴绝脉剑与冰魄寒光剑的物品窗转录不全，缺的字段照实说明，不填 0 冒充
+    ...(isComplete(sw) && sw.speed !== null && sw.knockback !== null
+      ? {}
+      : { effect: '（这把剑的部分数值在现存资料里没有留下转录）' }),
+    tradable: sw.tradable,
+    element: sw.element ?? '无属性',
+    category: '飞剑',
+    quality,
+    refine,
+    forge: { text: `铸剑之术${sw.forgeLevel}级`, met: forge >= sw.forgeLevel },
+    wield: { text: `御剑术${sw.wieldLevel}级`, met: wield >= sw.wieldLevel },
+    stats: {
+      attack: sw.attack,
+      durability: sw.durability,
+      absorb: sw.absorb,
+      speed: sw.speed ?? 0,
+      agility: [sw.agility ?? 0, sw.agility ?? 0],
+      knockback: sw.knockback ?? 0,
+    },
+    upkeep: sw.upkeepPerHour as unknown as [number, number, number, number, number],
+    ...(cost ? { craftCost: cost as unknown as [number, number, number, number, number] } : {}),
+    ...(sw.craftSeconds !== null ? { craftSeconds: sw.craftSeconds } : {}),
+  })
+}
+
+/** 法术窗：当前等级 + 升级消耗 + 升级按钮，结构与经脉窗同构。 */
+function skillWindow(s: GameState, id: number): string {
+  const node = skillNodeById(id)
+  if (!node) return '<DIV class=middle style="padding:12px">没有这门法术的记载。</DIV>'
+  const plan = planUpgrade(s, { system: 'skill', id: node.name })
+  if (plan.toLevel > node.cap) {
+    return `<DIV class=middle style="padding:10px">${esc(node.name)} 已至上限 Lv.${node.cap}。</DIV>`
+  }
+  return upgradePanel(node.name, plan, { system: 'skill', index: id })
+}
+
+function questWindow(s: GameState, id: string): string {
+  const q = activeQuests(s.quests).find((x) => x.id === id)
+  if (!q) return '<DIV class=middle style="padding:12px">没有这个任务。</DIV>'
+  const entry = s.quests.entries.find((e) => e.id === id)
+  const done = entry ? goalMet(q, entry, s) : false
+  const loc = q.goal.kind === 'slay' ? questLocation(s, q) : null
+  return renderQuest({
+    id: q.id,
+    title: questTitle(q),
+    summary: q.summary,
+    progress: loc
+      ? { kind: 'slay', monster: q.goal.kind === 'slay' ? q.goal.monster.name : '', at: loc, done }
+      : { kind: 'text', text: q.summary, done },
+    reward: q.reward.qi
+      ? { kind: 'qi', qi: qiRewardVector(q.reward.qi) }
+      : { kind: 'text', text: q.reward.note ?? (q.reward.realm ? `境界提升为 ${q.reward.realm}` : '—') },
+    description: [q.summary, ...(q.path ? [q.path] : [])],
+    claimable: done,
+  })
+}
+
+/** 任务奖励的真气可能写成「各 N」或逐项，统一成五元组。 */
+function qiRewardVector(r: unknown): [number, number, number, number, number] {
+  if (typeof r === 'number') return [r, r, r, r, r]
+  if (Array.isArray(r)) return [r[0] ?? 0, r[1] ?? 0, r[2] ?? 0, r[3] ?? 0, r[4] ?? 0]
+  const o = r as Record<string, number>
+  return ELEMENTS.map((e) => o[e] ?? 0) as unknown as [number, number, number, number, number]
+}
+
+function rankVm(s: GameState, tab: 'power' | 'estate' | 'exp') {
+  const kind = tab === 'estate' ? 'estate' : tab === 'exp' ? 'experience' : 'daoxing'
+  const rows = ranking(s.npc, s.clock.gameT, s.worldSeed, kind, 20).map((n) => ({
+    id: n.base.id,
+    name: n.base.name,
+    realm: n.realm,
+    value: kind === 'daoxing' ? n.daoxingText
+      : kind === 'estate' ? `${n.estate}两/小时`
+      : String(n.experience),
+  }))
+  return { tab: tab as 'power' | 'estate' | 'exp', rows }
+}
+
+function playerInfoWindow(s: GameState, id: number): string {
+  const me = id === 0
+  const npc = me ? null : allNpcsAt(s.npc, s.clock.gameT, s.worldSeed).find((n) => n.base.id === id)
+  if (!me && !npc) return '<DIV class=middle style="padding:12px">查无此人。</DIV>'
+  const school = npc?.base.school ?? s.player.school
+  // NPC 记录里没有性别（原版名册也不显示），统一按男身头像
+  const gender = npc ? 'm' : s.player.gender
+  return renderPlayerInfo({
+    playerId: id,
+    avatar: `${{ 蜀山: 'shushan', 昆仑: 'kunlun', 通天: 'tongtian' }[school]}${gender === 'f' ? 'f' : 'm'}`,
+    name: npc?.base.name ?? s.player.name,
+    element: npc?.base.element ?? s.player.element,
+    rank: npc
+      ? ranking(s.npc, s.clock.gameT, s.worldSeed, 'daoxing', 9999).findIndex((n) => n.base.id === id) + 1
+      : 1,
+    dao: npc?.daoxingText ?? daoxingText(s.player.daoxing),
+    origin: school,
+    ally: { id: 0, name: `${school}派` },
+    age: '-',
+    gender: gender === 'f' ? '女' : '男',
+    location: '-',
+    intro: '-',
+    self: me,
+    deletingDays: null,
+  })
+}
+
 function readDraft(): CreatePlayerVm {
   const q = (sel: string) => document.querySelector<HTMLInputElement>(sel)
   const sel = (name: string) => document.querySelector<HTMLSelectElement>(`select[name=${name}]`)
@@ -602,7 +1139,22 @@ function upgradePanel(
 
 export function boot(): void {
   installGameActions()
-  setPageResolver((url) => `<DIV class=middle style="padding:12px">（${url} 尚未接入）</DIV>`)
+  setPageResolver(resolvePage)
+
+  // 页面里的原版 .jsp 链接统一在这里拦一次（子标签、分页、筛选都走它）
+  document.addEventListener('click', (ev) => {
+    const a = (ev.target as HTMLElement | null)?.closest?.('a')
+    const href = a?.getAttribute('href')
+    if (!state || !href || href === '#' || href.startsWith('javascript:')) return
+    if (routeJsp(href)) ev.preventDefault()
+  })
+  document.addEventListener('submit', (ev) => {
+    const form = ev.target as HTMLFormElement | null
+    const action = form?.getAttribute('action')
+    if (!state || !form || !action) return
+    const q = new URLSearchParams(new FormData(form) as unknown as Record<string, string>)
+    if (routeJsp(`${action}?${q}`)) ev.preventDefault()
+  })
 
   if (STORAGE_KEY_AVAILABLE) {
     try {

@@ -14,6 +14,7 @@ import { resolveBattleEvent } from './battle.ts'
 import { resolveCraft } from './craft.ts'
 import { generateNpcs, type NpcWorld } from './npc.ts'
 import { emptyQuestLog } from './quest.ts'
+import { emptyMarket, refillNpcOrders, resolveMarketEvent, ctxOf, applyCtx } from './market.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -44,6 +45,11 @@ export const MIGRATIONS: readonly Migration[] = [
     from: 2,
     migrate: (old) => ({ ...(old as object), quests: emptyQuestLog() }),
   },
+  {
+    // v3 → v4：市场挂单进存档。空市场即可，下一次 tick 会按世界种子补上 NPC 单。
+    from: 3,
+    migrate: (old) => ({ ...(old as object), market: emptyMarket() }),
+  },
 ]
 
 const MERIDIAN_GROUPS: readonly MeridianGroup[] = ['手三阴', '手三阳', '足三阴', '足三阳']
@@ -71,6 +77,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
     worldSeed: opts.seed,
     npc: { bases: generateNpcs(opts.seed, 300), patches: {} },
     quests: emptyQuestLog(),
+    market: emptyMarket(),
     mail: [],
     player: {
       name: opts.name,
@@ -160,11 +167,13 @@ export function tick(
     if (ev.kind === 'move') return resolveMove(st, ev)
     if (ev.kind === 'battle') return resolveBattleEvent(st, ev)
     if (ev.kind === 'craft') return { state: resolveCraft(st, ev) }
-    // market 类事件由市场模块自己的上下文结算
+    if (ev.kind === 'market') return { state: applyCtx(resolveMarketEvent(ctxOf(st), ev)) }
     return { state: st }
   })
 
-  return { state: { ...out.state, timeline: out.timeline }, resolved: out.resolved }
+  // 结算完再补市场，这样刚被买走的单不会当场复活
+  const settled = refillNpcOrders({ ...out.state, timeline: out.timeline })
+  return { state: settled, resolved: out.resolved }
 }
 
 /** 改倍速（先结算到当前再换档，否则游戏时间会跳变）。 */

@@ -189,6 +189,35 @@ test('v1 老存档能迁移到 v2：进度保留、补上 NPC 世界', () => {
   assert.deepEqual(loaded!.npc.patches, {})
 })
 
+test('★v1 老存档一路迁到最新版：任务簿与市场都补齐', () => {
+  const store = memStorage()
+  store.setItem(
+    'xiuzhen.save',
+    JSON.stringify({
+      v: 1,
+      savedAt: 0,
+      state: {
+        v: 1,
+        clock: { gameT: 86400, wallT: 0, rate: 1 },
+        timeline: { events: [] },
+        rng: [1, 2, 3, 4],
+        worldSeed: 42,
+        mail: [],
+        player: { ...fresh().player, name: '老角色' },
+      },
+    }),
+  )
+  const loaded = loadGame(store)!
+  assert.equal(loaded.player.name, '老角色')
+  assert.ok(loaded.quests, 'v2→v3 补任务簿')
+  assert.ok(loaded.market, 'v3→v4 补市场')
+  assert.deepEqual(loaded.market, { qi: [], artifacts: [] })
+
+  // 空市场读出来后，一次 tick 就该按世界种子把 NPC 单补上
+  const after = tick(loaded, loaded.clock.wallT + 1000).state
+  assert.ok(after.market.qi.length > 0, 'tick 后市场应有挂单')
+})
+
 test('新档自带 NPC 世界', () => {
   const s = fresh()
   assert.ok(s.npc.bases.length > 0)

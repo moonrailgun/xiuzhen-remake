@@ -11,6 +11,8 @@ import {
   formatDuration,
   HOUR,
   DAY,
+  formatGameDate,
+  formatGameDateShort,
 } from './clock.ts'
 
 test('原速下游戏时间 = 墙钟流逝', () => {
@@ -88,4 +90,30 @@ test('dayOfServer 与 gameT 一致', () => {
   assert.equal(dayOfServer(advance(createClock(0), 0)), 0)
   assert.equal(dayOfServer(advance(createClock(0), DAY * 1000 - 1)), 0)
   assert.equal(dayOfServer(advance(createClock(0), DAY * 1000)), 1)
+})
+
+// —— 游戏日历的绝对时间戳 ——
+
+test('游戏时刻 → YYYY-MM-DD HH:MM:SS，从 2008-10-28 首服开服日起算', () => {
+  assert.equal(formatGameDate(0), '2008-10-28 00:00:00')
+  assert.equal(formatGameDate(3661), '2008-10-28 01:01:01')
+  assert.equal(formatGameDate(DAY), '2008-10-29 00:00:00')
+  // 跨年跨月都要对
+  assert.equal(formatGameDate(65 * DAY), '2009-01-01 00:00:00')
+})
+
+test('时间戳不随本机时区漂移（游戏日历与时区无关）', () => {
+  const before = process.env.TZ
+  try {
+    process.env.TZ = 'America/Los_Angeles'
+    const west = formatGameDate(DAY)
+    process.env.TZ = 'Asia/Shanghai'
+    assert.equal(formatGameDate(DAY), west)
+  } finally {
+    process.env.TZ = before
+  }
+})
+
+test('门派新闻用短格式 YY-MM-DD HH:MM', () => {
+  assert.equal(formatGameDateShort(3661), '08-10-28 01:01')
 })

@@ -13,6 +13,7 @@ import type { RngState } from './rng.ts'
 import type { Element } from '../data/meridian.ts'
 import type { NpcWorld } from './npc.ts'
 import type { QuestLog } from './quest.ts'
+import type { Market } from './market.ts'
 
 export type School = '蜀山' | '昆仑' | '通天'
 
@@ -81,6 +82,8 @@ export type GameState = {
   readonly npc: NpcWorld
   /** 任务进度 */
   readonly quests: QuestLog
+  /** 市场挂单：自己的 + NPC 的（`market.ts` 负责补货与结算） */
+  readonly market: Market
   /** 收件箱，上限 200 封（`docs/spec/DECISIONS.md` §2 的体积预算） */
   readonly mail: readonly MailItem[]
 }

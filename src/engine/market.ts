@@ -11,13 +11,14 @@
  *  3. **交易在途的真气不在身上** —— 卖出挂单的真气立刻离开丹田，买来的真气注入完成才到账。
  *     玩家专门用这一条躲掠夺（`docs/research/02` §1.6）。反过来，**被攻击时挂单自动取消**。
  *
- * 市场不在 `GameState` 里（存档结构由 `state.ts` 定死）。这里自带 `Market`，
- * 与 `GameState` 一起构成 `MarketCtx`，交给 `timeline.advanceTo` 当状态用。
+ * 市场存在 `GameState.market` 里（存档 v4 起）。所有操作仍以 `MarketCtx` 为单位，
+ * 这样纯函数不必知道自己被塞在哪；进出用 `ctxOf` / `applyCtx` 两个桥。
  */
 
 import { schedule, cancel, type GameEvent } from './timeline.ts'
 import { addQi, clampQi, type FiveQi, type GameState } from './state.ts'
 import { capacityOf, spendCoin } from './cultivate.ts'
+import { rand, randInt } from './rng.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 
 export type QiAmount = { readonly element: Element; readonly amount: number }
@@ -51,6 +52,10 @@ export type Market = {
 export const emptyMarket = (): Market => ({ qi: [], artifacts: [] })
 
 export type MarketCtx = { readonly state: GameState; readonly market: Market }
+
+/** 市场进出存档的两个桥。`ctx.state.market` 在操作期间是旧的，没人读它。 */
+export const ctxOf = (state: GameState): MarketCtx => ({ state, market: state.market })
+export const applyCtx = (ctx: MarketCtx): GameState => ({ ...ctx.state, market: ctx.market })
 
 export type MarketResult =
   | { readonly ok: true; readonly ctx: MarketCtx }
@@ -347,6 +352,73 @@ export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
       market: { ...ctx.market, artifacts: ctx.market.artifacts.filter((o) => o.id !== orderId) },
     },
   }
+}
+
+// —— NPC 挂单（单机版的「别人」）——
+//
+// 原版市场里挂单的是真人。单机下只能模拟：按世界种子 + 游戏小时确定性地生成，
+// 所以同一个存档任何时候重放都得到同一批单子，离线再久也不会「错过」行情。
+// 这是【重建】，不是还原 —— 原版挂单的数量与价格分布没有任何存档。
+
+/** 同时挂着的 NPC 单数。截图 #7/#123 每页 10 行、共 2 页 → 约 12–20 单。 */
+export const NPC_ORDER_TARGET = 12
+/** 一单挂多久（游戏秒）。到期撤下，换新的一批。 */
+export const NPC_ORDER_TTL = 24 * 3600
+
+const NPC_PREFIX = 'npc:'
+
+/** NPC 单的 id 是 `npc:{挂单小时}:{序号}`，小时用来做过期与去重。 */
+const npcHourOf = (id: string): number | null => {
+  if (!id.startsWith(NPC_PREFIX)) return null
+  const h = Number(id.slice(NPC_PREFIX.length).split(':')[0])
+  return Number.isFinite(h) ? h : null
+}
+
+/** 一单的内容：随机两种不同的真气，数量 1000–50000，比例在 1:1–1:2 之间。 */
+function npcOrder(seed: number, hour: number, slot: number): QiOrder {
+  const key = `${hour}:${slot}`
+  const gi = randInt(5, seed, 'mkt-give', key)
+  // 需求必须是另一种，所以在剩下 4 种里挑
+  const wi = (gi + 1 + randInt(4, seed, 'mkt-want', key)) % 5
+  const amount = 1000 + randInt(49, seed, 'mkt-amt', key) * 1000
+  // 比例 1.0–2.0，两位小数，向下取整到整点真气
+  const ratio = 1 + rand(seed, 'mkt-ratio', key)
+  return {
+    id: `${NPC_PREFIX}${hour}:${slot}`,
+    seller: `散修${100 + randInt(900, seed, 'mkt-name', key)}`,
+    offer: { element: ELEMENTS[gi]!, amount },
+    want: { element: ELEMENTS[wi]!, amount: Math.floor(amount * ratio) },
+    listed: true,
+  }
+}
+
+/**
+ * 把市场补到 `NPC_ORDER_TARGET` 单，并撤掉过期的 NPC 单。玩家自己的单不动。
+ *
+ * 新单的序号从「本小时已用过的最大序号 + 1」开始，
+ * 所以刚被买走的单不会在同一小时里原样复活。
+ */
+export function refillNpcOrders(state: GameState): GameState {
+  const hour = Math.floor(state.clock.gameT / 3600)
+  const kept = state.market.qi.filter((o) => {
+    const h = npcHourOf(o.id)
+    return h === null || hour - h < NPC_ORDER_TTL / 3600
+  })
+
+  let slot = 0
+  for (const o of kept) {
+    if (npcHourOf(o.id) !== hour) continue
+    slot = Math.max(slot, Number(o.id.split(':')[2] ?? 0) + 1)
+  }
+
+  const npcCount = kept.filter((o) => npcHourOf(o.id) !== null).length
+  const added: QiOrder[] = []
+  for (let i = npcCount; i < NPC_ORDER_TARGET; i++) {
+    added.push(npcOrder(state.worldSeed, hour, slot++))
+  }
+
+  if (added.length === 0 && kept.length === state.market.qi.length) return state
+  return { ...state, market: { ...state.market, qi: [...kept, ...added] } }
 }
 
 // —— 事件结算 ——

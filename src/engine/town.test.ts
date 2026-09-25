@@ -36,6 +36,7 @@ const state = (over: Partial<GameState['player']> = {}): GameState => ({
   worldSeed: 1,
   npc: { bases: [], patches: {} },
   quests: { entries: [], line: 'qi' as const, dantianBonus: 0 },
+  market: { qi: [], artifacts: [] },
   mail: [],
   player: {
     name: '莫函',

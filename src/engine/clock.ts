@@ -80,6 +80,28 @@ export function formatServerTime(clock: Clock): string {
 }
 
 /**
+ * 开服日（UTC 毫秒）。2008-10-28 是首服开服日
+ * （`reference/text/news/gonggao-2008-10-27-464.txt`），本地版就从这天算起，
+ * 这样战报和收件箱里的绝对时间戳读起来是「当年那个日历」。
+ */
+export const SERVER_OPEN_MS = Date.UTC(2008, 9, 28)
+
+/**
+ * 游戏时刻 → `YYYY-MM-DD HH:MM:SS`。收件箱的「发信时间」、炼制表的「完成时间」用它。
+ * 用 UTC 取字段，避免随使用者所在时区漂移（游戏日历与本机时区无关）。
+ */
+export function formatGameDate(gameT: number): string {
+  const d = new Date(SERVER_OPEN_MS + Math.max(0, Math.floor(gameT)) * 1000)
+  const p = (n: number, w = 2) => String(n).padStart(w, '0')
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+}
+
+/** 门派新闻用的短格式 `YY-MM-DD HH:MM`（截图与原版 DOM 都是这个写法）。 */
+export const formatGameDateShort = (gameT: number): string =>
+  formatGameDate(gameT).slice(2, 16)
+
+/**
  * 格式化成原版事件栏的倒计时 `H:MM:SS`（小时不补零，可超过 24，如 `1222:13:20`）。
  * 出处：截图 #3「需要时间 0:24:01」、#33「1527:46:40」。
  */

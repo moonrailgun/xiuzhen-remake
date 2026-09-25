@@ -166,6 +166,54 @@ const npcInfo = await page.evaluate(() => {
 })
 check('存档里有 NPC 世界与任务进度', npcInfo.count > 0 && npcInfo.hasQuests >= 0, JSON.stringify(npcInfo))
 
+// —— 12. 七个主标签全部接上真实状态 ——
+// 这是「点了不换页」这个大坑的回归：以前只有人物页和地图页是真的。
+const tabText = async (href) => {
+  await page.click(`#bigmenu a[href="${href}"]`)
+  await page.waitForTimeout(250)
+  return (await page.locator('#gleft').textContent())?.replace(/\s+/g, ' ') ?? ''
+}
+
+const skillText = await tabText('skill.jsp')
+check('法术页渲染法术树（不是人物页）',
+  (await page.locator('.skilltree').count()) > 0 && !skillText.includes('经脉'),
+  skillText.slice(0, 50))
+
+// 子标签：剑术树的节点数与炼器树不同，用它验证 ?tab= 真的换了树
+await page.click('#gleft a[href="skill.jsp?tab=1"]')
+await page.waitForTimeout(250)
+const swordCells = await page.locator('.skillcell').count()
+check('法术页子标签可切换（炼器 → 剑术）', swordCells === 6, `剑术树 ${swordCells} 格`)
+
+const itemText = await tabText('item.jsp')
+check('法宝页渲染「拥有法宝」一览', itemText.includes('拥有法宝'), itemText.slice(0, 50))
+
+await page.click('#gleft a[href="item.jsp?tab=1"]')
+await page.waitForTimeout(250)
+const swordRows = await page.locator('#gleft table.tablebg tr.trbg').count()
+const swordText = (await page.locator('#gleft').textContent()) ?? ''
+check('炼制飞剑页列出 14 把剑的真实数值',
+  swordRows >= 14 && swordText.includes('玉虚桃木剑'), `${swordRows} 行`)
+
+const tradeText = await tabText('trade.jsp')
+const offerRows = await page.locator('#gleft table.tablebg tr.trbg').count()
+check('交易页有真实挂单（NPC 自动补货）',
+  tradeText.includes('注意：购买真气') && offerRows > 1, `${offerRows} 行挂单`)
+
+const allyText = await tabText('ally.jsp')
+check('门派页显示道源与掌门', allyText.includes('通天'), allyText.slice(0, 50))
+
+await page.click('#gleft a[href="ally.jsp?tab=2&page=1&per=10&job=-2"]')
+await page.waitForTimeout(250)
+const memberText = (await page.locator('#gleft').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('门派成员页列出同道源的人（掌门排头）', memberText.includes('掌门'), memberText.slice(0, 60))
+
+// 消息是右侧浮窗，不换左栏
+await page.click('#bigmenu a[onclick*="msg.jsp"]')
+await page.waitForTimeout(250)
+check('消息按钮打开收件箱浮窗',
+  (await page.locator('#rwindowcontent').textContent())?.includes('收件箱') ?? false)
+
 // 12. 没有 JS 报错
 check('全程无 JS 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 

@@ -91,6 +91,7 @@ export function startMove(
   toY: number,
   opts: { readonly weeksOpen?: number } = {},
 ): MoveResult {
+  if (!Number.isInteger(toX) || !Number.isInteger(toY)) return { ok: false, reason: '目标坐标必须是整数' }
   if (!inWorld(toX, toY)) return { ok: false, reason: '目标超出了修真世界的范围' }
   if (toX === state.player.x && toY === state.player.y) {
     return { ok: false, reason: '你已经在这里了' }
@@ -166,8 +167,11 @@ export function resolveMove(
 export function moveDisplay(
   state: GameState,
 ): { current: { x: number; y: number; seconds: number }; next?: { x: number; y: number; seconds: number } } | null {
-  const ev = state.timeline.events.find((e) => e.id === MOVE_EVENT_ID)
+  const ev = state.timeline.events.find((e) => e.id === MOVE_EVENT_ID || (e.kind === 'move' && e.payload['op'] === 'escort'))
   if (!ev) return null
+  if (ev.payload['op'] === 'escort') {
+    return { current: { x: Number(ev.payload['x']), y: Number(ev.payload['y']), seconds: Math.max(0, Math.round(ev.finishAt - state.clock.gameT)) } }
+  }
   const legs = ev.payload['legs'] as MoveLeg[]
   const index = ev.payload['index'] as number
   const cur = legs[index]

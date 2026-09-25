@@ -225,3 +225,27 @@ test('离线很久：一次推进把积压的修炼全结算', () => {
   assert.equal(out.resolved.length, 1)
   assert.equal(levelOf(out.state, meridian0), 3)
 })
+
+test('法术修炼在引擎校验前置，不能跳过剑术树', () => {
+  assert.equal(startCultivate(state(), { system: 'skill', id: '万剑诀' }).ok, false)
+  assert.equal(startCultivate(state({ skills: { 大周天剑法: 5 } }), { system: 'skill', id: '万剑诀' }).ok, true)
+})
+
+test('法术达到上限或未知法术不能继续扣资源', () => {
+  for (const id of ['御剑术', '不存在的法术']) {
+    const s = state({ skills: { 御剑术: 20 }, qi: qi(1e20, 1e20, 1e20, 1e20, 1e20) })
+    assert.equal(startCultivate(s, { system: 'skill', id }).ok, false)
+  }
+})
+
+test('易经20到500级的重建消耗单调且不超过最高丹田容量', () => {
+  let previous = 0
+  const s = state({ body: [0, 0, 0, 0, 0, 36, 0, 0] })
+  for (let level = 20; level <= 500; level++) {
+    const plan = planUpgrade({ ...s, player: { ...s.player, skills: { 易经: level - 1 } } }, { system: 'skill', id: '易经' })
+    const cost = Math.max(...plan.cost)
+    assert.ok(Number.isFinite(cost) && cost <= capacityOf(s), `易经${level}级不可支付：${cost}`)
+    assert.ok(cost >= previous)
+    previous = cost
+  }
+})

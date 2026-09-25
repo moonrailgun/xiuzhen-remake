@@ -6,18 +6,19 @@
  * 离线一个月和离线一秒走的是同一条代码路径。
  */
 
-import { advance, setRate, DAY, type Clock } from './clock.ts'
-import { advanceTo, emptyTimeline, type GameEvent } from './timeline.ts'
+import { advance, setRate, DAY, HOUR, WEEK, weekOfServer, type Clock } from './clock.ts'
+import { cancel, schedule, sorted, emptyTimeline, type GameEvent } from './timeline.ts'
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { resolveCraft } from './craft.ts'
-import { generateNpcs, type NpcWorld } from './npc.ts'
-import { emptyQuestLog } from './quest.ts'
-import { emptyMarket, refillNpcOrders, resolveMarketEvent, ctxOf, applyCtx } from './market.ts'
+import { generateNpcs } from './npc.ts'
+import { applyQuestProgress, emptyQuestLog, resolveQuestBattle } from './quest.ts'
+import { resolveEscort, settleTownIncome } from './town.ts'
+import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, settleNpcPurchases, ctxOf, applyCtx } from './market.ts'
 import { scheduleRaid, resolveRaid } from './raid.ts'
 import { seedRng } from './rng.ts'
-import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
+import { save, load, importSave, SaveError, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
 import {
   hourlyQi,
@@ -62,6 +63,22 @@ export const MIGRATIONS: readonly Migration[] = [
     migrate: (old) => {
       const s = old as { player?: object }
       return { ...(old as object), player: { ...(s.player ?? {}), vip: false } }
+    },
+  },
+  {
+    // v6 → v7：挂单增加上架时间、法宝原物；结丹记录与出击快照均为可选字段。
+    // 旧版尚未成交的自己的挂单从存档时刻开始等买家，不能追溯出售。
+    // 旧返航已发过奖励，缺少 loot 必须保持缺省，不能迁移补发。
+    from: 6,
+    migrate: (old) => {
+      const s = old as GameState | null
+      if (!s?.market || !Array.isArray(s.market.qi) || !Array.isArray(s.market.artifacts)) return old
+      return { ...s, market: {
+        qi: s.market.qi.map(o => o?.seller === s.player?.name && o.listed && o.listedAt === undefined
+          ? { ...o, listedAt: s.clock?.gameT } : o),
+        artifacts: s.market.artifacts.map(o => o?.seller === s.player?.name && o.listedAt === undefined
+          ? { ...o, listedAt: s.clock?.gameT } : o),
+      } }
     },
   },
 ]
@@ -123,7 +140,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
 export type TerrainProvider = (x: number, y: number) => FiveQi
 
 /** 默认走真实世界生成（种子来自存档，所以离线重放也一致）。 */
-export const terrainOf = (state: GameState, weeksOpen = 99): TerrainProvider =>
+export const terrainOf = (state: GameState, weeksOpen = weekOfServer(state.clock)): TerrainProvider =>
   (x, y) => qiAt(state.worldSeed, x, y, terrainAt(state.worldSeed, x, y, weeksOpen))
 
 /**
@@ -161,44 +178,82 @@ export function currentQiPerHour(
 }
 
 /**
- * 推进到当前时刻：先按产量补真气，再结算到期事件。
- *
- * 顺序很重要：先补真气再结算，这样离线期间「攒够真气 → 自动升级」这类链条
- * 才不会因为结算时真气还没到账而断掉。
+ * 按事件和小时边界推进。每段先结算收入，再用该时刻的状态处理事件；
+ * 突破、移动、被抢之后，余下时间使用新的产量、位置与资源。
  */
 export function tick(
   state: GameState,
   nowWall: number,
-  terrain: TerrainProvider = terrainOf(state),
+  terrain?: TerrainProvider,
 ): { state: GameState; resolved: readonly GameEvent[] } {
   const clock = advance(state.clock, nowWall)
-  const elapsed = clock.gameT - state.clock.gameT
-  if (elapsed <= 0) return { state: { ...state, clock }, resolved: [] }
+  let current = state
+  const resolved: GameEvent[] = []
+  let nextHour = (Math.floor(state.clock.gameT / HOUR) + 1) * HOUR
 
-  const perHour = currentQiPerHour(state, terrain)
-  const withQi = gainQi({ ...state, clock }, perHour, elapsed)
+  while (true) {
+    const event = sorted(current.timeline)[0]
+    const purchaseAt = nextNpcPurchaseAt(current)
+    const at = Math.max(current.clock.gameT, Math.min(clock.gameT, nextHour, event?.finishAt ?? Infinity, purchaseAt ?? Infinity))
+    const elapsed = at - current.clock.gameT
+    if (elapsed > 0) {
+      const weeks = Math.floor(at / WEEK) - Math.floor(current.clock.gameT / WEEK)
+      current = gainQi({ ...current, clock: { ...clock, gameT: at } }, currentQiPerHour(current, terrain), elapsed)
+      current = settleTownIncome(current, elapsed)
+      if (weeks > 0) current = { ...current, player: { ...current.player, bonusCoin: current.player.bonusCoin + 20 * weeks } }
+    }
 
-  const out = advanceTo(withQi, withQi.timeline, clock.gameT, (st, ev) => {
-    if (ev.kind === 'cultivate') return { state: resolveCultivate(st, ev) }
-    if (ev.kind === 'move') return resolveMove(st, ev)
-    if (ev.kind === 'battle') return resolveBattleEvent(st, ev)
-    if (ev.kind === 'craft') return { state: resolveCraft(st, ev) }
-    if (ev.kind === 'market') return { state: applyCtx(resolveMarketEvent(ctxOf(st), ev)) }
-    if (ev.kind === 'raid') return { state: resolveRaid(st, ev) }
-    return { state: st }
-  })
+    // 先从真实时间线取走当前事件，取消挂单等副作用就不会被旧的事件数组覆盖。
+    // 同时刻事件按 id 稳定排序，事件追加的同刻后续也在离开这个时刻前结算。
+    if (event && event.finishAt <= at) {
+      if (resolved.length >= 100_000) throw new Error('事件结算超过安全上限')
+      current = { ...current, timeline: cancel(current.timeline, event.id) }
+      const out = resolveEvent(current, event)
+      current = applyQuestProgress(current, out.state, event)
+      for (const follow of out.follow ?? []) current = { ...current, timeline: schedule(current.timeline, follow) }
+      resolved.push(event)
+      continue
+    }
 
-  // 结算完再补市场，这样刚被买走的单不会当场复活；
-  // 再看看这一小时有没有人来打你（出保之后才会有）
-  const settled = scheduleRaid(refillNpcOrders({ ...out.state, timeline: out.timeline }))
-  return { state: settled, resolved: out.resolved }
+    if (purchaseAt !== null && purchaseAt <= at) {
+      current = settleNpcPurchases(current)
+      continue // 成交可能生成已到期的注入事件，同一时刻继续处理。
+    }
+
+    if (at === nextHour) {
+      current = scheduleRaid(refillNpcOrders(current))
+      nextHour += HOUR
+    }
+    if (at >= clock.gameT) break
+  }
+
+  if (clock.gameT > state.clock.gameT || resolved.length > 0) current = refillNpcOrders(current)
+  if (current.clock.wallT !== clock.wallT) current = { ...current, clock }
+  return { state: current, resolved }
+}
+
+function resolveEvent(state: GameState, event: GameEvent): { state: GameState; follow?: readonly GameEvent[] } {
+  if (event.kind === 'cultivate') return { state: event.payload.op === 'goldenCore' ? state : resolveCultivate(state, event) }
+  if (event.kind === 'move') return event.payload.op === 'escort' ? { state: resolveEscort(state, event) } : resolveMove(state, event)
+  if (event.kind === 'battle') {
+    const out = resolveBattleEvent(state, event)
+    return out.outcome?.won
+      ? { ...out, state: { ...out.state, quests: resolveQuestBattle(out.state.quests, event, true) } }
+      : out
+  }
+  if (event.kind === 'craft') return { state: resolveCraft(state, event) }
+  if (event.kind === 'market') return { state: applyCtx(resolveMarketEvent(ctxOf(state), event)) }
+  if (event.kind === 'raid') return { state: resolveRaid(state, event) }
+  return { state }
 }
 
 /** 改倍速（先结算到当前再换档，否则游戏时间会跳变）。 */
-export const changeRate = (state: GameState, nowWall: number, rate: number): GameState => ({
-  ...state,
-  clock: setRate(state.clock, nowWall, rate),
-})
+export function changeRate(state: GameState, nowWall: number, rate: number, terrain?: TerrainProvider): GameState {
+  // 先验证倍率，非法输入不必重放整段离线时间。
+  setRate(state.clock, state.clock.wallT, rate)
+  const settled = tick(state, nowWall, terrain).state
+  return { ...settled, clock: { ...settled.clock, rate } }
+}
 
 // —— 存档 ——
 
@@ -207,14 +262,108 @@ export const changeRate = (state: GameState, nowWall: number, rate: number): Gam
  * 不会把「关页面之后的这段时间」重复结算一次。
  * 存档头上的 `savedAt` 记游戏时间，因为整个项目不读墙钟（`DECISIONS.md` §3.6）。
  */
-export function saveGame(storage: Storage, state: GameState, nowWall: number): void {
-  const settled = { ...state, clock: advance(state.clock, nowWall) }
-  save(storage, settled, settled.clock.gameT)
+export function saveGame(storage: Storage, state: GameState, nowWall: number): GameState {
+  const settled = tick(state, nowWall).state
+  save(storage, settled, settled.clock.gameT, { migrations: MIGRATIONS, validate: validateGameState })
+  return settled
 }
 
 export function loadGame(storage: Storage): GameState | null {
-  const out = load(storage, MIGRATIONS)
-  return out ? (out.state as GameState) : null
+  const out = load(storage, MIGRATIONS, validateGameState)
+  return out ? { ...(out.state as GameState), v: SAVE_VERSION } : null
+}
+
+/** 导入与启动读档使用相同的迁移和游戏结构校验。 */
+export function importGame(text: string): GameState {
+  // 早期界面导出的是裸 GameState；仍须经过版本迁移及同一套结构校验。
+  let raw: unknown
+  try { raw = JSON.parse(text) } catch { /* importSave 给出统一的错误信息 */ }
+  if (typeof raw === 'object' && raw !== null && 'player' in raw && 'clock' in raw && !('state' in raw)) {
+    const old = raw as { v?: unknown; clock?: { gameT?: unknown } }
+    text = JSON.stringify({ v: old.v, savedAt: old.clock?.gameT, state: raw })
+  }
+  const state = importSave(text, MIGRATIONS, validateGameState) as GameState
+  return { ...state, v: SAVE_VERSION }
+}
+
+/** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */
+export function validateGameState(value: unknown): asserts value is GameState {
+  const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+  const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
+  const numbers = (v: unknown, length: number): boolean => Array.isArray(v) && v.length === length && v.every(number)
+  const string = (v: unknown): boolean => typeof v === 'string'
+  const strings = (v: Record<string, unknown>, keys: string[]) => keys.every((key) => string(v[key]))
+  const numeric = (v: Record<string, unknown>, keys: string[]) => keys.every((key) => number(v[key]))
+  const arrayOf = (v: unknown, valid: (item: Record<string, unknown>) => boolean): boolean =>
+    Array.isArray(v) && v.every((item: unknown) => object(item) && valid(item))
+  const optionalNumber = (v: unknown) => v === undefined || number(v)
+  const element = (v: unknown) => ELEMENTS.includes(v as Element)
+  const combatElement = (v: unknown) => v === null || element(v)
+  const artifact = (a: Record<string, unknown>) => strings(a, ['id', 'name', 'status']) &&
+    ['sword', 'guard', 'pill', 'book', 'misc'].includes(a.kind as string) &&
+    ['废品', '凡品', '上品', '极品'].includes(a.quality as string) && numeric(a, ['refine', 'count'])
+  const eventPayload = (event: Record<string, unknown>): boolean => {
+    const data = event.payload
+    if (!object(data)) return false
+    switch (event.kind) {
+      case 'cultivate':
+        if (data.op === 'goldenCore') return string(data.questId)
+        return number(data.toLevel) && (data.system === 'skill' ? string(data.id)
+          : ['meridian', 'body'].includes(data.system as string) && number(data.index) && Number.isInteger(data.index) && data.index < (data.system === 'body' ? 8 : 12))
+      case 'move':
+        if (data.op === 'escort') return numeric(data, ['x', 'y', 'fee'])
+        return number(data.index) && Number.isInteger(data.index) &&
+          arrayOf(data.legs, leg => numeric(leg, ['x', 'y', 'seconds']) && string(leg.terrain)) &&
+          data.index < (data.legs as unknown[]).length
+      case 'battle':
+        return ['outbound', 'fighting', 'returning'].includes(data.phase as string) &&
+          object(data.target) && strings(data.target, ['name']) && ['monster', 'player'].includes(data.target.kind as string) &&
+          numeric(data.target, ['x', 'y', 'attack', 'agility', 'hp']) && combatElement(data.target.element) && optionalNumber(data.target.npcId) &&
+          Array.isArray(data.swordIds) && data.swordIds.every(string) &&
+          arrayOf(data.swords, sword => strings(sword, ['id', 'name', 'quality']) && numeric(sword, ['refine', 'speed', 'agility']) &&
+            numbers(sword.attack, 2) && numbers(sword.durability, 2) && combatElement(sword.element) &&
+            (sword.launchedStats === undefined || object(sword.launchedStats) && numeric(sword.launchedStats, ['attack', 'durability', 'speed', 'agility']))) &&
+          (data.loot === undefined || numbers(data.loot, 5)) &&
+          (data.targetQi === undefined || numbers(data.targetQi, 5)) && optionalNumber(data.targetRootLevel)
+      case 'craft':
+        return ['sword', 'guard', 'pill'].includes(data.kind as string) && strings(data, ['name', 'quality']) && number(data.count)
+      case 'market':
+        return data.op === 'list' ? string(data.orderId) : data.op === 'inject' && element(data.element) && number(data.amount)
+      case 'raid':
+        return string(data.attacker) && numeric(data, ['swordPower', 'swords']) && element(data.element)
+      default:
+        return false
+    }
+  }
+  const fail = (): never => { throw new SaveError('存档的游戏数据结构损坏', 'corrupt') }
+  if (!object(value)) fail()
+  const s = value as Record<string, unknown>
+  const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
+  if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+      !object(c) || !numeric(c, ['gameT', 'wallT', 'rate']) || c.rate === 0 ||
+      !object(p) || !strings(p, ['name', 'gender', 'element', 'school', 'realm']) ||
+      !['m', 'f'].includes(p.gender as string) || !ELEMENTS.includes(p.element as Element) ||
+      !['蜀山', '昆仑', '通天'].includes(p.school as string) ||
+      !['筑基期', '辟谷期', '心动期', '金丹期', '元婴期'].includes(p.realm as string) ||
+      !numeric(p, ['x', 'y', 'daoxing', 'experience', 'silver', 'coin', 'bonusCoin', 'createdAt']) ||
+      !numbers(p.qi, 5) || !numbers(p.meridians, 12) || !numbers(p.body, 8) ||
+      !object(p.skills) || !Object.values(p.skills).every(number) || typeof p.vip !== 'boolean' ||
+      !arrayOf(p.artifacts, artifact) ||
+      !object(tl) || !arrayOf(tl.events, (e) => strings(e, ['id', 'kind']) && number(e.finishAt) && eventPayload(e)) ||
+      !object(npc) || !arrayOf(npc.bases, (n) => strings(n, ['name', 'profile', 'school', 'element']) && numeric(n, ['id', 'bornAt', 'homeX', 'homeY'])) ||
+      !object(npc.patches) || !Object.values(npc.patches).every((patch) => object(patch) && Object.values(patch).every(number)) ||
+      !object(quests) || !['qi', 'sword'].includes(quests.line as string) || !number(quests.dantianBonus) ||
+      !arrayOf(quests.entries, (q) => string(q.id) && number(q.acceptedAt) && typeof q.done === 'boolean' &&
+        (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
+        (q.coreEventId === undefined || string(q.coreEventId)) && (q.cleared === undefined || typeof q.cleared === 'boolean')) ||
+      !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
+        optionalNumber(o.listedAt) &&
+        [o.offer, o.want].every((a) => object(a) && ELEMENTS.includes(a.element as Element) && number(a.amount))) ||
+      !arrayOf(market.artifacts, (o) => strings(o, ['id', 'seller', 'name']) && numeric(o, ['refine', 'priceCoin']) && optionalNumber(o.listedAt) &&
+        (o.artifact === undefined || object(o.artifact) && artifact(o.artifact))) ||
+      !object(s.towns) || !Object.values(s.towns).every((t) => object(t) && strings(t, ['id', 'kind', 'name']) && numeric(t, ['x', 'y']) &&
+        arrayOf(t.investments, (i) => string(i.owner) && number(i.silver))) ||
+      !arrayOf(s.mail, (m) => strings(m, ['id', 'subject', 'from', 'kind']) && number(m.at) && typeof m.read === 'boolean' && object(m.body))) fail()
 }
 
 /** 顶栏要显示的资源条数据。 */

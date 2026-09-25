@@ -36,6 +36,13 @@ test('新号一次移动 2 格、观察 4 格（官方新手指南原文）', ()
   assert.equal(sightRange(0), 4)
 })
 
+test('移动入口拒绝非整数坐标，不能把小数交给逐格寻路', () => {
+  const result = startMove(state(), 1.5, 100)
+  assert.equal(result.ok, false)
+  assert.match(result.ok ? '' : result.reason, /坐标/)
+  for (const x of [100.5, NaN, Infinity, -1, 200]) assert.equal(startMove(state(), x, 100).ok, false)
+})
+
 test('行万里路增加移动距离，穷千里目增加视野', () => {
   assert.equal(moveRange(5), 7)
   assert.equal(sightRange(10), 14)

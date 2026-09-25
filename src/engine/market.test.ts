@@ -81,6 +81,16 @@ const ctxOf = (over?: Partial<GameState['player']>): MarketCtx => ({
 
 const ok = (r: { ok: boolean }): r is { ok: true; ctx: MarketCtx } => r.ok
 
+test('买走最高序号挂单后补货不复用尚在注入的订单编号', () => {
+  const first = refillNpcOrders(state())
+  const order = first.market.qi.at(-1)!
+  const purchased = buyQi({ state: first, market: first.market }, order.id)
+  assert.ok(purchased.ok)
+  const replenished = refillNpcOrders({ ...purchased.ctx.state, market: purchased.ctx.market })
+  assert.ok(!replenished.market.qi.some(o => o.id === order.id))
+  assert.doesNotThrow(() => buyQi({ state: replenished, market: replenished.market }, replenished.market.qi.at(-1)!.id))
+})
+
 /** 把 ctx 推进到 until 并结算市场事件。 */
 function advance(ctx: MarketCtx, until: number): MarketCtx {
   const out = advanceTo<MarketCtx>(

@@ -254,15 +254,15 @@ test('花 1 仙石取消跑镖', () => {
 // —— 驿站 ——
 
 test('驿站传送扣仙石并挪位置', () => {
-  const r = teleport(state({ coin: 10 }), { x: 200, y: 50 }, { fromKind: '城池' })
+  const r = teleport(state({ coin: 10 }), { x: 199, y: 50 }, { fromKind: '城池' })
   assert.ok(r.ok)
   assert.equal(r.state.player.coin, 10 - STATION_COST_COIN)
-  assert.equal(r.state.player.x, 200)
+  assert.equal(r.state.player.x, 199)
   assert.equal(r.state.player.y, 50)
 })
 
 test('被攻击时不能使用驿站传送', () => {
-  const r = teleport(state({ coin: 10 }), { x: 200, y: 50 }, { fromKind: '城池', underAttack: true })
+  const r = teleport(state({ coin: 10 }), { x: 199, y: 50 }, { fromKind: '城池', underAttack: true })
   assert.equal(r.ok, false)
   assert.equal(r.ok === false && r.reason, '你正在被攻击，无法使用驿站')
 })
@@ -277,7 +277,8 @@ test('只有城池有驿站', () => {
 
 test('心动任务「千金散尽」交 100 万两给李员外', () => {
   assert.equal(payLiYuanwai(state({ silver: 999_999 })).ok, false)
-  const r = payLiYuanwai(state({ silver: 1_000_000 }))
+  const active = state({ silver: 1_000_000 })
+  const r = payLiYuanwai({ ...active, quests: { ...active.quests, entries: [{ id: 'realm:qianjin:1', acceptedAt: 0, done: false }] } })
   assert.ok(r.ok)
   assert.equal(r.state.player.silver, 0)
 })

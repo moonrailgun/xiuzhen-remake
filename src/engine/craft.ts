@@ -62,7 +62,7 @@ export type CraftResult =
  * 开始炼制。同类只能有一炉，不同类可以并行。
  */
 export function startCraft(state: GameState, order: CraftOrder): CraftResult {
-  if (order.count <= 0) return { ok: false, reason: '请填写炼制数量' }
+  if (!Number.isSafeInteger(order.count) || order.count <= 0) return { ok: false, reason: '请填写炼制数量' }
 
   const queueId = CRAFT_QUEUE_ID[order.kind]
   if (state.timeline.events.some((e) => e.id === queueId)) {
@@ -71,6 +71,8 @@ export function startCraft(state: GameState, order: CraftOrder): CraftResult {
       reason: order.kind === 'pill' ? '丹炉正在炼制中' : '该类法宝正在炼制中',
     }
   }
+
+  if (!canAcquireArtifacts(state, order.count)) return { ok: false, reason: '法宝携带数量已达上限，请先提升袖里乾坤或腾出空位' }
 
   const total: FiveQi = order.cost.map((v) => v * order.count) as unknown as FiveQi
   if (!canAfford(state.player.qi, total)) {
@@ -125,6 +127,19 @@ export const BODY_SLEEVE = 3
 export const BASE_ARTIFACT_SLOTS = 5
 export const artifactSlots = (sleeveLevel: number, vip = false, superVip = false): number =>
   BASE_ARTIFACT_SLOTS + sleeveLevel + (vip ? 5 : 0) + (superVip ? 15 : 0)
+
+/** 当前单机版VIP是设置开关，未实现高级VIP权益。 */
+export const artifactCapacity = (state: GameState): number =>
+  artifactSlots(state.player.body[BODY_SLEEVE] ?? 0, state.player.vip)
+
+/** 已携带及各炼器队列预留的数量；购买不能占用在炼成品的位置。 */
+export const artifactSpaceUsed = (state: GameState): number =>
+  state.player.artifacts.reduce((sum, artifact) => sum + artifact.count, 0) +
+  state.timeline.events.filter((event) => event.kind === 'craft')
+    .reduce((sum, event) => sum + (Number(event.payload['count']) || 0), 0)
+
+export const canAcquireArtifacts = (state: GameState, count: number): boolean =>
+  Number.isSafeInteger(count) && count > 0 && artifactSpaceUsed(state) + count <= artifactCapacity(state)
 
 // —— 淬炼 ——
 

@@ -8,12 +8,18 @@ import {
   resourceBarOf,
   saveGame,
   loadGame,
+  importGame,
 } from './game.ts'
+import { acceptEscort, hourlyIncomeOf, type Town } from './town.ts'
+import { entryOf, startCoreCompression, CORE_COMPRESS_SECONDS, CORE_QI_POINTS } from './quest.ts'
+import { listQi, listArtifact, ctxOf, applyCtx, LISTING_DELAY_SECONDS, NPC_PURCHASE_DELAY_SECONDS, injectSecondsFor } from './market.ts'
+import { JINDAN_CHAIN } from '../data/quests.ts'
+import { launch } from './battle.ts'
 import { startCultivate, capacityOf } from './cultivate.ts'
-import { DAY, HOUR } from './clock.ts'
+import { DAY, HOUR, WEEK } from './clock.ts'
 import { isOutOfProtection } from './state.ts'
 import type { FiveQi, GameState } from './state.ts'
-import type { Storage } from './save.ts'
+import { serialize, SAVE_KEYS, SAVE_VERSION, type Storage } from './save.ts'
 
 const qi = (...v: number[]): FiveQi => v as unknown as FiveQi
 
@@ -72,6 +78,7 @@ test('tick：按流逝时间补真气', () => {
 test('tick：真气不超过丹田上限', () => {
   const s: GameState = {
     ...fresh(),
+    npc: { bases: [], patches: {} },
     player: { ...fresh().player, meridians: Array(12).fill(2), body: [0, 0, 0, 0, 0, 2, 0, 0] },
   }
   const out = tick(s, 1000 * 3600_000) // 1000 小时
@@ -97,7 +104,7 @@ test('tick：离线期间的修炼会被结算掉', () => {
 
   // 离线 30 天
   const out = tick(s, 30 * DAY * 1000)
-  assert.equal(out.resolved.length, 1, '积压的修炼应被结算')
+  assert.equal(out.resolved.filter((e) => e.kind === 'cultivate').length, 1, '积压的修炼应被结算')
   assert.equal(out.state.player.meridians[0], 1)
 })
 
@@ -150,10 +157,230 @@ test('存档时先结算时钟：关页面再打开不会重复补一段', () =>
   const loaded = loadGame(store)!
   assert.equal(loaded.clock.gameT, 3600, '存档里的游戏时间应已推进')
   assert.equal(loaded.clock.wallT, 3600_000, '墙钟基准也要更新')
+  assert.equal(loaded.player.qi[1], 60, '写盘时同一段产出也必须到账')
+  assert.equal(tick(loaded, 7200_000).state.player.qi[1], 120)
+})
+
+const quiet = (): GameState => {
+  const s = fresh()
+  return { ...s, npc: { bases: [], patches: {} }, player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0] } }
+}
+
+test('改倍率直接结算尚未入账的真气与到期事件', () => {
+  let s = quiet()
+  s = { ...s, player: { ...s.player, qi: qi(100, 100, 100, 100, 100) } }
+  const started = startCultivate(s, { system: 'meridian', index: 0 })
+  assert.ok(started.ok)
+  const switched = changeRate(started.state, HOUR * 1000, 10)
+  assert.equal(switched.player.meridians[0], 1)
+  assert.ok(switched.player.qi[1] > started.state.player.qi[1], '切换前的产出不能丢失')
+  const unchanged = changeRate(quiet(), HOUR * 1000, 1)
+  assert.equal(unchanged.player.qi[1], 12, '点击当前倍率也要结算')
+})
+
+test('离线修炼按完成时刻分段：突破后使用新产量', () => {
+  const s = quiet()
+  const started = startCultivate({ ...s, player: { ...s.player, qi: qi(100, 100, 100, 100, 100) } }, { system: 'meridian', index: 0 })
+  assert.ok(started.ok)
+  const due = started.state.timeline.events[0]!.finishAt
+  const terrain = () => qi(4, 4, 4, 4, 4)
+  const offline = tick(started.state, DAY * 1000, terrain).state
+  const online = tick(tick(started.state, due * 1000, terrain).state, DAY * 1000, terrain).state
+  assert.ok(Math.abs(offline.player.qi[1] - online.player.qi[1]) < 1e-8)
+  assert.ok(offline.player.qi[1] > 400, '突破后的近一天应享受升级产量')
+})
+
+test('移动的每段分别使用当时坐标的元气，同刻事件只结算一次', () => {
+  const s: GameState = { ...quiet(), timeline: { events: [{
+    id: 'move:current', kind: 'move', finishAt: 1800,
+    payload: { index: 0, legs: [
+      { x: 101, y: 100, terrain: '平原', seconds: 1800 },
+      { x: 102, y: 100, terrain: '平原', seconds: 1800 },
+    ] },
+  }] } }
+  const terrain = (x: number) => qi(x === 100 ? 2 : x === 101 ? 4 : 6, 2, 2, x === 100 ? 2 : x === 101 ? 4 : 6, 2)
+  const result = tick(s, 2 * HOUR * 1000, terrain)
+  assert.equal(result.state.player.x, 102)
+  assert.equal(result.state.player.qi[3], 27, '半小时6/h + 半小时12/h + 一小时18/h')
+  assert.equal(result.resolved.length, 2)
+  assert.equal(tick(result.state, 2 * HOUR * 1000, terrain).resolved.length, 0)
+})
+
+test('零耗时/立即完成事件不需要等下一秒才结算', () => {
+  const s = quiet()
+  const started = startCultivate({ ...s, player: { ...s.player, qi: qi(100, 100, 100, 100, 100) } }, { system: 'meridian', index: 0 })
+  assert.ok(started.ok)
+  const immediate = { ...started.state, timeline: { events: started.state.timeline.events.map((e) => ({ ...e, finishAt: 0 })) } }
+  const result = tick(immediate, 0)
+  assert.equal(result.state.player.meridians[0], 1)
+  assert.equal(result.state.timeline.events.length, 0)
+})
+
+test('跨周工资离线补发，存档重载与重复tick不重复领取', () => {
+  const store = memStorage()
+  const s = quiet()
+  const before = tick(s, (WEEK - 1) * 1000).state
+  assert.equal(before.player.bonusCoin, 100)
+  const after = tick(before, 2 * WEEK * 1000).state
+  assert.equal(after.player.bonusCoin, 140)
+  saveGame(store, after, 2 * WEEK * 1000)
+  assert.equal(tick(loadGame(store)!, 2 * WEEK * 1000).state.player.bonusCoin, 140)
+  assert.equal(tick(loadGame(store)!, 3 * WEEK * 1000).state.player.bonusCoin, 160)
+})
+
+test('合法JSON但游戏结构损坏时回退备份，后续保存保留健康备份', () => {
+  const store = memStorage()
+  const backup = serialize(quiet(), 0)
+  store.setItem(SAVE_KEYS.backup, backup)
+  for (const bad of [{}, { ...quiet(), clock: {} }, { ...quiet(), player: { ...quiet().player, qi: [1] } }]) {
+    store.setItem(SAVE_KEYS.main, serialize(bad, 0))
+    const recovered = loadGame(store)!
+    assert.equal(recovered.player.name, '173小鱼')
+    saveGame(store, recovered, 1000)
+    assert.equal(store.getItem(SAVE_KEYS.backup), backup, '坏主档不能覆盖好的备份')
+  }
+})
+
+test('只有备份时仍能恢复角色', () => {
+  const store = memStorage()
+  store.setItem(SAVE_KEYS.backup, serialize(quiet(), 0))
+  assert.equal(loadGame(store)?.player.name, '173小鱼')
+})
+
+test('队列负载损坏也回退备份，不能等事件到期才崩溃', () => {
+  const store = memStorage()
+  const valid = quiet()
+  store.setItem(SAVE_KEYS.backup, serialize(valid, 0))
+  for (const kind of ['move', 'battle', 'cultivate', 'craft', 'market', 'raid']) {
+    store.setItem(SAVE_KEYS.main, serialize({ ...valid, timeline: { events: [{ id: 'bad', kind, finishAt: 1, payload: {} }] } }, 0))
+    assert.deepEqual(loadGame(store)?.timeline, valid.timeline, kind)
+  }
+})
+
+test('导入兼容标准导出与旧裸状态，同时拒绝合法 JSON 坏档', () => {
+  const s = quiet()
+  assert.deepEqual(importGame(serialize(s, 0)), s)
+  assert.deepEqual(importGame(JSON.stringify(s)), s)
+  assert.throws(() => importGame(JSON.stringify({ ...s, player: { ...s.player, qi: [1] } })))
+})
+
+test('没有时间和事件变化时 tick 保留原状态引用', () => {
+  const s = quiet()
+  assert.equal(tick(s, 0).state, s)
+})
+
+test('主循环结算全部产业收入，在线小步与离线一致', () => {
+  const s = quiet()
+  const town: Town = { id: 'town:100,100', name: '长安', kind: '小镇', x: 100, y: 100, investments: [{ owner: s.player.name, silver: 1_000_000 }] }
+  const invested = { ...s, towns: { [town.id]: town } }
+  const offline = tick(invested, HOUR * 1000).state
+  let online = invested
+  for (let i = 1; i <= 360; i++) online = tick(online, i * 10_000).state
+  assert.equal(offline.player.silver, hourlyIncomeOf(town, s.player.name))
+  assert.ok(offline.player.silver > 0)
+  assert.equal(online.player.silver, offline.player.silver)
+})
+
+test('运镖到期抵达并发佣金，余下离线时间按新位置产气', () => {
+  const s = quiet()
+  const town: Town = { id: 'town:100,100', name: '长安', kind: '小镇', x: 100, y: 100, investments: [] }
+  const started = acceptEscort(s, town, { x: 101, y: 100 })
+  assert.ok(started.ok)
+  const ev = started.state.timeline.events[0]!
+  const terrain = (x: number) => qi(4, x === 100 ? 4 : 8, 4, 4, 4)
+  const out = tick(started.state, (ev.finishAt + HOUR) * 1000, terrain)
+  assert.equal(out.state.player.x, 101)
+  assert.equal(out.state.player.silver, ev.payload.fee)
+  assert.equal(out.state.player.qi[1], 12 * ev.finishAt / HOUR + 24)
+  assert.equal(out.state.timeline.events.length, 0)
+})
+
+test('主循环把真实炼制完成计入炼制任务，只记一次', () => {
+  const s = quiet()
+  const active: GameState = {
+    ...s,
+    quests: { ...s.quests, line: 'sword', entries: [{ id: 'newbie:sword:1', acceptedAt: 0, done: false }] },
+    timeline: { events: [{ id: 'craft:sword:1', kind: 'craft', finishAt: 10, payload: { kind: 'sword', name: '青龙伏魔剑', quality: '极品', count: 1 } }] },
+  }
+  const out = tick(active, 10_000).state
+  assert.equal(entryOf(out.quests, 'newbie:sword:1')?.count, 1)
+  assert.equal(entryOf(tick(out, 20_000).state.quests, 'newbie:sword:1')?.count, 1)
+})
+
+test('主循环在打赢时推进斩杀任务，抵达与返回不提前发奖', () => {
+  const s = quiet()
+  const active: GameState = { ...s, quests: { ...s.quests, entries: [{ id: 'beast:1', acceptedAt: 0, done: false }] } }
+  const launched = launch(active,
+    { kind: 'monster', name: '三青鸟', x: 100, y: 100, attack: 14, agility: 10, hp: 30, element: null },
+    [{ id: 'sword:strong', name: '青龙伏魔剑', quality: '极品', refine: 0, attack: [1000, 1000], durability: [1000, 1000], agility: 100, speed: 100, element: '金' }])
+  assert.ok(launched.ok)
+  const outbound = launched.state.timeline.events[0]!
+  const arrived = tick(launched.state, outbound.finishAt * 1000).state
+  assert.equal(entryOf(arrived.quests, 'beast:1')?.cleared, undefined)
+  const fight = arrived.timeline.events.find(e => e.payload.phase === 'fighting')!
+  assert.ok(fight)
+  const won = tick(arrived, fight.finishAt * 1000).state
+  assert.equal(entryOf(won.quests, 'beast:1')?.cleared, true)
+  assert.equal(tick(won, (fight.finishAt + HOUR) * 1000).state.mail.length, 1)
 })
 
 test('没有存档时返回 null', () => {
   assert.equal(loadGame(memStorage()), null)
+})
+
+test('离线真气寄卖依次上架、成交和注入，与在线分段结算相同', () => {
+  const s = quiet()
+  const funded = { ...s, player: { ...s.player, qi: qi(0, 100, 0, 0, 0) } }
+  const listed = listQi(ctxOf(funded), { id: 'own:qi', offer: { element: '木', amount: 100 }, want: { element: '金', amount: 100 } })
+  assert.ok(listed.ok)
+  const initial = applyCtx(listed.ctx)
+  const purchasedAt = LISTING_DELAY_SECONDS + NPC_PURCHASE_DELAY_SECONDS
+  const finishAt = purchasedAt + injectSecondsFor(initial, 100)
+  const offline = tick(initial, finishAt * 1000).state
+  let online = tick(initial, LISTING_DELAY_SECONDS * 1000).state
+  online = tick(online, purchasedAt * 1000).state
+  assert.equal(online.player.qi[0], 0, '成交后需等待注入')
+  online = tick(online, finishAt * 1000).state
+  assert.equal(offline.player.qi[0], 100)
+  assert.equal(online.player.qi[0], 100)
+  assert.equal(offline.market.qi.some(o => o.id === 'own:qi'), false)
+  assert.equal(offline.timeline.events.length, 0)
+  assert.equal(tick(offline, finishAt * 1000).state.player.qi[0], 100)
+})
+
+test('法宝寄卖到期发普通仙石，同刻重复结算不重复发钱', () => {
+  const s = quiet()
+  const item = { id: 'sword:sale', kind: 'sword', name: '青龙伏魔剑', quality: '极品', refine: 0, status: '空闲', count: 1 } as const
+  const listed = listArtifact(ctxOf({ ...s, player: { ...s.player, artifacts: [item] } }), item.id, 2)
+  assert.ok(listed.ok)
+  const out = tick(applyCtx(listed.ctx), NPC_PURCHASE_DELAY_SECONDS * 1000).state
+  assert.equal(out.player.coin, 2)
+  assert.equal(out.player.bonusCoin, 100)
+  assert.equal(out.market.artifacts.some(o => o.id === item.id), false)
+  assert.equal(tick(out, NPC_PURCHASE_DELAY_SECONDS * 1000).state.player.coin, 2)
+})
+
+test('旧挂单已过成交与注入时间时同一时刻补结算', () => {
+  const s = quiet()
+  const legacy: GameState = { ...s, clock: { ...s.clock, gameT: 2 * HOUR }, market: { ...s.market, qi: [
+    { id: 'legacy:qi', seller: s.player.name, listed: true, offer: { element: '木', amount: 100 }, want: { element: '金', amount: 100 } },
+  ] } }
+  const out = tick(legacy, 0).state
+  assert.equal(out.player.qi[0], 100)
+  assert.equal(out.timeline.events.length, 0)
+  assert.equal(tick(out, 0).state, out)
+})
+
+test('结丹压缩在主循环完成，每份真元只发一次', () => {
+  const s = quiet()
+  const id = JINDAN_CHAIN[0]!.id
+  const active: GameState = { ...s, quests: { ...s.quests, entries: [{ id, acceptedAt: 0, done: false, coreQi: CORE_QI_POINTS }] } }
+  const started = startCoreCompression(active, id)
+  assert.ok(started.ok)
+  const out = tick(started.value, CORE_COMPRESS_SECONDS * 1000).state
+  assert.equal(entryOf(out.quests, id)?.count, 1)
+  assert.equal(entryOf(out.quests, id)?.coreEventId, undefined)
+  assert.equal(tick(out, CORE_COMPRESS_SECONDS * 1000).state.quests, out.quests)
 })
 
 // —— 存档迁移（改 state 结构就必须加一条，否则等于丢档）——
@@ -241,4 +468,51 @@ test('★v5 老存档迁到 v6：补上 VIP 开关，默认关（等同原版没
   const loaded = loadGame(store)!
   assert.equal(loaded.player.vip, false, '老档默认没 VIP')
   assert.equal(loaded.player.name, s.player.name, '其余进度不受影响')
+})
+
+test('v6 旧挂单从迁移时刻开始等待买家，标准存档与裸导出兼容', () => {
+  const s = quiet()
+  const old = {
+    ...s, v: 6, clock: { ...s.clock, gameT: 2 * HOUR },
+    market: {
+      qi: [{ id: 'old:qi', seller: s.player.name, listed: true,
+        offer: { element: '木', amount: 100 }, want: { element: '金', amount: 100 } }],
+      artifacts: [{ id: 'old:sword', seller: s.player.name, name: '青龙伏魔剑', refine: 0, priceCoin: 2 }],
+    },
+  }
+  const store = memStorage()
+  store.setItem(SAVE_KEYS.main, JSON.stringify({ v: 6, savedAt: old.clock.gameT, state: old }))
+  const loaded = loadGame(store)!
+  assert.equal(loaded.v, SAVE_VERSION)
+  assert.equal(loaded.market.qi[0]!.listedAt, old.clock.gameT)
+  assert.equal(loaded.market.artifacts[0]!.listedAt, old.clock.gameT)
+  assert.deepEqual(importGame(JSON.stringify(old)), loaded)
+  assert.equal(tick(loaded, 0).state.player.coin, 0, '不能追溯旧版未实现的成交')
+  const sold = tick(loaded, NPC_PURCHASE_DELAY_SECONDS * 1000).state
+  assert.equal(sold.player.coin, 2)
+  assert.equal(sold.player.qi[0], 0, '真气成交仍需等待注入')
+  const delivered = tick(sold, (NPC_PURCHASE_DELAY_SECONDS + injectSecondsFor(sold, 100)) * 1000).state
+  assert.equal(delivered.player.qi[0], 100)
+})
+
+test('新版与旧版出击、返航载荷均可保存，旧返航不会重新补发战利品', () => {
+  const s = quiet()
+  const launched = launch(s,
+    { kind: 'player', name: '对手', x: 100, y: 100, attack: 1, agility: 1, hp: 1, element: '火', npcId: 1 },
+    [{ id: 'sword:strong', name: '青龙伏魔剑', quality: '极品', refine: 0, attack: [1000, 1000], durability: [1000, 1000], agility: 100, speed: 100, element: '金' }])
+  assert.ok(launched.ok)
+  assert.deepEqual(importGame(serialize(launched.state, 0)), launched.state)
+  const outbound = launched.state.timeline.events[0]!
+  const oldSword = { ...(outbound.payload.swords as Record<string, unknown>[])[0] }
+  delete oldSword.launchedStats
+  const oldReturning: GameState = { ...s, v: 6, timeline: { events: [
+    { ...outbound, payload: { ...outbound.payload, phase: 'returning', swords: [oldSword] } },
+  ] } }
+  const imported = importGame(JSON.stringify(oldReturning))
+  assert.equal(tick(imported, outbound.finishAt * 1000).state.player.qi[0], 0)
+  const returning: GameState = { ...s, timeline: { events: [
+    { ...outbound, payload: { ...outbound.payload, phase: 'returning', loot: qi(100, 0, 0, 0, 0) } },
+  ] } }
+  const saved = importGame(serialize(returning, 0))
+  assert.equal(tick(saved, outbound.finishAt * 1000).state.player.qi[0], 100)
 })

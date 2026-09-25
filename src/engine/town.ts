@@ -7,18 +7,18 @@
  * 证据强弱差很多：**商业等级表、书籍阅历表、镖局对话**是原文；
  * **运镖佣金公式、运镖耗时、驿站价目**是重建（`town.ts` 里逐条标了）。
  *
- * 和市场一样，城镇不在 `GameState` 里（存档结构由 `state.ts` 定死），
- * `Town` 由调用方持有，函数收进来再还回去。
+ * 城镇保存在 `GameState.towns`；投资操作返回新城镇，由调用方更新对应条目。
  */
 
 import { schedule, cancel, type GameEvent } from './timeline.ts'
 import type { Artifact, GameState } from './state.ts'
 import { spendCoin, type StartResult } from './cultivate.ts'
+import { activeQuests, paySilver } from './quest.ts'
+import { inWorld } from '../data/world.ts'
 import {
   BANK_NOTES,
   ESCORT_CANCEL_COIN,
   ESCORT_SECONDS_PER_CELL,
-  LI_YUANWAI_SILVER,
   READ_BOOK_SILVER,
   RENAME_LENGTH,
   STATION_COST_COIN,
@@ -89,7 +89,7 @@ export function invest(
   silver: number,
   others: readonly Town[] = [],
 ): InvestResult {
-  if (silver <= 0) return { ok: false, reason: '投资金额不正确' }
+  if (!Number.isSafeInteger(silver) || silver <= 0) return { ok: false, reason: '投资金额不正确' }
   if (state.player.silver < silver) return { ok: false, reason: '银两不足' }
 
   const me = state.player.name
@@ -108,6 +108,26 @@ export function invest(
     state: { ...state, player: { ...state.player, silver: state.player.silver - silver } },
     town: { ...town, investments },
   }
+}
+
+/** 撤回本人全部本金，其他股东的投资保持不变。 */
+export function withdrawInvestment(state: GameState, town: Town): InvestResult {
+  const mine = town.investments.find(i => i.owner === state.player.name)
+  if (!mine) return { ok: false, reason: '你没有投资这处产业' }
+  return {
+    ok: true,
+    state: { ...state, player: { ...state.player, silver: state.player.silver + mine.silver } },
+    town: { ...town, investments: town.investments.filter(i => i.owner !== state.player.name) },
+  }
+}
+
+/** clock 为区间终点；使用累计整数差，让在线小步与离线整段所得一致。 */
+export function settleTownIncome(state: GameState, elapsedSeconds: number): GameState {
+  if (!(elapsedSeconds > 0)) return state
+  const rate = Object.values(state.towns).reduce((sum, t) => sum + hourlyIncomeOf(t, state.player.name), 0)
+  const end = state.clock.gameT
+  const income = Math.floor(end * rate / 3600) - Math.floor(Math.max(0, end - elapsedSeconds) * rate / 3600)
+  return income ? { ...state, player: { ...state.player, silver: state.player.silver + income } } : state
 }
 
 /**
@@ -252,9 +272,11 @@ export function acceptEscort(
   from: Town,
   to: { readonly x: number; readonly y: number },
 ): StartResult {
+  if (!Number.isInteger(to.x) || !Number.isInteger(to.y) || !inWorld(to.x, to.y)) return { ok: false, reason: '目的地坐标不正确' }
   if (state.timeline.events.some((e) => e.id === ESCORT_EVENT_ID)) {
     return { ok: false, reason: '你已经有一趟镖在身上了' }
   }
+  if (state.timeline.events.some(e => e.kind === 'move')) return { ok: false, reason: '移动途中无法接镖' }
   const quote = quoteEscort(from, to)
   if (quote.distance <= 0) return { ok: false, reason: '请选择别的州县' }
 
@@ -301,7 +323,9 @@ export function teleport(
   to: { readonly x: number; readonly y: number },
   opts: { readonly fromKind?: TownKind; readonly underAttack?: boolean } = {},
 ): StartResult {
-  if (opts.underAttack) return { ok: false, reason: '你正在被攻击，无法使用驿站' }
+  if (!Number.isInteger(to.x) || !Number.isInteger(to.y) || !inWorld(to.x, to.y)) return { ok: false, reason: '目的地坐标不正确' }
+  if (opts.underAttack || state.timeline.events.some(e => e.kind === 'raid')) return { ok: false, reason: '你正在被攻击，无法使用驿站' }
+  if (state.timeline.events.some(e => e.kind === 'move')) return { ok: false, reason: '移动途中无法使用驿站' }
   if (opts.fromKind && opts.fromKind !== '城池') return { ok: false, reason: '只有城池才有驿站' }
 
   const paid = spendCoin(state, STATION_COST_COIN)
@@ -313,9 +337,9 @@ export function teleport(
 
 /** 心动任务「千金散尽」：交 100 万两。 */
 export function payLiYuanwai(state: GameState): StartResult {
-  if (state.player.silver < LI_YUANWAI_SILVER) return { ok: false, reason: '银两不足' }
-  return {
-    ok: true,
-    state: { ...state, player: { ...state.player, silver: state.player.silver - LI_YUANWAI_SILVER } },
-  }
+  const q = activeQuests(state.quests).find(q => q.goal.kind === 'silver' && q.goal.npc === '李员外')
+  if (!q) return { ok: false, reason: '请先领取千金散尽任务' }
+  const paid = paySilver(state, state.quests, q.id, Math.floor(state.player.silver))
+  if (!paid.ok) return paid
+  return { ok: true, state: { ...paid.value.state, quests: paid.value.log } }
 }

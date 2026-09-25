@@ -47,7 +47,7 @@ export const RAID_RANGE = 12
 /** 把玩家的法宝换算成迎敌单位：护身在前、飞剑在后。 */
 export function defenders(state: GameState): readonly CombatSword[] {
   const items = state.player.artifacts
-    .filter((a) => (a.kind === 'sword' || a.kind === 'guard') && a.status !== '损坏')
+    .filter((a) => (a.kind === 'sword' || a.kind === 'guard') && a.status === '空闲')
     .map((a): CombatSword | null => {
       const t = swordByName(a.name)
       if (a.kind === 'guard') {

@@ -16,8 +16,10 @@
  */
 
 import { schedule, cancel, type GameEvent } from './timeline.ts'
-import { addQi, clampQi, type FiveQi, type GameState } from './state.ts'
+import { addQi, clampQi, type Artifact, type FiveQi, type GameState } from './state.ts'
 import { capacityOf, spendCoin } from './cultivate.ts'
+import { canAcquireArtifacts } from './craft.ts'
+import { SWORDS, isComplete, swordByName } from '../data/swords.ts'
 import { rand, randInt } from './rng.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 
@@ -32,6 +34,7 @@ export type QiOrder = {
   readonly want: QiAmount
   /** 上架延迟过去了没有。没上架的单别人看不见。 */
   readonly listed: boolean
+  readonly listedAt?: number
 }
 
 export type ArtifactOrder = {
@@ -42,6 +45,9 @@ export type ArtifactOrder = {
   readonly refine: number
   /** 标价：**普通仙石**（卖法宝是普通仙石的来源之一） */
   readonly priceCoin: number
+  readonly listedAt?: number
+  /** 保留原物，撤单、成交不改变种类或属性。旧存档按飞剑兼容。 */
+  readonly artifact?: Artifact
 }
 
 export type Market = {
@@ -165,7 +171,7 @@ export function listQi(
   ctx: MarketCtx,
   order: { readonly id: string; readonly offer: QiAmount; readonly want: QiAmount },
 ): MarketResult {
-  if (order.offer.amount <= 0 || order.want.amount <= 0) {
+  if (![order.offer, order.want].every(a => Number.isSafeInteger(a.amount) && a.amount > 0 && ELEMENTS.includes(a.element))) {
     return { ok: false, reason: '数量不正确' }
   }
   if (!hasQi(ctx.state.player.qi, order.offer)) {
@@ -209,7 +215,7 @@ export const myOrders = (ctx: MarketCtx): readonly QiOrder[] =>
  * （「被打时挂在市场的单自动取消并可被掠夺」`docs/research/02` §1.6）。
  */
 export function cancelQiOrders(ctx: MarketCtx, ids: readonly string[]): MarketCtx {
-  const cancelled = ctx.market.qi.filter((o) => ids.includes(o.id))
+  const cancelled = ctx.market.qi.filter((o) => ids.includes(o.id) && o.seller === ctx.state.player.name)
   if (!cancelled.length) return ctx
 
   const cap = capacityOf(ctx.state)
@@ -222,7 +228,7 @@ export function cancelQiOrders(ctx: MarketCtx, ids: readonly string[]): MarketCt
 
   return {
     state: { ...ctx.state, player: { ...ctx.state.player, qi }, timeline },
-    market: { ...ctx.market, qi: ctx.market.qi.filter((o) => !ids.includes(o.id)) },
+    market: { ...ctx.market, qi: ctx.market.qi.filter((o) => !cancelled.includes(o)) },
   }
 }
 
@@ -279,7 +285,8 @@ export function listArtifact(
   if (!item) return { ok: false, reason: '没有这件法宝' }
   if (item.quality !== '极品') return { ok: false, reason: '只有极品法宝可以交易' }
   if (item.status !== '空闲') return { ok: false, reason: '法宝不在空闲状态' }
-  if (priceCoin <= 0) return { ok: false, reason: '价格不正确' }
+  if (!Number.isSafeInteger(priceCoin) || priceCoin <= 0) return { ok: false, reason: '价格不正确' }
+  if (ctx.market.artifacts.some(o => o.id === artifactId)) return { ok: false, reason: '挂单已存在' }
 
   const entry: ArtifactOrder = {
     id: artifactId,
@@ -287,6 +294,8 @@ export function listArtifact(
     name: item.name,
     refine: item.refine,
     priceCoin,
+    listedAt: ctx.state.clock.gameT,
+    artifact: item,
   }
   return {
     ok: true,
@@ -307,6 +316,7 @@ export function listArtifact(
 export function settleArtifactSale(ctx: MarketCtx, orderId: string): MarketResult {
   const order = ctx.market.artifacts.find((o) => o.id === orderId)
   if (!order) return { ok: false, reason: '挂单不存在' }
+  if (order.seller !== ctx.state.player.name) return { ok: false, reason: '不是自己的挂单' }
   return {
     ok: true,
     ctx: {
@@ -319,11 +329,27 @@ export function settleArtifactSale(ctx: MarketCtx, orderId: string): MarketResul
   }
 }
 
+const artifactOf = (order: ArtifactOrder): Artifact => order.artifact ?? {
+  id: order.id, name: order.name, refine: order.refine,
+  kind: 'sword', quality: '极品', status: '空闲', count: 1,
+}
+
+export function cancelArtifactOrders(ctx: MarketCtx, ids: readonly string[]): MarketCtx {
+  const returned = ctx.market.artifacts.filter(o => ids.includes(o.id) && o.seller === ctx.state.player.name)
+  if (!returned.length) return ctx
+  return {
+    state: { ...ctx.state, player: { ...ctx.state.player, artifacts: [...ctx.state.player.artifacts, ...returned.map(artifactOf)] } },
+    market: { ...ctx.market, artifacts: ctx.market.artifacts.filter(o => !returned.includes(o)) },
+  }
+}
+
 /** 买法宝：**只能用普通仙石**（附加仙石不行，`cultivate.spendCoin` 的 requireNormal）。 */
 export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
   const order = ctx.market.artifacts.find((o) => o.id === orderId)
   if (!order) return { ok: false, reason: '挂单不存在' }
   if (order.seller === ctx.state.player.name) return { ok: false, reason: '不能买自己的挂单' }
+
+  if (!canAcquireArtifacts(ctx.state, 1)) return { ok: false, reason: '法宝携带数量已达上限' }
 
   const paid = spendCoin(ctx.state, order.priceCoin, { requireNormal: true })
   if (!paid.ok) return { ok: false, reason: paid.reason }
@@ -337,15 +363,7 @@ export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
           ...paid.state.player,
           artifacts: [
             ...paid.state.player.artifacts,
-            {
-              id: order.id,
-              kind: 'sword' as const,
-              name: order.name,
-              quality: '极品' as const,
-              refine: order.refine,
-              status: '空闲',
-              count: 1,
-            },
+            artifactOf(order),
           ],
         },
       },
@@ -364,6 +382,46 @@ export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
 export const NPC_ORDER_TARGET = 12
 /** 一单挂多久（游戏秒）。到期撤下，换新的一批。 */
 export const NPC_ORDER_TTL = 24 * 3600
+/** 单机成交模拟：合理标价上市一小时后成交。 */
+export const NPC_PURCHASE_DELAY_SECONDS = 3600
+
+/** [重建] 以铸造门槛和淬炼等级估价，避免任意标价套取仙石。 */
+export function npcArtifactPrice(order: Pick<ArtifactOrder, 'name' | 'refine'>): number {
+  const sword = swordByName(order.name)
+  return Math.max(2, (sword?.forgeLevel ?? 10) * 2) * 2 ** Math.min(20, Math.max(0, order.refine))
+}
+
+const purchaseAt = (order: { readonly listedAt?: number }): number => (order.listedAt ?? 0) + NPC_PURCHASE_DELAY_SECONDS
+
+export function nextNpcPurchaseAt(state: GameState): number | null {
+  const times = [
+    ...state.market.qi.filter(o => o.seller === state.player.name && o.listed && isFairRatio(o)).map(purchaseAt),
+    ...state.market.artifacts.filter(o => o.seller === state.player.name && o.priceCoin <= npcArtifactPrice(o)).map(purchaseAt),
+  ]
+  return times.length ? Math.min(...times) : null
+}
+
+/** 移除已成交挂单就是结算标记；同一时刻重复调用不会重复发钱或真气。 */
+export function settleNpcPurchases(state: GameState): GameState {
+  let ctx = ctxOf(state)
+  for (const o of state.market.qi) {
+    if (o.seller !== state.player.name || !o.listed || !isFairRatio(o) || purchaseAt(o) > state.clock.gameT) continue
+    ctx = {
+      state: { ...ctx.state, timeline: schedule(ctx.state.timeline, {
+        id: injectEventId(o.id), kind: 'market',
+        finishAt: purchaseAt(o) + injectSecondsFor(state, o.want.amount),
+        payload: { op: 'inject', element: o.want.element, amount: o.want.amount },
+      }) },
+      market: { ...ctx.market, qi: ctx.market.qi.filter(x => x.id !== o.id) },
+    }
+  }
+  for (const o of state.market.artifacts) {
+    if (o.seller !== state.player.name || o.priceCoin > npcArtifactPrice(o) || purchaseAt(o) > state.clock.gameT) continue
+    const sold = settleArtifactSale(ctx, o.id)
+    if (sold.ok) ctx = sold.ctx
+  }
+  return applyCtx(ctx)
+}
 
 const NPC_PREFIX = 'npc:'
 
@@ -410,6 +468,11 @@ export function refillNpcOrders(state: GameState): GameState {
     if (npcHourOf(o.id) !== hour) continue
     slot = Math.max(slot, Number(o.id.split(':')[2] ?? 0) + 1)
   }
+  // 买走的订单仍可能正在注入；复用其编号会与已有事件冲突。
+  for (const event of state.timeline.events) {
+    const prefix = injectEventId(`${NPC_PREFIX}${hour}:`)
+    if (event.id.startsWith(prefix)) slot = Math.max(slot, Number(event.id.slice(prefix.length)) + 1)
+  }
 
   const npcCount = kept.filter((o) => npcHourOf(o.id) !== null).length
   const added: QiOrder[] = []
@@ -417,8 +480,25 @@ export function refillNpcOrders(state: GameState): GameState {
     added.push(npcOrder(state.worldSeed, hour, slot++))
   }
 
-  if (added.length === 0 && kept.length === state.market.qi.length) return state
-  return { ...state, market: { ...state.market, qi: [...kept, ...added] } }
+  const artifactPrefix = 'npc-artifact:'
+  // 从 NPC 买来的原物保留编号；重新寄卖后归玩家所有，不再按 NPC 库存过期。
+  const isNpcArtifactOrder = (o: ArtifactOrder): boolean => o.seller !== state.player.name && o.id.startsWith(artifactPrefix)
+  const artifacts = state.market.artifacts.filter(o => !isNpcArtifactOrder(o) || hour - Number(o.id.split(':')[1]) < NPC_ORDER_TTL / 3600)
+  const swords = SWORDS.filter(s => s.tradable && isComplete(s))
+  let artifactSlot = 0
+  // 包含已买入背包的 id，避免同一小时补货时产生重复物品 id。
+  for (const item of [...artifacts, ...state.player.artifacts]) {
+    if (item.id.startsWith(`${artifactPrefix}${hour}:`)) artifactSlot = Math.max(artifactSlot, Number(item.id.split(':')[2]) + 1)
+  }
+  const addedArtifacts: ArtifactOrder[] = []
+  for (let i = artifacts.filter(isNpcArtifactOrder).length; i < 3 && swords.length; i++) {
+    const slot = artifactSlot++
+    const sword = swords[randInt(swords.length, state.worldSeed, 'mkt-artifact', `${hour}:${slot}`)]!
+    const offer = { name: sword.name, refine: 0 }
+    addedArtifacts.push({ id: `${artifactPrefix}${hour}:${slot}`, seller: '散修商人', ...offer, priceCoin: npcArtifactPrice(offer), listedAt: hour * 3600 })
+  }
+  if (added.length === 0 && kept.length === state.market.qi.length && addedArtifacts.length === 0 && artifacts.length === state.market.artifacts.length) return state
+  return { ...state, market: { qi: [...kept, ...added], artifacts: [...artifacts, ...addedArtifacts] } }
 }
 
 // —— 事件结算 ——
@@ -433,7 +513,7 @@ export function resolveMarketEvent(ctx: MarketCtx, event: GameEvent): MarketCtx 
       ...ctx,
       market: {
         ...ctx.market,
-        qi: ctx.market.qi.map((o) => (o.id === orderId ? { ...o, listed: true } : o)),
+        qi: ctx.market.qi.map((o) => (o.id === orderId ? { ...o, listed: true, listedAt: event.finishAt } : o)),
       },
     }
   }

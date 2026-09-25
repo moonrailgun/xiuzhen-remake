@@ -14,6 +14,7 @@ import { schedule, countByKind, type GameEvent, type Timeline } from './timeline
 import { addQi, subQi, canAfford, clampQi, totalQi, type FiveQi, type GameState } from './state.ts'
 import { upgradeCost, upgradeSeconds, dantianCapacity } from '../data/upgrade.ts'
 import type { Element } from '../data/meridian.ts'
+import { SKILL_TREES } from '../data/skills.ts'
 
 export type CultivateTarget =
   | { readonly system: 'meridian'; readonly index: number }
@@ -54,12 +55,28 @@ export type CultivatePlan = {
 export function planUpgrade(state: GameState, target: CultivateTarget): CultivatePlan {
   const from = levelOf(state, target)
   const to = from + 1
-  const cost = upgradeCost(target.system, to, state.player.element)
+  const cost = upgradeCost(target.system, to, state.player.element, target.system === 'skill' ? target.id : undefined)
   const seconds = upgradeSeconds(target.system, to, {
     steelLevel: state.player.body[BODY_STEEL] ?? 0,
     calmLevel: state.player.body[BODY_CALM] ?? 0,
+    skillId: target.system === 'skill' ? target.id : undefined,
   })
   return { cost, seconds, fromLevel: from, toLevel: to }
+}
+
+/** 前置与等级上限共用法术页的规则；未知法术不能凭字符串获得。 */
+export function skillUpgradeBlockReason(state: GameState, id: string): string | undefined {
+  const nodes = Object.values(SKILL_TREES).flat()
+  const node = nodes.find((n) => n.name === id)
+  if (!node) return '没有这门法术'
+  if ((state.player.skills[id] ?? 0) >= node.cap) return '该法术已修炼至上限'
+  for (const requirement of node.requires ?? []) {
+    const parent = nodes.find((n) => n.id === requirement.id)!
+    if ((state.player.skills[parent.name] ?? 0) < requirement.level) {
+      return `需要先将${parent.name}修炼至${requirement.level}级`
+    }
+  }
+  return undefined
 }
 
 export type StartResult =
@@ -75,7 +92,11 @@ export function startCultivate(
   target: CultivateTarget,
   opts: { readonly hasVip?: boolean } = {},
 ): StartResult {
-  const slots = cultivateSlots(opts.hasVip ?? false)
+  if (target.system === 'skill') {
+    const reason = skillUpgradeBlockReason(state, target.id)
+    if (reason) return { ok: false, reason }
+  }
+  const slots = cultivateSlots(opts.hasVip ?? state.player.vip)
   if (countByKind(state.timeline, 'cultivate') >= slots) {
     return { ok: false, reason: '修炼队列已满' }
   }
@@ -143,7 +164,7 @@ export function resolveCultivate(state: GameState, event: GameEvent): GameState 
 
 /** 当前丹田容量（单种真气）。 */
 export const capacityOf = (state: GameState): number =>
-  dantianCapacity(state.player.body[BODY_DANTIAN] ?? 0)
+  dantianCapacity(state.player.body[BODY_DANTIAN] ?? 0) + state.quests.dantianBonus
 
 /**
  * 按小时产出真气，并按丹田上限截断。

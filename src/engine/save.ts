@@ -13,7 +13,7 @@
  */
 
 /** 当前存档格式版本。**改 state 结构必须 +1 并加一条迁移。** */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 const KEY = 'xiuzhen.save'
 const BACKUP_KEY = 'xiuzhen.save.backup'
@@ -36,6 +36,8 @@ export type Migration = {
   readonly from: number
   readonly migrate: (state: unknown) => unknown
 }
+
+export type SaveValidator = (state: unknown) => void
 
 export type SaveErrorKind = 'corrupt' | 'too-new' | 'no-migration' | 'write-failed' | 'empty'
 
@@ -62,7 +64,9 @@ function parseEnvelope(raw: string): Envelope<unknown> {
   if (
     typeof parsed !== 'object' ||
     parsed === null ||
-    typeof (parsed as { v?: unknown }).v !== 'number' ||
+    !Number.isInteger((parsed as { v?: unknown }).v) ||
+    ((parsed as { v: number }).v < 1) ||
+    !Number.isFinite((parsed as { savedAt?: unknown }).savedAt) ||
     !('state' in parsed)
   ) {
     throw new SaveError('存档缺少版本号或数据体', 'corrupt')
@@ -98,13 +102,30 @@ export function serialize<S>(state: S, now: number): string {
  * 写存档。先把现有存档挪到备份 key，再写新的。
  * @throws SaveError('write-failed') 配额不足或存储不可用时，调用方应提示用户导出
  */
-export function save<S>(storage: Storage, state: S, now: number): void {
+export function save<S>(
+  storage: Storage,
+  state: S,
+  now: number,
+  options: { migrations?: readonly Migration[]; validate?: SaveValidator } = {},
+): void {
+  options.validate?.(state)
   const payload = serialize(state, now)
   try {
     const previous = storage.getItem(KEY)
-    if (previous !== null) storage.setItem(BACKUP_KEY, previous)
+    if (previous !== null) {
+      let healthy = false
+      try {
+        importSave(previous, options.migrations, options.validate)
+        healthy = true
+      } catch (e) {
+        // 用健康备份恢复后，坏主档不能再覆盖掉这份救命备份。
+        if (e instanceof SaveError && e.kind === 'too-new') throw e
+      }
+      if (healthy) storage.setItem(BACKUP_KEY, previous)
+    }
     storage.setItem(KEY, payload)
   } catch (e) {
+    if (e instanceof SaveError) throw e
     throw new SaveError('存档写入失败（可能是空间不足或浏览器禁用了存储）', 'write-failed', e)
   }
 }
@@ -116,17 +137,22 @@ export function save<S>(storage: Storage, state: S, now: number): void {
 export function load(
   storage: Storage,
   migrations: readonly Migration[] = [],
+  validate?: SaveValidator,
 ): { state: unknown; usedBackup: boolean } | null {
   const raw = storage.getItem(KEY)
-  if (raw === null) return null
+  if (raw === null) {
+    const backup = storage.getItem(BACKUP_KEY)
+    return backup === null ? null : { state: importSave(backup, migrations, validate), usedBackup: true }
+  }
 
   try {
-    return { state: migrateToCurrent(parseEnvelope(raw), migrations), usedBackup: false }
+    return { state: importSave(raw, migrations, validate), usedBackup: false }
   } catch (primaryError) {
+    if (primaryError instanceof SaveError && primaryError.kind !== 'corrupt') throw primaryError
     const backup = storage.getItem(BACKUP_KEY)
     if (backup === null) throw primaryError
     try {
-      return { state: migrateToCurrent(parseEnvelope(backup), migrations), usedBackup: true }
+      return { state: importSave(backup, migrations, validate), usedBackup: true }
     } catch {
       throw primaryError // 备份也坏了，报原始错误更有用
     }
@@ -140,9 +166,11 @@ export const exportSave = <S>(state: S, now: number): string => serialize(state,
  * 导入用户给的 JSON 文本。先校验形状与版本，再迁移。
  * 不直接写入存储，由调用方决定（通常是让用户确认覆盖）。
  */
-export function importSave(text: string, migrations: readonly Migration[] = []): unknown {
+export function importSave(text: string, migrations: readonly Migration[] = [], validate?: SaveValidator): unknown {
   if (text.trim() === '') throw new SaveError('导入内容为空', 'empty')
-  return migrateToCurrent(parseEnvelope(text), migrations)
+  const state = migrateToCurrent(parseEnvelope(text), migrations)
+  validate?.(state)
+  return state
 }
 
 export function clear(storage: Storage): void {

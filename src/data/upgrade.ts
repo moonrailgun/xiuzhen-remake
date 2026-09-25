@@ -98,10 +98,13 @@ const bodyCurve = makeCurve(BODY_ANCHORS)
 const skillCurve = makeCurve(SKILL_ANCHORS)
 
 /** 升到 `toLevel` 需要的总真气。 */
-export function totalCost(system: keyof typeof COST_RATIO, toLevel: number): number {
+export function totalCost(system: keyof typeof COST_RATIO, toLevel: number, skillId?: string): number {
   if (toLevel <= 0) return 0
   const curve = system === 'meridian' ? meridianCurve : system === 'body' ? bodyCurve : skillCurve
-  return curve(toLevel)
+  // 易经上限500，不能拿20级法术的末段指数无限外推。原逐级表已失落，
+  // 20级之后沿用最后一个重建锚点作为有界平台；不声称这是原版成本。
+  // 保留1..20已有曲线，500级仍能以最高丹田支付，且成本不会倒退。
+  return curve(system === 'skill' && skillId === '易经' ? Math.min(toLevel, 20) : toLevel)
 }
 
 /** 升到 `toLevel` 的五行消耗。 */
@@ -109,7 +112,8 @@ export const upgradeCost = (
   system: keyof typeof COST_RATIO,
   toLevel: number,
   self: Element,
-): FiveQi => splitByElement(totalCost(system, toLevel), self, system)
+  skillId?: string,
+): FiveQi => splitByElement(totalCost(system, toLevel, skillId), self, system)
 
 /**
  * 升级耗时（秒）。
@@ -123,9 +127,9 @@ export const upgradeCost = (
 export function upgradeSeconds(
   system: keyof typeof COST_RATIO,
   toLevel: number,
-  opts: { readonly steelLevel?: number; readonly calmLevel?: number } = {},
+  opts: { readonly steelLevel?: number; readonly calmLevel?: number; readonly skillId?: string } = {},
 ): number {
-  const total = totalCost(system, toLevel)
+  const total = totalCost(system, toLevel, opts.skillId)
   const rate = system === 'skill' ? 1 / 0.71 : system === 'meridian' ? 1 / 0.78 : 1.0
   const base = total * rate
   const boost =

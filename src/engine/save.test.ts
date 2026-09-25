@@ -89,6 +89,18 @@ test('比程序更新的存档拒绝加载（降级运行时不能损坏存档�
   assert.throws(() => load(s), (e: unknown) => e instanceof SaveError && e.kind === 'too-new')
 })
 
+test('新版本主档不能偷偷回退旧备份或被旧程序覆盖', () => {
+  const s = memStorage()
+  const future = JSON.stringify({ v: SAVE_VERSION + 1, savedAt: 0, state: {} })
+  const backup = serialize({ progress: 100 }, 0)
+  s.setItem(SAVE_KEYS.main, future)
+  s.setItem(SAVE_KEYS.backup, backup)
+  assert.throws(() => load(s), (e: unknown) => e instanceof SaveError && e.kind === 'too-new')
+  assert.throws(() => save(s, { progress: 0 }, 0), (e: unknown) => e instanceof SaveError && e.kind === 'too-new')
+  assert.equal(s.getItem(SAVE_KEYS.main), future)
+  assert.equal(s.getItem(SAVE_KEYS.backup), backup)
+})
+
 test('迁移链逐步升级', () => {
   const migrations: Migration[] = [
     { from: 1, migrate: (s) => ({ ...(s as object), added: true }) },

@@ -15,16 +15,12 @@
  *    这里用无状态随机按 `worldSeed + 任务 id` 算，保证同一存档任何时候查都是同一个点；
  *  - 「放弃要花仙石」见于文曲星君任务的回帖，但**哪些任务收、收多少** [未知]，这里一律不收。
  *
- * ## 为什么任务状态不在 `GameState` 里
- *
- * `state.ts` 是别处在用的既有结构，这里不动它。任务日志是独立的 `QuestLog`，
- * 所有函数都是 `(log, state) -> 新 log` 或 `-> { state, log }`。接主循环时把
- * `quests: QuestLog` 挂进 `GameState` 并加一条存档迁移即可。
+ * 任务日志保存在 `GameState.quests`；按事件结算的进度由主循环调用 `applyQuestProgress`。
  */
 
 import { DAY, weekdayOf } from './clock.ts'
 import { randInt } from './rng.ts'
-import type { GameEvent } from './timeline.ts'
+import { schedule, type GameEvent } from './timeline.ts'
 import { capacityOf } from './cultivate.ts'
 import {
   addQi,
@@ -37,7 +33,7 @@ import {
   type GameState,
   type Realm,
 } from './state.ts'
-import { MERIDIANS, groupElement } from '../data/meridian.ts'
+import { ELEMENTS, MERIDIANS, groupElement } from '../data/meridian.ts'
 import { WORLD_SIZE } from '../data/world.ts'
 import {
   SANSHI_SPAWN_WEEKDAY,
@@ -68,6 +64,10 @@ export type QuestEntry = {
   readonly cleared?: boolean
   /** 计数型条件的累计值：炼制或淬炼的件数、已交给 NPC 的银两 */
   readonly count?: number
+  /** 已汇聚、尚未开始压缩的本命真气。 */
+  readonly coreQi?: number
+  /** 当前压缩对应事件，防止重复结算。 */
+  readonly coreEventId?: string
 }
 
 export type QuestLog = {
@@ -276,13 +276,77 @@ const patch = (log: QuestLog, id: string, f: (e: QuestEntry) => QuestEntry): Que
   entries: log.entries.map((e) => (e.id === id && !e.done ? f(e) : e)),
 })
 
-/** 答题 / 选分支 / 结丹完成这类「点一下就算数」的条件。 */
+/** 标记外部条件已完成；实际答题、选分支与结丹规则由对应入口检查。 */
 export const markCleared = (log: QuestLog, id: string): QuestLog =>
   patch(log, id, (e) => ({ ...e, cleared: true }))
 
 /** 新手第 3 步：选先炼气还是先炼剑，顺带把这一步标记完成。 */
 export function chooseLine(log: QuestLog, id: string, line: NewbieLine): QuestLog {
+  const entry = entryOf(log, id)
+  if (!entry || entry.done || entry.cleared || questOf(log, id)?.goal.kind !== 'choice' || !['qi', 'sword'].includes(line)) return log
   return markCleared({ ...log, line }, id)
+}
+
+/** 原问答没有完整题库留存，以任务明确要求的本命属性完成教学。 */
+export function answerQuiz(log: QuestLog, state: GameState, id: string, answer: string): QuestResult<QuestLog> {
+  const entry = entryOf(log, id)
+  if (!entry || entry.done || questOf(log, id)?.goal.kind !== 'quiz') return fail('没有这个进行中的答题任务')
+  if (answer !== state.player.element) return fail('回答不正确，请到人物页面查看自己的本命属性')
+  return ok(markCleared(log, id))
+}
+
+export const CORE_QI_POINTS = 286000
+export const CORE_COMPRESS_SECONDS = 12 * 3600
+
+/** [重建] 最小结丹流程只汇聚本命属性，采用资料中的纯属性压缩时长。 */
+export function gatherCoreQi(state: GameState, id: string, amount: number): QuestResult<GameState> {
+  const entry = entryOf(state.quests, id)
+  if (!entry || entry.done || entry.cleared || questOf(state.quests, id)?.goal.kind !== 'goldenCore') return fail('没有进行中的结丹任务')
+  if (!Number.isSafeInteger(amount) || amount <= 0) return fail('请输入正整数真气数量')
+  const remaining = CORE_QI_POINTS - (entry.coreQi ?? 0)
+  if (amount > remaining) return fail(`本次还可汇聚${remaining}点真气`)
+  if ((entry.count ?? 0) + (entry.coreEventId ? 1 : 0) >= 10) return fail('已汇聚足够的真元')
+  const index = ELEMENTS.indexOf(state.player.element)
+  if (state.player.qi[index]! < amount) return fail('本命真气不足')
+  const qi = state.player.qi.map((n, i) => n - (i === index ? amount : 0)) as unknown as FiveQi
+  return ok({ ...state, player: { ...state.player, qi, daoxing: state.player.daoxing + amount }, quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) + amount })) })
+}
+
+export function startCoreCompression(state: GameState, id: string): QuestResult<GameState> {
+  const entry = entryOf(state.quests, id)
+  if (!entry || entry.done || entry.cleared || questOf(state.quests, id)?.goal.kind !== 'goldenCore') return fail('没有进行中的结丹任务')
+  if (entry.coreEventId) return fail('真元正在压缩')
+  if ((entry.coreQi ?? 0) < CORE_QI_POINTS) return fail(`需要汇聚${CORE_QI_POINTS}点本命真气`)
+  const eventId = `quest:core:${id}:${entry.acceptedAt}:${entry.count ?? 0}`
+  return ok({ ...state,
+    quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) - CORE_QI_POINTS, coreEventId: eventId })),
+    timeline: schedule(state.timeline, { id: eventId, kind: 'cultivate', finishAt: state.clock.gameT + CORE_COMPRESS_SECONDS, payload: { op: 'goldenCore', questId: id } }),
+  })
+}
+
+/** 只记录实际炼制事件和成功淬炼的状态变化，购买、任务赠送不会计入炼制。 */
+export function applyQuestProgress(before: GameState, after: GameState, event?: GameEvent): GameState {
+  let log = after.quests
+  if (event?.kind === 'cultivate' && event.payload['op'] === 'goldenCore') {
+    const id = String(event.payload['questId'])
+    const entry = entryOf(log, id)
+    if (entry && !entry.done && entry.coreEventId === event.id) {
+      log = patch(log, id, e => ({ ...e, count: (e.count ?? 0) + 1, cleared: (e.count ?? 0) + 1 >= 10, coreEventId: undefined }))
+    }
+  } else if (event?.kind === 'craft') {
+    const made = after.player.artifacts.filter(a => !before.player.artifacts.some(b => b.id === a.id))
+    for (const e of log.entries) {
+      const goal = questOf(log, e.id)?.goal
+      if (e.done || goal?.kind !== 'craft') continue
+      const count = made.filter(a => a.name === goal.item || (goal.item === '飞剑' && a.kind === 'sword') || (goal.item === '丹药' && a.kind === 'pill')).reduce((sum, a) => sum + a.count, 0)
+      if (count) log = patch(log, e.id, x => ({ ...x, count: (x.count ?? 0) + count }))
+    }
+  } else if (!event) {
+    const removed = before.player.artifacts.filter(a => !after.player.artifacts.some(b => b.id === a.id))
+    const refined = after.player.artifacts.filter(a => !before.player.artifacts.some(b => b.id === a.id) && removed.filter(b => b.name === a.name && b.quality === a.quality && b.refine === a.refine - 1).length >= 2)
+    if (refined.length) log = recordProgress(log, 'refine', refined.length)
+  }
+  return log === after.quests ? after : { ...after, quests: log }
 }
 
 /** 炼制 / 淬炼完成时调用，把件数记到对应任务上。 */
@@ -328,9 +392,10 @@ export function paySilver(
   const q = questOf(log, id)
   if (!entry || entry.done || !q) return fail('没有这个进行中的任务')
   if (q.goal.kind !== 'silver') return fail('该任务不需要交纳银两')
-  if (amount <= 0) return fail('交纳的银两必须大于 0')
+  if (!Number.isSafeInteger(amount) || amount <= 0) return fail('交纳的银两必须为正整数')
   if (state.player.silver < amount) return fail('银两不足')
   const remaining = q.goal.amount - (entry.count ?? 0)
+  if (remaining <= 0) return fail('银两已经交齐，请领取任务奖励')
   const paid = Math.min(amount, remaining)
   return ok({
     state: { ...state, player: { ...state.player, silver: state.player.silver - paid } },
@@ -396,7 +461,7 @@ export function resolveQuestBattle(log: QuestLog, event: GameEvent, won: boolean
 
 /** 当前丹田容量：本体等级算出来的基础容量 + 境界奖励的固定加成。 */
 export const questCapacity = (state: GameState, log: QuestLog): number =>
-  capacityOf(state) + log.dantianBonus
+  capacityOf({ ...state, quests: log })
 
 /**
  * 领取奖励（截图 #83 的「领取奖励」按钮）。

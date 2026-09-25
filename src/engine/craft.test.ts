@@ -218,3 +218,14 @@ test('找不到法宝时报错', () => {
   assert.equal(r.ok, false)
   assert.match((r as { reason: string }).reason, /找不到/)
 })
+
+test('炼器预留法宝位，不得超过携带上限或抢占另一炉位', () => {
+  assert.equal(startCraft(state(), swordOrder(6)).ok, false)
+  const reserved = (startCraft(state(), swordOrder(5)) as { state: GameState }).state
+  assert.equal(startCraft(reserved, pillOrder()).ok, false)
+  assert.equal(startCraft(state({ vip: true }), swordOrder(10)).ok, true)
+})
+
+test('炼器拒绝小数和非有限数量', () => {
+  for (const count of [0.5, NaN, Infinity]) assert.equal(startCraft(state(), swordOrder(count)).ok, false)
+})

@@ -11,7 +11,7 @@ import { scheduleRaid, resolveRaid, defenders, RAID_EVENT_ID, RAID_CHANCE_PER_HO
 import { vaultCapacity } from './loot.ts'
 import { newGame, tick } from './game.ts'
 import { listQi, ctxOf, applyCtx } from './market.ts'
-import { DAY } from './clock.ts'
+import { DAY, HOUR } from './clock.ts'
 import { PROTECTION_DAYS, type Artifact, type FiveQi, type GameState } from './state.ts'
 
 const base = (): GameState => newGame({
@@ -94,6 +94,49 @@ test('★护身排在飞剑前面迎敌（原文：来袭时护身先接战）',
 test('损坏的法宝不参加迎敌', () => {
   const s = { ...base(), player: { ...base().player, artifacts: [sword({ status: '损坏' })] } }
   assert.equal(defenders(s).length, 0)
+})
+
+test('在外飞剑和淬炼修理中的法宝不能同时在家迎敌', () => {
+  for (const status of ['斩杀中', '绞杀中', '返回中', '淬炼中', '修理中']) {
+    const s = { ...base(), player: { ...base().player, artifacts: [sword({ status }), guard({ status })] } }
+    assert.equal(defenders(s).length, 0, status)
+  }
+})
+
+function nearWolf(): GameState {
+  const s = outOfProtection(base())
+  return {
+    ...s,
+    npc: { bases: [{ id: 1, name: '测试狼', profile: '小狼', school: '通天', element: '木', bornAt: 0, homeX: 100, homeY: 100 }], patches: { 1: { x: 100, y: 100 } } },
+    player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0], artifacts: [guard({ quality: '极品', refine: 10 })] },
+  }
+}
+
+test('离线七天与逐小时在线的来袭数量和时间相同', () => {
+  const s = nearWolf()
+  const offline = tick(s, 7 * DAY * 1000).state
+  let online = s
+  for (let hour = 1; hour <= 7 * 24; hour++) online = tick(online, hour * HOUR * 1000).state
+  assert.ok(offline.mail.length > 0, '离线不能跳过每小时的来袭判定')
+  assert.deepEqual(offline.mail, online.mail)
+  assert.deepEqual(offline.timeline, online.timeline)
+})
+
+test('一次来袭结束后同一小时不会再次掷中同一只狼', () => {
+  const s = nearWolf()
+  let running = scheduleRaid({ ...s, clock: { ...s.clock, gameT: 266 * HOUR } })
+  assert.equal(running.timeline.events.length, 1, '固定种子的已知命中小时')
+  for (let minute = 1; minute <= 5; minute++) running = tick(running, minute * 60_000).state
+  assert.equal(running.mail.length, 1)
+  assert.equal(running.timeline.events.length, 0)
+})
+
+test('离线来袭只抢到达时刻的积蓄，之后的产出保留', () => {
+  const s = outOfProtection(base())
+  const start: GameState = { ...s, npc: { bases: [], patches: {} }, player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0] }, timeline: { events: [{ ...raidEvent(s), finishAt: s.clock.gameT + 60 }] } }
+  const result = tick(start, DAY * 1000, () => [4, 4, 4, 4, 4]).state
+  assert.equal(result.mail[0]!.at, s.clock.gameT + 60)
+  assert.ok(result.player.qi.some((v) => v > 280), '被抢后余下近24小时仍应正常产出')
 })
 
 // —— 掠夺 ——

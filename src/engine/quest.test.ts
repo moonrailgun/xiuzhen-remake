@@ -350,19 +350,19 @@ test('斩妖任务领取时定下坐标，出击目标带怪物属性', () => {
 test('坐标按 worldSeed 决定，同一存档每次算出来都一样；五岳用原版固定坐标', () => {
   const s1 = makeState()
   const q = BEAST_QUESTS[49]! // 第 50 回 九尾妖狐
-  assert.deepEqual(questLocation(s1, q, 0), questLocation(s1, q, 0))
+  assert.deepEqual(questLocation(s1, q), questLocation(s1, q))
   const s2 = { ...s1, worldSeed: 999 }
-  assert.notDeepEqual(questLocation(s1, q, 0), questLocation(s2, q, 0))
+  assert.notDeepEqual(questLocation(s1, q), questLocation(s2, q))
 
   // 五岳坐标写死在数据表里，不随机
   const yushan = XIANTIAN_CHAIN[1]!
-  assert.deepEqual(questLocation(s1, yushan, 0), yushan.at)
+  assert.deepEqual(questLocation(s1, yushan), yushan.at)
 })
 
 test('新手靶子落在身边 8 格内（原文「附近的山顶有块试剑石」）', () => {
   const state = makeState({ x: 100, y: 100 })
   const q = questById('newbie:sword:2', 'qi')! // 以石试剑
-  const [x, y] = questLocation(state, q, 0)
+  const [x, y] = questLocation(state, q)
   assert.ok(Math.abs(x - 100) <= 8 && Math.abs(y - 100) <= 8, `落点 (${x},${y}) 应在 8 格内`)
 })
 

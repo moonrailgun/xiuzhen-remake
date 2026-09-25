@@ -626,6 +626,213 @@ def gen_map_tiles() -> int:
     return n
 
 
+# ============================================================
+# 法术树背景图（img/skill/bg*.gif）与按 id 落盘的图标
+#
+# 04 §7.1：整棵树是一张 460×425 的背景图，**箭头与「Lv.N」标注都画在这张图上**，
+# 图标只是叠在上面的绝对定位元素。所以背景图必须自己画。
+# 几何来自 04 §7.2（截图实测，四张源图都是原生 1:1）：
+#   图标外框 64×64，列左缘 x = 58/198/338，行上缘 y = 0/120/240/360。
+# 画法来自 04 §7.2 末段：3px 粗黑线 + 实心三角箭头（≈13 宽 × 12 长），
+# 直角拐弯无圆角，线中间断开放 14px 手写斜体的「Lv.N」。
+# 箭头清单来自 04 §7.3 的三张表（炼器 / 术数 / 剑术）。
+# ============================================================
+
+SKILL_COL_X = (58, 198, 338)
+SKILL_ROW_Y = (0, 120, 240, 360)
+SKILL_CELL = 64
+SKILL_BG = (460, 425)
+
+# 每条箭头 = (途经点序列, 标注)。点用 (列, 行, 出口) 表示，出口 ∈ 上/下/左/右/心。
+SKILL_ARROWS = {
+    # 炼器：c1r0 ─Lv.1↓→ c1r1；c1r1 ─Lv.3→ c2r1；c1r1 ─Lv.5↓→ c1r2；c2r1 ─Lv.5↓→ c2r2
+    "produce": [
+        ([(1, 0, "d"), (1, 1, "u")], "Lv.1"),
+        ([(1, 1, "r"), (2, 1, "l")], "Lv.3"),
+        ([(1, 1, "d"), (1, 2, "u")], "Lv.5"),
+        ([(2, 1, "d"), (2, 2, "u")], "Lv.5"),
+    ],
+    # 剑术：c1r0 左出折下→c0r1；右出折下→c2r1；c0r1 ─Lv.3→ c1r1 ←Lv.3─ c2r1；
+    #       c1r1 ─Lv.5↓→ c1r2；c0r1 下出跨两行折右 ─Lv.5→ c1r3
+    "sword": [
+        ([(1, 0, "l"), (0, 0, "c"), (0, 1, "u")], "Lv.1"),
+        ([(1, 0, "r"), (2, 0, "c"), (2, 1, "u")], "Lv.1"),
+        ([(0, 1, "r"), (1, 1, "l")], "Lv.3"),
+        ([(2, 1, "l"), (1, 1, "r")], "Lv.3"),
+        ([(1, 1, "d"), (1, 2, "u")], "Lv.5"),
+        ([(0, 1, "d"), (0, 3, "c"), (1, 3, "l")], "Lv.5"),
+    ],
+    # 术数：c0r0 右出折下 ─Lv.5→ c1r1；c0r0 ─Lv.64↓（跨两行）→ c0r2；c1r1 ─Lv.3→ c2r1；
+    #       c1r1 下出折左 ─Lv.20→ c0r2；c2r0 ─Lv.1↓→ c2r1；c2r1 ─Lv.1↓→ c2r2
+    "math": [
+        ([(0, 0, "r"), (1, 0, "c"), (1, 1, "u")], "Lv.5"),
+        ([(0, 0, "d"), (0, 2, "u")], "Lv.64"),
+        ([(1, 1, "r"), (2, 1, "l")], "Lv.3"),
+        ([(1, 1, "d"), (1, 2, "c"), (0, 2, "r")], "Lv.20"),
+        ([(2, 0, "d"), (2, 1, "u")], "Lv.1"),
+        ([(2, 1, "d"), (2, 2, "u")], "Lv.1"),
+    ],
+}
+
+# 图标按 src/pages/skill.ts 的 id 落盘（原版路径是 img/skill/{id}.gif）。
+# 101/106/107 是 DOM 原文的 id，其余是 skill.ts 里标了 [推断] 的编号。
+# 没有对应美术的一律复用未解锁的「?」框（manifest 记「占位」）。
+SKILL_ICON_ART = {
+    102: "liandan", 103: "zhujian", 104: None, 101: None, 107: None, 106: None,
+    201: "yujian", 202: "liantai", 203: "kuanren", 204: None, 205: None, 206: None,
+    301: "yijing", 302: "jiugong", 303: None, 304: None, 305: None, 306: None,
+}
+
+
+def _skill_port(col: int, row: int, side: str):
+    """格子某一侧的出入点（心 = 中心，用来做折线拐点）。"""
+    x, y = SKILL_COL_X[col], SKILL_ROW_Y[row]
+    cx, cy = x + SKILL_CELL // 2, y + SKILL_CELL // 2
+    return {
+        "u": (cx, y), "d": (cx, y + SKILL_CELL),
+        "l": (x, cy), "r": (x + SKILL_CELL, cy),
+        "c": (cx, cy),
+    }[side]
+
+
+def _arrow_head(d: ImageDraw.ImageDraw, a, b, fill=(8, 5, 0, 255)):
+    """在 b 处画一个指向 a→b 方向的实心三角（≈13 宽 × 12 长）。"""
+    bx, by = b
+    if a[0] == b[0]:
+        s = 1 if by > a[1] else -1
+        d.polygon([(bx, by), (bx - 6, by - 12 * s), (bx + 6, by - 12 * s)], fill=fill)
+    else:
+        s = 1 if bx > a[0] else -1
+        d.polygon([(bx, by), (bx - 12 * s, by - 6), (bx - 12 * s, by + 6)], fill=fill)
+
+
+def _skill_bg(tree: str) -> Image.Image:
+    im = Image.new("RGBA", SKILL_BG, (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    fnt = font(14)
+    for path, label in SKILL_ARROWS[tree]:
+        pts = [_skill_port(*p) for p in path]
+        for a, b in zip(pts, pts[1:]):
+            d.line([a, b], fill=(8, 5, 0, 255), width=3)
+        _arrow_head(d, pts[-2], pts[-1])
+        # 标注压在最后一段的中点上，先用白底把线「断开」
+        ax, ay = pts[-2]
+        bx, by = pts[-1]
+        mx, my = (ax + bx) // 2, (ay + by) // 2
+        l, t, r, b2 = d.textbbox((0, 0), label, font=fnt)
+        w, h = r - l, b2 - t
+        d.rectangle([mx - w // 2 - 3, my - h // 2 - 2, mx + w // 2 + 3, my + h // 2 + 2],
+                    fill=(255, 255, 255, 255))
+        d.text((mx - w // 2 - l, my - h // 2 - t), label, font=fnt, fill=(8, 5, 0, 255))
+    return im
+
+
+def gen_skill_trees() -> int:
+    n = 0
+    # 炼器树按道源分三套（bgproducek.gif 是 DOM 原文，另两套按同名推）
+    produce = _skill_bg("produce")
+    for suffix in ("k", "s", "t"):
+        save(produce, f"skill/bgproduce{suffix}.gif")
+        n += 1
+    save(_skill_bg("sword"), "skill/bgsword.gif")
+    save(_skill_bg("math"), "skill/bgmath.gif")
+    n += 2
+
+    # 按 id 落盘图标：有美术的复制美术，没有的复用「?」框
+    unknown = OUT / "skill" / "unknown.gif"
+    if unknown.exists():
+        fallback = Image.open(unknown).convert("RGBA")
+        for skill_id, art in SKILL_ICON_ART.items():
+            src = OUT / "skill" / f"{art}.gif" if art else None
+            im = Image.open(src).convert("RGBA") if src and src.exists() else fallback
+            save(im, f"skill/{skill_id}.gif")
+            n += 1
+
+    # 秘笈标签的页标题图（与 gen_placeholders 的墨迹条同一配方）
+    im = Image.new("RGBA", (150, 30), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for y in range(4, 26):
+        a = int(38 * (1 - abs(y - 15) / 12))
+        d.line([(6, y), (143, y)], fill=(120, 120, 120, max(0, a)))
+    d.text((12, 6), "秘 笈", font=font(14), fill=(70, 70, 70, 255))
+    save(im, "title/titlebook.gif")
+    n += 1
+    return n
+
+
+# ============================================================
+# 收件箱分页键 + 任务窗底部的图片按钮
+#
+# 规格照 tools/assets/manifest.json：
+#  - img/{top,ahead,back,bottom}.gif：16×16，按钮通式底 + 黑色实心三角，
+#    到头的两键（首页/尾页）另加一道竖线。分页条零截图，尺寸为估读。
+#  - img/{giveupquest,closewindows}.gif：按钮通式 —— 内部 #f0f0e0、边缘 #c0c0c0、
+#    1px 深灰褐边 #76716d、四角约 5px 回纹折角、12px 宋体黑字居中。
+#    字样取截图 #83 的逐字转录（docs/research/05 §11.1「领取奖励　关闭窗口」），
+#    所以 closewindows 写「关闭窗口」而不是 manifest 里估的「关闭」。
+#  - img/getreward.gif：#83 上确有这个按钮，但**原版文件名没留下**（不在 07 §7.2 的
+#    文件名全集里），名字是重建的；外观走同一套按钮通式。
+# ============================================================
+
+BTN_FACE = (240, 240, 224)      # 米灰底内部
+BTN_EDGE = (192, 192, 192)      # 底的边缘一圈
+BTN_LINE = (118, 113, 109)      # 1px 深灰褐边 #76716d
+PAGE_BTN = 16                   # 分页键边长
+
+
+def _button_base(w: int, h: int) -> Image.Image:
+    """按钮通式的底：米灰面 + 1px 深灰褐边 + 四角 5px 回纹折角。"""
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle((0, 0, w - 1, h - 1), fill=BTN_FACE + (255,), outline=BTN_LINE + (255,))
+    d.rectangle((1, 1, w - 2, h - 2), outline=BTN_EDGE + (255,))
+    # 四角回纹：每角画一个 5px 的直角折线（内缩 2px）
+    k = 5
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        cx = 2 if sx > 0 else w - 3
+        cy = 2 if sy > 0 else h - 3
+        d.line([(cx, cy), (cx + sx * k, cy)], fill=BTN_LINE + (255,))
+        d.line([(cx, cy), (cx, cy + sy * (k - 2))], fill=BTN_LINE + (255,))
+    return im
+
+
+def gen_page_and_quest_buttons() -> int:
+    n = 0
+
+    # —— 分页四键：三角朝向 + 到头两键的竖线 ——
+    # (文件名, 朝左?, 到头?)
+    pagers = (("top.gif", True, True), ("ahead.gif", True, False),
+              ("back.gif", False, False), ("bottom.gif", False, True))
+    for name, left, end in pagers:
+        im = _button_base(PAGE_BTN, PAGE_BTN)
+        d = ImageDraw.Draw(im)
+        ink = (0, 0, 0, 255)
+        # 三角：高 7px，居中；到头的键把三角让开 2px 给竖线
+        shift = -1 if (left and end) else (1 if (not left and end) else 0)
+        cx, cy = PAGE_BTN // 2 + shift, PAGE_BTN // 2
+        if left:
+            d.polygon([(cx + 2, cy - 4), (cx + 2, cy + 4), (cx - 3, cy)], fill=ink)
+            if end:
+                d.line([(cx - 4, cy - 4), (cx - 4, cy + 4)], fill=ink)
+        else:
+            d.polygon([(cx - 2, cy - 4), (cx - 2, cy + 4), (cx + 3, cy)], fill=ink)
+            if end:
+                d.line([(cx + 4, cy - 4), (cx + 4, cy + 4)], fill=ink)
+        save(im, name)
+        n += 1
+
+    # —— 任务窗底部的图片按钮 ——
+    for name, label in (("giveupquest.gif", "放弃任务"),
+                        ("closewindows.gif", "关闭窗口"),
+                        ("getreward.gif", "领取奖励")):
+        im = _button_base(72, 20)
+        centered(ImageDraw.Draw(im), (0, 0, 72, 20), label, font(12), (0, 0, 0, 255))
+        save(im, name)
+        n += 1
+
+    return n
+
+
 def main() -> int:
     total = 0
     total += gen_element_icons()
@@ -636,6 +843,8 @@ def main() -> int:
     total += gen_event_icons()
     total += gen_placeholders()
     total += gen_map_tiles()
+    total += gen_skill_trees()
+    total += gen_page_and_quest_buttons()
     print(f"生成 C/D 档素材 {total} 个 → public/img/")
     return 0
 

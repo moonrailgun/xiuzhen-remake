@@ -24,8 +24,11 @@ import { ELEMENTS, type Element } from '../data/meridian.ts'
 
 export type TradeView = 'buyqi' | 'sellqi' | 'buyitem' | 'sellitem'
 
-/** 五行 → 资源图标文件名。与 `player.ts` / `shell.ts` 同一套 `img/res/*.gif`。 */
-const RES_ICON: Record<Element, string> = {
+/**
+ * 五行 → 资源图标文件名。与 `player.ts` / `shell.ts` 同一套 `img/res/*.gif`。
+ * 本该放 `shell.ts`（资源条也用），但那份是别人的文件，这里导出给 `payment.ts` 复用。
+ */
+export const RES_ICON: Record<Element, string> = {
   金: 'gold',
   木: 'wood',
   水: 'water',

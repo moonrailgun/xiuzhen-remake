@@ -248,6 +248,42 @@ a.help, .help {
   z-index: 3;
 }
 
+/* —— 法术页（skill.jsp）—— */
+/* 整棵树是一张 460×425 的背景图（箭头与 Lv.N 标注都画在图上，见 04 §7.1）；
+   图标是叠在上面的绝对定位元素，3 列 × 4 行、每格 64×64（04 §7.2 截图实测）。 */
+.skilltree {
+  position: relative;
+  width: 460px; height: 425px;
+  background-repeat: no-repeat;
+}
+.skillcell { position: absolute; display: block; width: 64px; height: 64px; }
+/* 计数 `(0/20)`：12px 宋体黑字，贴在图标右下角外侧 */
+.skillcount {
+  position: absolute;
+  font-size: var(--fs-small); line-height: var(--lh-small);
+  white-space: nowrap;
+}
+
+/* —— 法宝页（item.jsp）—— */
+/* 墨迹条右端的折叠钮 `[-]`：粉灰底小方块 + 一道红褐横线（截图 #155 / #68），
+   链接指向 item.jsp?hide=1&tab=N */
+.hidebtn {
+  display: inline-block;
+  width: 11px; height: 11px; line-height: 9px;
+  text-align: center;
+  background: var(--row-bg-alt);
+  border: 1px solid var(--line);
+  color: var(--warn);
+  font-weight: bold;
+}
+/* 「准备炼制:」后面的输入框，截图里约 4 个数字宽 */
+.craftnum { width: 34px; font-size: var(--fs-small); }
+
+/* —— 物品详情 R 窗（itemmid.jsp）—— */
+/* R 窗内容区宽 230（09 §5 的宽度档）；窗内各表自身写的是 width="100%" */
+.itemmid { width: 230px; }
+.pilluse { padding: 3px; }
+
 /* —— 地图页 —— */
 /* 地图区：448×245 可视窗，外面一圈留给 8 个滚屏箭头（约 480×280）。
    .mapdiv 自成层叠上下文，避免地块高达 565 的 z-index 盖住浮窗。 */
@@ -266,3 +302,47 @@ a.help, .help {
 #sceneimg { display: inline-block; vertical-align: top; }
 #mapmenu { position: absolute; z-index: 50; }
 #mapbar { width: 460px; }
+
+/* —— 交易 / 排行榜 / 付费 / 五行互化 / 产业 —— */
+
+/* 原版 oui.css 里裸 <a> 是草绿色：证据有两条 ——
+   (1) 购买真气页 #123/#7 上「提供/需求」表头、「购买」、分页四链接都是绿的，
+       而它们在 DOM 里要么没 class，要么是 middlebold（黑粗体）；
+   (2) 正因为默认是绿的，事件栏才需要 `#gmid a:not(.skillup)` 那条强制黑字的覆盖。
+   这里不动全局 a 规则（会波及已做完的页面），只把表格里这几类操作链接补成草绿。 */
+.tablebg a.middlebold,
+.tablebg a.smallbold,
+.tablebg tr.titlebg a { color: var(--link); }
+.tablebg a.middlebold:hover,
+.tablebg a.smallbold:hover,
+.tablebg tr.titlebg a:hover { color: var(--link-hover); }
+
+/* 付费页分节之间的 6px 空行（#9 实测：五行吸收组与法宝组之间空 6px）。
+   .tablebg td 默认 padding:3px，会把 6px 撑成 12px，所以这一行单独清零。 */
+tr.paygap td { padding: 0; height: 6px; background: var(--row-bg); }
+
+/* 交易页的筛选条与出售表单：原生 select/button，只把字号压到正文档，
+   不动外观 —— 截图里的控件长相随截图者的系统主题变化（#123 Vista、#93 XP Luna），
+   本来就没有统一外观可抄。 */
+.tablebg select, .tablebg input,
+form select, form input { font-family: inherit; font-size: var(--fs-small); vertical-align: middle; }
+
+/* —— 门派 / 消息 / 任务 / 资料 —— */
+/* 这几页几乎全靠 HTML 属性（width/colSpan/cellPadding）定版，只补 oui.css 里还缺的 class。 */
+
+/* span.b：原版唯一的「纯加粗」class（删号剩余天数、玉匣奖励物品名），不带字号 */
+.b { font-weight: bold; }
+
+/* 收件箱是全站唯一用 cellPadding=2 的数据表（原版 DOM 如此），
+   要盖掉 .tablebg td 的 3px，否则 230px 的 R 窗会被撑出横向滚动条。 */
+#msgform .tablebg td { padding: 2px; }
+
+/* 写消息的正文框：上面那条只覆盖了 input/select，textarea 也得钉回小号宋体，
+   否则 macOS 会换成 13px 等宽字体，460px 的 L 窗对不上。 */
+textarea { font-family: inherit; font-size: var(--fs-small); }
+
+/* 成员分页条的「第[__]/N页」输入框（原版 id=allypage、size=3） */
+#allypage { text-align: center; }
+
+/* 读信正文区：外壳给了 height=200，正文再高就顺着表格长，不滚动（原版如此）。 */
+#msgcontent { width: 100%; }

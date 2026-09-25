@@ -84,6 +84,8 @@ def main():
           (len(rows), len(rows) - len(ORIGINAL)))
     print("各档数量：" + "  ".join("%s=%d" % (t, tiers[t]) for t in "ABCD"))
 
+    errors += check_topbar()
+
     if errors:
         print("\n对账失败：")
         for e in errors:
@@ -91,6 +93,53 @@ def main():
         return 1
     print("对账通过。")
     return 0
+
+
+def check_topbar():
+    """顶栏横幅：尺寸对不对、保留下来的部分有没有被重采样/抹平。
+
+    不能量「整图高频能量」：
+      - 旧版有一层没擦干净的 UI 鬼影，鬼影本身就是高频，把数字撑到 25；
+      - 新版把 31% 的像素擦掉补平了，全图高频自然降到 11 —— 但它明显更清楚。
+    也不能量文件体积：补平的区域压得更小（19KB < 旧版 66KB）。
+
+    真正该钉死的是：**没被擦的那些像素，必须还是原生截图的像素**。
+    只要这条成立，「修真」和山就不可能糊，因为它们压根没被动过。
+    """
+    path = os.path.join(ROOT, "..", "..", "public", "img", "top", "back2.jpg")
+    if not os.path.exists(path):
+        return ["顶栏横幅 img/top/back2.jpg 不在了"]
+    try:
+        import numpy as np
+        from PIL import Image
+        sys.path.insert(0, ROOT)
+        from rebuild_topbar import SRC, BAND, WATERMARK_RECT, dirty_mask
+    except Exception:
+        return []  # 没装 PIL 就跳过，别拦住别人跑对账
+
+    im = Image.open(path).convert("RGB")
+    out = []
+    if im.size != (1000, 98):
+        out.append("顶栏横幅应是 1000×98（顶栏宽 1000），实得 %dx%d" % im.size)
+        return out
+
+    src = np.asarray(Image.open(SRC).convert("RGB").crop(BAND)).astype(float)
+    got = np.asarray(im).astype(float)
+
+    keep = ~dirty_mask(np.asarray(Image.open(SRC).convert("RGB").crop(BAND)).astype(np.uint8))
+    # logo 那块是从 #114 换过来的，不参与和 #2 的比对
+    x0, y0, x1, y1 = WATERMARK_RECT
+    keep[y0:y1, x0:x1] = False
+
+    # 实测标定：原样写出 0.72（只有 JPEG 量化误差）；高斯 r=0.6 → 1.16、
+    # r=1.2 → 2.44、r=2.0 → 4.06；当年那张糊版 → 18.40。取 1.0 能抓到肉眼可见的软化。
+    diff = np.abs(got - src)[keep].mean()
+    if diff > 1.0:
+        out.append(
+            "顶栏横幅保留区与原生截图平均差 %.2f（应 ≤1.0，原样写出约 0.7）—— "
+            "说明那部分被重采样/模糊/抹平过，不再是原图像素" % diff
+        )
+    return out
 
 
 if __name__ == "__main__":

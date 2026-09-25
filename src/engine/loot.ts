@@ -78,8 +78,8 @@ export function knockback(
 ): { x: number; y: number } {
   // 原文观察到的范围是 1–4 格
   const dist = 1 + randInt(Math.max(1, Math.min(4, knockbackStat)), seed, 'kbdist', key)
-  const dir = randInt(4, seed, 'kbdir', key)
-  const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][dir]!
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const
+  const [dx, dy] = dirs[randInt(4, seed, 'kbdir', key)] ?? dirs[0]
   return {
     x: Math.max(0, Math.min(WORLD_SIZE - 1, x + dx * dist)),
     y: Math.max(0, Math.min(WORLD_SIZE - 1, y + dy * dist)),

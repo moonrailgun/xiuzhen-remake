@@ -10,6 +10,7 @@ import { advance, setRate, DAY, type Clock } from './clock.ts'
 import { advanceTo, emptyTimeline, type GameEvent } from './timeline.ts'
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
+import { resolveBattleEvent } from './battle.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -137,7 +138,8 @@ export function tick(
   const out = advanceTo(withQi, withQi.timeline, clock.gameT, (st, ev) => {
     if (ev.kind === 'cultivate') return { state: resolveCultivate(st, ev) }
     if (ev.kind === 'move') return resolveMove(st, ev)
-    // 战斗与炼器在阶段 4 接上
+    if (ev.kind === 'battle') return resolveBattleEvent(st, ev)
+    // 炼器队列在下一步接上
     return { state: st }
   })
 

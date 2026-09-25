@@ -1,0 +1,476 @@
+/**
+ * 任务引擎：领取 / 进行 / 交付 / 放弃，条件判定与发奖。
+ *
+ * 【照原版】的部分：
+ *  - 任务按链推进，前一步交付了下一步才出现在「可领取的任务」里（`02 §4.1`、`§4.2`）；
+ *  - 任务栏每条后面跟一个 **「放弃」** 链接（`03 §1.9`(e) 原文
+ *    `斩却三尸-上尸彭踞(1/4)　放弃　目标地点: (60,134)`）；
+ *  - 完成了不会自动发奖，要点「领取奖励」（截图 #83 的底部按钮）——
+ *    所以状态是四态：可领取 / 进行中 / **可交付** / 已完成；
+ *  - 《百妖记》按境界开放（1–5 无门槛，6–20 要出保护期，之后每 20 回一个境界）；
+ *  - 斩三尸**只在周六刷新**、满地图随机（`15374`；`DECISIONS.md` §5 #8 取周六）。
+ *
+ * 【重建】的部分：
+ *  - 任务怪的**坐标生成规则**原版没留下（只知道试剑石在「附近的山顶」、三尸「满地图随机」）。
+ *    这里用无状态随机按 `worldSeed + 任务 id` 算，保证同一存档任何时候查都是同一个点；
+ *  - 「放弃要花仙石」见于文曲星君任务的回帖，但**哪些任务收、收多少** [未知]，这里一律不收。
+ *
+ * ## 为什么任务状态不在 `GameState` 里
+ *
+ * `state.ts` 是别处在用的既有结构，这里不动它。任务日志是独立的 `QuestLog`，
+ * 所有函数都是 `(log, state) -> 新 log` 或 `-> { state, log }`。接主循环时把
+ * `quests: QuestLog` 挂进 `GameState` 并加一条存档迁移即可。
+ */
+
+import { DAY, weekdayOf } from './clock.ts'
+import { randInt } from './rng.ts'
+import { schedule, cancel, type GameEvent } from './timeline.ts'
+import { resolveBattle, type CombatSword } from './combat.ts'
+import { capacityOf } from './cultivate.ts'
+import {
+  addQi,
+  clampQi,
+  isOutOfProtection,
+  REALMS,
+  ZERO_QI,
+  type Artifact,
+  type FiveQi,
+  type GameState,
+  type Realm,
+} from './state.ts'
+import { MERIDIANS, groupElement } from '../data/meridian.ts'
+import { WORLD_SIZE } from '../data/world.ts'
+import {
+  SANSHI_SPAWN_WEEKDAY,
+  chainsFor,
+  qiRewardFor,
+  questById,
+  type Monster,
+  type NewbieLine,
+  type Quest,
+} from '../data/quests.ts'
+
+// ===========================================================================
+// 存档结构
+// ===========================================================================
+
+/** 可领取 / 进行中 / 可交付 / 已完成。原版没有「失败」态（放弃就是删掉重来）。 */
+export type QuestStatus = 'available' | 'active' | 'ready' | 'done' | 'locked'
+
+export type QuestEntry = {
+  readonly id: string
+  /** 领取时刻（游戏秒） */
+  readonly acceptedAt: number
+  /** 奖励已领 */
+  readonly done: boolean
+  /** 目标坐标（斩妖类领取时定死，免得每次查都跳） */
+  readonly at?: readonly [number, number]
+  /** 外部事件型条件已满足：怪被打死 / 答完题 / 选完分支 / 金丹已成 */
+  readonly cleared?: boolean
+  /** 计数型条件的累计值：炼制或淬炼的件数、已交给 NPC 的银两 */
+  readonly count?: number
+}
+
+export type QuestLog = {
+  readonly entries: readonly QuestEntry[]
+  /** 新手任务第 3 步选的线。未选之前两条线前 3 步完全相同，默认 `qi` 不影响正确性。 */
+  readonly line: NewbieLine
+  /** 已领的境界奖励累计的丹田上限加成（辟谷 +5000、心动 +10000、元婴 160000）。 */
+  readonly dantianBonus: number
+}
+
+export const emptyQuestLog = (line: NewbieLine = 'qi'): QuestLog => ({
+  entries: [],
+  line,
+  dantianBonus: 0,
+})
+
+export type QuestResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly reason: string }
+
+const fail = (reason: string): { ok: false; reason: string } => ({ ok: false, reason })
+const ok = <T>(value: T): { ok: true; value: T } => ({ ok: true, value })
+
+// ===========================================================================
+// 查询
+// ===========================================================================
+
+export const entryOf = (log: QuestLog, id: string): QuestEntry | undefined =>
+  log.entries.find((e) => e.id === id)
+
+export const questOf = (log: QuestLog, id: string): Quest | undefined => questById(id, log.line)
+
+const realmRank = (r: Realm): number => REALMS.indexOf(r)
+
+/** 境界是否到了（含更高境界）。 */
+export const realmReached = (player: GameState['player'], need: Realm): boolean =>
+  realmRank(player.realm) >= realmRank(need)
+
+/** 一条链里，前面的步骤是否全都交付了。 */
+function chainUnlocked(log: QuestLog, chain: readonly Quest[], index: number): boolean {
+  for (let i = 0; i < index; i++) {
+    const prev = chain[i]
+    if (!prev) return false
+    if (!entryOf(log, prev.id)?.done) return false
+  }
+  return true
+}
+
+function findChain(log: QuestLog, id: string): { chain: readonly Quest[]; index: number } | null {
+  for (const chain of chainsFor(log.line)) {
+    const index = chain.findIndex((q) => q.id === id)
+    if (index >= 0) return { chain, index }
+  }
+  return null
+}
+
+/**
+ * 领取门槛。返回 `null` 表示可以领。
+ * 三尸的「只在周六」写在这里而不是数据表里 —— 它是规则不是数值。
+ */
+export function acceptBlocker(q: Quest, state: GameState): string | null {
+  const req = q.require
+  if (req?.realm && !realmReached(state.player, req.realm)) return `境界不足，需要${req.realm}`
+  if (req?.outOfProtection && !isOutOfProtection(state.player, state.clock.gameT, DAY)) {
+    return '尚未离开新手保护期'
+  }
+  if (q.series === '斩却三尸' && q.goal.kind === 'slay') {
+    if (weekdayOf(state.clock) !== SANSHI_SPAWN_WEEKDAY) return '三尸只在每周六现身'
+  }
+  return null
+}
+
+/** 四态 + `locked`（前置未完成或门槛未到）。 */
+export function statusOf(log: QuestLog, state: GameState, id: string): QuestStatus {
+  const entry = entryOf(log, id)
+  if (entry?.done) return 'done'
+  const found = findChain(log, id)
+  if (!found) return 'locked'
+  const q = found.chain[found.index]!
+  if (entry) return goalMet(q, entry, state) ? 'ready' : 'active'
+  if (!chainUnlocked(log, found.chain, found.index)) return 'locked'
+  return acceptBlocker(q, state) === null ? 'available' : 'locked'
+}
+
+/** 原版右栏「查看可领取任务」列出的就是这些。 */
+export function availableQuests(log: QuestLog, state: GameState): readonly Quest[] {
+  const out: Quest[] = []
+  for (const chain of chainsFor(log.line)) {
+    for (let i = 0; i < chain.length; i++) {
+      const q = chain[i]!
+      if (entryOf(log, q.id)) continue
+      if (!chainUnlocked(log, chain, i)) break
+      if (acceptBlocker(q, state) === null) out.push(q)
+      // 一条链一次只开放一个任务
+      break
+    }
+  }
+  return out
+}
+
+/** 任务栏上正在进行的（含可交付的）。 */
+export const activeQuests = (log: QuestLog): readonly Quest[] =>
+  log.entries.filter((e) => !e.done).flatMap((e) => {
+    const q = questOf(log, e.id)
+    return q ? [q] : []
+  })
+
+// ===========================================================================
+// 完成条件判定
+// ===========================================================================
+
+/** 12 条经脉各炼化哪种真气（随本命属性变，见 `meridian.ts`）。 */
+const meridianElements = (state: GameState) =>
+  MERIDIANS.map((m) => groupElement(state.player.element, m.group))
+
+export function goalMet(q: Quest, entry: QuestEntry, state: GameState): boolean {
+  const g = q.goal
+  const p = state.player
+  switch (g.kind) {
+    case 'meridian': {
+      const hit = p.meridians.flatMap((lv, i) => (lv >= g.level ? [i] : []))
+      if (hit.length < g.count) return false
+      if (g.elements === undefined) return true
+      const els = meridianElements(state)
+      return new Set(hit.map((i) => els[i])).size >= g.elements
+    }
+    case 'body':
+      return (p.body[g.index] ?? 0) >= g.level
+    case 'skill':
+      return (p.skills[g.id] ?? 0) >= g.level
+    case 'craft':
+    case 'refine':
+      return (entry.count ?? 0) >= g.count
+    case 'silver':
+      return (entry.count ?? 0) >= g.amount
+    case 'daoxing':
+      return p.daoxing >= g.points
+    case 'experience':
+      return p.experience >= g.points
+    case 'slay':
+    case 'quiz':
+    case 'choice':
+    case 'goldenCore':
+      return entry.cleared === true
+  }
+}
+
+// ===========================================================================
+// 领取 / 放弃
+// ===========================================================================
+
+/**
+ * 任务怪的落点。[重建]
+ * 原版只说试剑石在「附近的山顶」、三尸「满地图随机」，生成规则没有存档。
+ * 这里：新手任务的靶子落在身边 8 格内，其余满地图；三尸按**周**变位置（每周六换一处）。
+ */
+export function questLocation(state: GameState, q: Quest, weekKey = 0): readonly [number, number] {
+  if (q.at) return q.at
+  const seed = state.worldSeed
+  if (q.category === 'newbie') {
+    const dx = randInt(17, seed, 'questnear', q.id, 'x') - 8
+    const dy = randInt(17, seed, 'questnear', q.id, 'y') - 8
+    return [clampToWorld(state.player.x + dx), clampToWorld(state.player.y + dy)]
+  }
+  return [
+    randInt(WORLD_SIZE, seed, 'quest', q.id, weekKey, 'x'),
+    randInt(WORLD_SIZE, seed, 'quest', q.id, weekKey, 'y'),
+  ]
+}
+
+const clampToWorld = (v: number): number => Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(v)))
+
+export function accept(log: QuestLog, state: GameState, id: string): QuestResult<QuestLog> {
+  if (entryOf(log, id)) return fail('该任务已经领取过了')
+  const found = findChain(log, id)
+  if (!found) return fail('没有这个任务')
+  const q = found.chain[found.index]!
+  if (!chainUnlocked(log, found.chain, found.index)) return fail('前置任务尚未完成')
+  const blocker = acceptBlocker(q, state)
+  if (blocker) return fail(blocker)
+
+  const week = Math.floor(state.clock.gameT / (7 * DAY))
+  const entry: QuestEntry = {
+    id,
+    acceptedAt: state.clock.gameT,
+    done: false,
+    ...(q.goal.kind === 'slay' ? { at: questLocation(state, q, week) } : {}),
+  }
+  return ok({ ...log, entries: [...log.entries, entry] })
+}
+
+/** 放弃（任务栏上的「放弃」链接）。已交付的不能放弃。 */
+export function abandon(log: QuestLog, id: string): QuestResult<QuestLog> {
+  const entry = entryOf(log, id)
+  if (!entry) return fail('没有领取这个任务')
+  if (entry.done) return fail('任务已经完成，无法放弃')
+  return ok({ ...log, entries: log.entries.filter((e) => e.id !== id) })
+}
+
+// ===========================================================================
+// 进度上报
+// ===========================================================================
+
+const patch = (log: QuestLog, id: string, f: (e: QuestEntry) => QuestEntry): QuestLog => ({
+  ...log,
+  entries: log.entries.map((e) => (e.id === id && !e.done ? f(e) : e)),
+})
+
+/** 答题 / 选分支 / 结丹完成这类「点一下就算数」的条件。 */
+export const markCleared = (log: QuestLog, id: string): QuestLog =>
+  patch(log, id, (e) => ({ ...e, cleared: true }))
+
+/** 新手第 3 步：选先炼气还是先炼剑，顺带把这一步标记完成。 */
+export function chooseLine(log: QuestLog, id: string, line: NewbieLine): QuestLog {
+  return markCleared({ ...log, line }, id)
+}
+
+/** 炼制 / 淬炼完成时调用，把件数记到对应任务上。 */
+export function recordProgress(
+  log: QuestLog,
+  kind: 'craft' | 'refine',
+  count: number,
+  item?: string,
+): QuestLog {
+  let next = log
+  for (const e of log.entries) {
+    if (e.done) continue
+    const goal = questOf(log, e.id)?.goal
+    if (!goal || goal.kind !== kind) continue
+    // 「炼制飞剑」与「炼制一把青龙伏魔剑」是两个任务，炼普通剑不该推进后者
+    if (goal.kind === 'craft' && item !== undefined && goal.item !== item) continue
+    next = patch(next, e.id, (x) => ({ ...x, count: (x.count ?? 0) + count }))
+  }
+  return next
+}
+
+/** 打死某只怪之后调用：把所有盯着这只怪的任务标成「已斩」。 */
+export function recordSlain(log: QuestLog, monsterName: string): QuestLog {
+  let next = log
+  for (const e of log.entries) {
+    if (e.done) continue
+    const q = questOf(log, e.id)
+    if (q?.goal.kind === 'slay' && q.goal.monster.name === monsterName) {
+      next = markCleared(next, e.id)
+    }
+  }
+  return next
+}
+
+/** 交银两（千金散尽）。银两不够就交多少算多少，与原版「分批交」一致。 */
+export function paySilver(
+  state: GameState,
+  log: QuestLog,
+  id: string,
+  amount: number,
+): QuestResult<{ state: GameState; log: QuestLog }> {
+  const entry = entryOf(log, id)
+  const q = questOf(log, id)
+  if (!entry || entry.done || !q) return fail('没有这个进行中的任务')
+  if (q.goal.kind !== 'silver') return fail('该任务不需要交纳银两')
+  if (amount <= 0) return fail('交纳的银两必须大于 0')
+  if (state.player.silver < amount) return fail('银两不足')
+  const remaining = q.goal.amount - (entry.count ?? 0)
+  const paid = Math.min(amount, remaining)
+  return ok({
+    state: { ...state, player: { ...state.player, silver: state.player.silver - paid } },
+    log: patch(log, id, (e) => ({ ...e, count: (e.count ?? 0) + paid })),
+  })
+}
+
+// ===========================================================================
+// 打怪：与 timeline 配合
+// ===========================================================================
+
+export const QUEST_BATTLE_PREFIX = 'quest-battle:'
+
+/** 把任务怪转成一张战斗卡（护身/飞剑共用的结构）。 */
+export const monsterAsSword = (m: Monster): CombatSword => ({
+  id: `monster:${m.name}`,
+  name: m.name,
+  element: m.element,
+  attack: m.attack,
+  durability: m.life,
+  agility: m.agility,
+})
+
+/**
+ * 对任务怪出击：排一个 `battle` 事件。
+ *
+ * 结果在**创建事件时**就算好写进 payload —— `timeline.ts` 要求结算是纯函数，
+ * 离线重放两次必须得到同一结果。缠斗时长 = 双方敏捷之和（`combat.ts`）。
+ */
+export function attackQuestMonster(
+  state: GameState,
+  log: QuestLog,
+  id: string,
+  swords: readonly CombatSword[],
+  travelSeconds: number,
+): QuestResult<GameState> {
+  const entry = entryOf(log, id)
+  const q = questOf(log, id)
+  if (!entry || entry.done || !q) return fail('没有这个进行中的任务')
+  if (q.goal.kind !== 'slay') return fail('该任务不是斩妖任务')
+  if (swords.length === 0) return fail('没有可用的飞剑')
+  const eventId = `${QUEST_BATTLE_PREFIX}${id}`
+  if (state.timeline.events.some((e) => e.id === eventId)) return fail('已经有飞剑在路上了')
+
+  const monster = monsterAsSword(q.goal.monster)
+  const result = resolveBattle(swords, [monster])
+  const win = result.defender.every((d) => d.broken)
+
+  const event: GameEvent = {
+    id: eventId,
+    kind: 'battle',
+    finishAt: state.clock.gameT + travelSeconds + result.tangleSeconds,
+    payload: {
+      quest: id,
+      monster: q.goal.monster.name,
+      win,
+      broken: result.attacker.filter((a) => a.broken).map((a) => a.id),
+    },
+  }
+  return ok({ ...state, timeline: schedule(state.timeline, event) })
+}
+
+/** 取消出击（原版事件栏的红 ×）。 */
+export const cancelQuestBattle = (state: GameState, id: string): GameState => ({
+  ...state,
+  timeline: cancel(state.timeline, `${QUEST_BATTLE_PREFIX}${id}`),
+})
+
+/** 战斗事件到点：赢了就把任务标成「已斩」。在 `game.ts` 的 resolver 里调。 */
+export function resolveQuestBattle(log: QuestLog, event: GameEvent): QuestLog {
+  if (!event.id.startsWith(QUEST_BATTLE_PREFIX)) return log
+  if (event.payload['win'] !== true) return log
+  const id = event.payload['quest']
+  return typeof id === 'string' ? markCleared(log, id) : log
+}
+
+// ===========================================================================
+// 交付发奖
+// ===========================================================================
+
+/** 当前丹田容量：本体等级算出来的基础容量 + 境界奖励的固定加成。 */
+export const questCapacity = (state: GameState, log: QuestLog): number =>
+  capacityOf(state) + log.dantianBonus
+
+/**
+ * 领取奖励（截图 #83 的「领取奖励」按钮）。
+ * 真气按丹田上限截断；「充满丹田」这类文字奖励单独处理。
+ */
+export function claim(
+  log: QuestLog,
+  state: GameState,
+  id: string,
+): QuestResult<{ state: GameState; log: QuestLog }> {
+  const entry = entryOf(log, id)
+  const q = questOf(log, id)
+  if (!entry || !q) return fail('没有这个任务')
+  if (entry.done) return fail('奖励已经领过了')
+  if (!goalMet(q, entry, state)) return fail('任务尚未完成')
+
+  const r = q.reward
+  const nextLog: QuestLog = {
+    ...log,
+    dantianBonus: log.dantianBonus + (r.dantianBonus ?? 0),
+    entries: log.entries.map((e) => (e.id === id ? { ...e, done: true } : e)),
+  }
+
+  const cap = questCapacity(state, nextLog)
+  let qi: FiveQi = state.player.qi
+  if (r.qi) qi = addQi(qi, qiRewardFor(r.qi, state.player.element))
+  // 「充满丹田」[原文 c/4317]：筑基→辟谷的奖励，五行一次加满
+  if (r.note === '充满丹田') qi = addQi(ZERO_QI, [cap, cap, cap, cap, cap] as unknown as FiveQi)
+
+  const artifacts: readonly Artifact[] = r.items
+    ? [
+        ...state.player.artifacts,
+        ...r.items.map(
+          (name): Artifact => ({
+            id: `quest:${id}:${name}`,
+            kind: 'misc',
+            name,
+            quality: '凡品',
+            refine: 0,
+            status: '空闲',
+            count: 1,
+          }),
+        ),
+      ]
+    : state.player.artifacts
+
+  return ok({
+    log: nextLog,
+    state: {
+      ...state,
+      player: {
+        ...state.player,
+        qi: clampQi(qi, cap),
+        realm: r.realm ?? state.player.realm,
+        artifacts,
+      },
+    },
+  })
+}

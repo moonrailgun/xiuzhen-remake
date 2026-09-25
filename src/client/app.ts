@@ -18,6 +18,9 @@ import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation } from '../engine/quest.ts'
 import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
+import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
+import { launch, type LaunchSword } from '../engine/battle.ts'
+import { startCraft } from '../engine/craft.ts'
 import { changeRate } from '../engine/game.ts'
 import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
@@ -28,7 +31,7 @@ import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
 import { openWindow, closeWindow, setPageResolver, startCountdowns } from './windows.ts'
-import { esc } from '../pages/html.ts'
+import { esc, escJs } from '../pages/html.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
   try {
@@ -366,9 +369,99 @@ export function installGameActions(): void {
     step()
   }
 
-  /** 对选中场景进行推算（术数，阶段 4 接上）。 */
+  /** 对选中场景进行推算（水镜玄光：按坐标推算该地修炼的玩家）。 */
   g['spyScene'] = () => {
-    openWindow('mwindow', '推算', '<DIV class=middle style="padding:10px">术数推算将在后续版本开放。</DIV>')
+    if (!state || !mapSelected) return
+    const here = npcsAtCell(state.npc, state.clock.gameT, state.worldSeed, mapSelected.x, mapSelected.y)
+    const body = here.length === 0
+      ? '此地空无一人。'
+      : here.map((n) => `${esc(n.base.name)}${n.suffix ? `(${n.suffix})` : ''}　${esc(n.realm)}　道行 ${esc(n.daoxingText)}`).join('<BR>')
+    openWindow('mwindow', '掐指一算',
+      `<DIV class=middle style="padding:10px">(${mapSelected.x},${mapSelected.y})<BR>${body}</DIV>`)
+  }
+
+  /** 对玩家推算（掐指一算菜单）。 */
+  g['spyPlayer'] = (name: string) => {
+    if (!state) return
+    const s = state
+    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
+      .find((n) => n.base.name === name)
+    if (!target) {
+      openWindow('mwindow', '掐指一算', '<DIV class=middle style="padding:10px">对方已不在你的感应范围内。</DIV>')
+      return
+    }
+    const kinds = Object.keys(DIVINATIONS) as DivinationKind[]
+    const menu = kinds.map((k) =>
+      `<DIV style="padding:3px 0"><A class=skillup href="#" onclick="doDivine('${k}','${escJs(name)}')">${k}</A>` +
+      `<SPAN class=smallgray>　${DIVINATIONS[k].effect}</SPAN></DIV>`).join('')
+    openWindow('lwindow', '掐指一算', `<DIV class=middle style="padding:10px">${menu}</DIV>`)
+  }
+
+  g['doDivine'] = (kind: string, name: string) => {
+    if (!state) return
+    const s = state
+    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
+      .find((n) => n.base.name === name)
+    if (!target) return
+    const r = divine(kind as DivinationKind, target, {
+      at: s.clock.gameT,
+      byName: s.player.name,
+      myYijing: s.player.skills['易经'] ?? 0,
+      theirYijing: 0,
+      targetMeridians: Array(12).fill(Math.min(20, Math.floor(target.daoxing / 9000))),
+      inSight: true,
+      located: true,
+    })
+    if (!r.ok) {
+      openWindow('mwindow', '推算失败', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+      return
+    }
+    state = { ...s, mail: [r.mail, ...s.mail].slice(0, 200) }
+    closeWindow('lwindow')
+    openWindow('mwindow', '推算', `<DIV class=middle style="padding:10px">推算结果已送到你的消息里。</DIV>`)
+    step()
+  }
+
+  /** 加为护法。 */
+  g['addpal'] = (name: string) => {
+    openWindow('mwindow', '护法',
+      `<DIV class=middle style="padding:10px">已向 ${esc(name)} 发出护法邀请。</DIV>`)
+  }
+
+  /** 原版的通用 ajax 提交入口。本地版没有服务端，按 action 分发。 */
+  g['ajaxPost'] = (action: string, params: string) => {
+    const g2 = globalThis as unknown as Record<string, (...a: unknown[]) => void>
+    if (action === 'paycoin') {
+      const m = /pay=(\d+)/.exec(params ?? '')
+      if (m) g2['paycoin']!(Number(m[1]))
+      return
+    }
+    openWindow('mwindow', '提示',
+      `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
+  }
+  g['postForm'] = (action: string) => {
+    openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
+  }
+
+  /** 炼制法宝（炼制页的「炼制」按钮）。 */
+  g['sendMakeItem'] = (itemId: number, count: number) => {
+    if (!state) return
+    const n = Math.max(1, Math.floor(count || 1))
+    // 夹具期先用玉虚桃木剑的原版消耗；阶段 5 接真实配方表
+    const r = startCraft(state, {
+      kind: 'sword',
+      name: '玉虚桃木剑',
+      count: n,
+      cost: [140, 144, 71, 48, 95] as never,
+      baseSeconds: 667,
+      quality: '凡品',
+    })
+    if (!r.ok) {
+      openWindow('mwindow', '无法炼制', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+      return
+    }
+    state = r.state
+    step()
   }
 
   /** 查看可领取任务。 */

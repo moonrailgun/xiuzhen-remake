@@ -7,9 +7,13 @@
 
 import { renderShell, type MainTab } from '../pages/shell.ts'
 import { renderPlayer, type PlayerVm } from '../pages/player.ts'
+import { renderMap, screenCells, type MapVm, type MapCell } from '../pages/map.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
 import { newGame, tick, saveGame, loadGame, resourceBarOf } from '../engine/game.ts'
+import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
+import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
+import { weekOfServer } from '../engine/clock.ts'
 import { startCultivate, planUpgrade, speedUp, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
 import { sorted } from '../engine/timeline.ts'
@@ -31,6 +35,12 @@ const STORAGE_KEY_AVAILABLE = (() => {
 /** 建号页的临时选择。 */
 let draft: CreatePlayerVm = { gender: 1, attr: 5, school: 0, posi: 0 }
 let state: GameState | null = null
+/** 当前主标签 */
+let tab: MainTab = 'player'
+/** 地图视图中心（可以跳到别处看，不等于人物所在） */
+let mapCenter: { x: number; y: number } | null = null
+/** 地图上选中的格子 */
+let mapSelected: { x: number; y: number } | null = null
 
 const ELEMENT_BY_ATTR: Record<number, Element> = { 0: '金', 1: '木', 2: '土', 3: '水', 4: '火' }
 const SCHOOL_BY_ID: Record<number, '蜀山' | '昆仑' | '通天'> = { 1: '蜀山', 2: '昆仑', 3: '通天' }
@@ -66,6 +76,37 @@ function playerVm(s: GameState): PlayerVm {
   }
 }
 
+/** 按真实世界生成一屏地图。 */
+function mapVm(s: GameState): MapVm {
+  const weeks = weekOfServer(s.clock)
+  const center = mapCenter ?? { x: s.player.x, y: s.player.y }
+  const cells: MapCell[] = screenCells(center.x, center.y).map((p) => {
+    const t = terrainAt(s.worldSeed, p.x, p.y, weeks)
+    const key = TERRAIN_KEY[t]
+    return {
+      name: sceneName(s.worldSeed, p.x, p.y),
+      posx: p.x,
+      posy: p.y,
+      terrain: `${key}${terrainVariant(s.worldSeed, p.x, p.y, t)}`,
+      scene: `${key}0${terrainVariant(s.worldSeed, p.x, p.y, t) + 1}`,
+      qi: qiAt(s.worldSeed, p.x, p.y, t),
+      playernum: p.x === s.player.x && p.y === s.player.y ? 1 : 0,
+    }
+  })
+  const sel = mapSelected ?? { x: s.player.x, y: s.player.y }
+  const selected = cells.find((c) => c.posx === sel.x && c.posy === sel.y) ?? cells[56]!
+  return {
+    centerX: center.x,
+    centerY: center.y,
+    playerX: s.player.x,
+    playerY: s.player.y,
+    playerDis: sightRange(s.player.body[BODY_EYE] ?? 0) / 2,
+    cells,
+    selected,
+    goByDistance: 3,
+  }
+}
+
 function midVm(s: GameState) {
   const events = sorted(s.timeline)
   const rows = (kind: string) =>
@@ -77,10 +118,23 @@ function midVm(s: GameState) {
         seconds: Math.max(0, Math.round(e.finishAt - s.clock.gameT)),
         speedup: kind === 'cultivate',
       }))
+
+  // 移动事件照原版显示「当前段坐标 + 下个目标」，并带取消的红 ×
+  const md = moveDisplay(s)
+  const move = md
+    ? [{
+        icon: 'event/move.gif',
+        text: `(${md.current.x}, ${md.current.y})`,
+        seconds: md.current.seconds,
+        cancelId: 'move',
+        nextLeg: md.next ? { text: `下个目标(${md.next.x},${md.next.y})`, seconds: md.next.seconds } : undefined,
+      }]
+    : []
+
   return {
     battle: rows('battle'),
     craft: rows('craft'),
-    move: rows('move'),
+    move,
     cultivate: rows('cultivate'),
     npcs: [],
     players: [],
@@ -112,11 +166,11 @@ function render(): void {
 
   const s = state
   app.innerHTML = renderShell({
-    tab: 'player' as MainTab,
+    tab,
     resources: resourceBarOf(s),
     serverTime: formatServerTime(s.clock),
     version: '版本号:1.2.1-yyge',
-    left: renderPlayer(playerVm(s)),
+    left: tab === 'map' ? renderMap(mapVm(s)) : renderPlayer(playerVm(s)),
     mid: renderMid(midVm(s)),
     right: renderRight({ quests: [], guardingMe: 0, guardingOthers: 0, guardCap: 7 }),
   })
@@ -128,6 +182,8 @@ function step(): void {
   if (!state) return render()
   const out = tick(state, Date.now())
   state = out.state
+  // 人物走动后，地图视图跟着人物（除非玩家手动跳到别处看）
+  if (out.resolved.some((e) => e.kind === 'move')) mapCenter = null
   render()
   persist()
 }
@@ -222,6 +278,63 @@ export function installGameActions(): void {
     if (!r.ok) return
     state = r.state
     step()
+  }
+
+  /** 主标签切页。原版是链接跳转，本地版拦下来换渲染。 */
+  g['gotoTab'] = (next: string) => {
+    tab = next as MainTab
+    render()
+  }
+
+  /** 地图：点格子选中。 */
+  g['onMapCellClick'] = (x: number, y: number) => {
+    mapSelected = { x, y }
+    render()
+  }
+
+  /** 地图：向选中场景步行移动。 */
+  g['mapMenuMove'] = () => {
+    if (!state || !mapSelected) return
+    const r = startMove(state, mapSelected.x, mapSelected.y, {
+      weeksOpen: weekOfServer(state.clock),
+    })
+    if (!r.ok) {
+      openWindow('mwindow', '无法移动', `<DIV class=middle style="padding:10px">${r.reason}</DIV>`)
+      return
+    }
+    state = r.state
+    step()
+  }
+
+  /** 地图：滚屏。 */
+  g['goBy'] = (dx: number, dy: number) => {
+    if (!state) return
+    const dis = Number((document.getElementById('gobydis') as HTMLInputElement | null)?.value ?? 3)
+    const c = mapCenter ?? { x: state.player.x, y: state.player.y }
+    mapCenter = { x: c.x + dx * dis, y: c.y + dy * dis }
+    render()
+  }
+
+  /** 地图：坐标跳转。 */
+  g['goToPos'] = () => {
+    const x = Number((document.getElementById('viewposx') as HTMLInputElement | null)?.value)
+    const y = Number((document.getElementById('viewposy') as HTMLInputElement | null)?.value)
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      mapCenter = { x, y }
+      render()
+    }
+  }
+
+  /** 事件栏的取消（移动事件的红 ×）。 */
+  g['cancelmove'] = () => {
+    if (!state) return
+    state = cancelMove(state)
+    step()
+  }
+
+  /** 对选中场景进行推算（术数，阶段 4 接上）。 */
+  g['spyScene'] = () => {
+    openWindow('mwindow', '推算', '<DIV class=middle style="padding:10px">术数推算将在后续版本开放。</DIV>')
   }
 
   g['exportSave'] = () => {

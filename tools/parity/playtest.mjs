@@ -94,7 +94,53 @@ check('刷新后存档保留', after?.includes('173小鱼') ?? false)
 const stillCultivating = await page.locator('#gmid').textContent()
 check('修炼事件在刷新后继续', (stillCultivating ?? '').includes('Lv1'))
 
-// 7. 没有 JS 报错
+// 7. 切到地图页
+await page.click('#bigmenu a[href="map.jsp"]')
+await page.waitForTimeout(400)
+const tiles = await page.locator('.mapdiv .tile').count()
+check('地图页渲染 113 格', tiles === 113, `实得 ${tiles}`)
+const sceneName = await page.locator('#sname').textContent()
+check('场景名显示州与地形', /\S+\s\S+/.test(sceneName ?? ''), sceneName ?? '')
+const qiSum = await page.evaluate(() =>
+  ['sgold', 'swood', 'swater', 'sfire', 'searth']
+    .map((id) => Number(document.getElementById(id)?.textContent ?? 0))
+    .reduce((a, b) => a + b, 0))
+check('天地元气总和为 20（普通格原版规律）', qiSum === 20, `总和 ${qiSum}`)
+await page.screenshot({ path: join(OUT, 'play-5-map.png') })
+
+// 8. 点一个邻格再步行移动
+const me = await page.evaluate(() => {
+  const el = document.getElementById('playermark')
+  return el ? { left: el.style.left, top: el.style.top } : null
+})
+check('地图上有自己的标记', me !== null)
+
+await page.evaluate(() => {
+  // 点人物右下相邻的一格（x+1）
+  const raw = localStorage.getItem('xiuzhen.save')
+  const st = JSON.parse(raw).state
+  window.onMapCellClick(st.player.x + 1, st.player.y)
+})
+await page.waitForTimeout(200)
+await page.click('a[onclick="mapMenuMove()"]')
+await page.waitForTimeout(400)
+
+const midText = await page.locator('#gmid').textContent()
+check('发起移动后出现移动事件', (midText ?? '').includes('移动事件'), (midText ?? '').replace(/\s+/g, ' ').slice(0, 70))
+await page.screenshot({ path: join(OUT, 'play-6-moving.png') })
+
+// 9. 超出移动范围时给出提示
+await page.evaluate(() => {
+  const raw = localStorage.getItem('xiuzhen.save')
+  const st = JSON.parse(raw).state
+  window.onMapCellClick(st.player.x + 50, st.player.y)
+})
+await page.click('a[onclick="mapMenuMove()"]')
+await page.waitForTimeout(300)
+const dialog = await page.locator('#mwindowcontent').textContent()
+check('超范围移动被拒绝并提示', (dialog ?? '').includes('移动'), (dialog ?? '').trim().slice(0, 40))
+
+// 10. 没有 JS 报错
 check('全程无 JS 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 
 await browser.close()

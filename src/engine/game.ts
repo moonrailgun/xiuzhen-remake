@@ -9,6 +9,7 @@
 import { advance, setRate, DAY, type Clock } from './clock.ts'
 import { advanceTo, emptyTimeline, type GameEvent } from './timeline.ts'
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
+import { resolveMove } from './move.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -21,6 +22,7 @@ import {
   type MeridianGroup,
 } from '../data/meridian.ts'
 import { dantianCapacity } from '../data/upgrade.ts'
+import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
 export const MIGRATIONS: readonly Migration[] = []
@@ -73,10 +75,12 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
   }
 }
 
-/** 所在地块的天地元气。阶段 3 接真实世界生成，现在先用原版样本里最常见的「五个 4」。 */
+/** 所在地块的天地元气。 */
 export type TerrainProvider = (x: number, y: number) => FiveQi
 
-const defaultTerrain: TerrainProvider = () => [4, 4, 4, 4, 4] as unknown as FiveQi
+/** 默认走真实世界生成（种子来自存档，所以离线重放也一致）。 */
+export const terrainOf = (state: GameState, weeksOpen = 99): TerrainProvider =>
+  (x, y) => qiAt(state.worldSeed, x, y, terrainAt(state.worldSeed, x, y, weeksOpen))
 
 /**
  * 当前每小时的五行产量（顶栏资源条显示它）。
@@ -86,7 +90,7 @@ const defaultTerrain: TerrainProvider = () => [4, 4, 4, 4, 4] as unknown as Five
  */
 export function currentQiPerHour(
   state: GameState,
-  terrain: TerrainProvider = defaultTerrain,
+  terrain: TerrainProvider = terrainOf(state),
 ): FiveQi {
   const self = state.player.element
   const terrainQi = terrain(state.player.x, state.player.y)
@@ -121,7 +125,7 @@ export function currentQiPerHour(
 export function tick(
   state: GameState,
   nowWall: number,
-  terrain: TerrainProvider = defaultTerrain,
+  terrain: TerrainProvider = terrainOf(state),
 ): { state: GameState; resolved: readonly GameEvent[] } {
   const clock = advance(state.clock, nowWall)
   const elapsed = clock.gameT - state.clock.gameT
@@ -132,7 +136,8 @@ export function tick(
 
   const out = advanceTo(withQi, withQi.timeline, clock.gameT, (st, ev) => {
     if (ev.kind === 'cultivate') return { state: resolveCultivate(st, ev) }
-    // 其余事件类型在阶段 3/4 接上
+    if (ev.kind === 'move') return resolveMove(st, ev)
+    // 战斗与炼器在阶段 4 接上
     return { state: st }
   })
 
@@ -173,5 +178,5 @@ export function resourceBarOf(state: GameState, terrain?: TerrainProvider) {
   }
 }
 
-export { dantianCapacity, DAY }
+export { dantianCapacity, DAY, WORLD_SIZE }
 export type { Clock }

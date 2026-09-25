@@ -88,8 +88,9 @@ ${each(MAIN_TABS, (t) => {
   const img = `<IMG${t === 'msg' ? ' id=msgopenbtn' : ''} height=20 src="img/btn/${t}_${t === active ? 2 : 1}.gif" width=60>`
   // onclick 是本模块的常量（不含任何用户输入），原样输出以保持与原版逐字一致。
   // 凡是要把玩家名等动态值拼进 onclick 的地方，必须走 escJs。
+  // 原版是链接跳转到 .jsp；本地版把它拦成 gotoTab()，但保留原 href 便于对照
   const a = def.href
-    ? `<A href="${def.href}">${img}</A>`
+    ? `<A href="${def.href}" onclick="return gotoTab('${t}'),false">${img}</A>`
     : `<A onclick="${def.onclick!}" href="#">${img}</A>`
   return `<TD width="12.5%"><DIV align=center>${a}</DIV></TD>`
 })}

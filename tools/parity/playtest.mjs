@@ -321,6 +321,15 @@ check('镖局老板的对话是原版逐字那一段',
   escortText.includes('负责管理') && escortText.includes('镖货往来') && escortText.includes('运镖的收益指数'),
   escortText.replace(/\s+/g, ' ').slice(0, 60))
 
+// 私塾先生：补写的对话要出现，并且标明不是原文
+await page.evaluate(() => window.openLWindow('', `npc.jsp?name=${encodeURIComponent('私塾先生')}`))
+await page.waitForTimeout(300)
+const schoolText = (await page.locator('#lwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('私塾先生有对话，且标明是本地版补写',
+  schoolText.includes('讲书解惑') && schoolText.includes('本地版按他的职司补写'),
+  schoolText.slice(0, 55))
+check('镖局老板那段不标补写（它是原文）', !escortText.includes('本地版按他的职司补写'))
+
 // 村长/镇长/太守：投资
 const chief = { 村庄: '村长', 小镇: '镇长', 城池: '太守' }[townAt.kind]
 await page.evaluate((n) => window.openLWindow('', `npc.jsp?name=${encodeURIComponent(n)}`), chief)

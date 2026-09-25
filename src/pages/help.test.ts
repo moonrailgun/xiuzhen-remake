@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renderHelp, HELP_TOPICS, HELP_ENTRIES } from './help.ts'
+import { renderHelp, HELP_TOPICS, HELP_ENTRIES, VERBATIM_TOPICS } from './help.ts'
 
 const show = (topic: string, history = [topic]) => renderHelp({ topic, history })
 
@@ -57,11 +57,31 @@ test('★书籍词条的阅历表：四档阅历与阅读场景', () => {
   assert.ok(html.includes('束修'))
 })
 
-test('★没有全文的 18 条如实说明，不编内容', () => {
-  const html = show('筑基期')
-  assert.ok(html.includes('没有留下存档'))
-  // 不能凭空冒出一段像模像样的正文
-  assert.ok(!html.includes('筑基期是'), '不应编造词条正文')
+test('★22 条词条现在全部有正文', () => {
+  for (const t of HELP_TOPICS) {
+    if (t === '游戏指南') continue
+    const e = HELP_ENTRIES[t]
+    assert.ok(e?.paragraphs && e.paragraphs.length > 0, `${t} 还没有正文`)
+  }
+})
+
+test('★本地版补写的条目会标明「不是原文」，原版四条不标', () => {
+  // 补写的要标
+  for (const t of ['属性', '境界', '筑基期', '飞剑']) {
+    assert.ok(show(t).includes('本地版按游戏规则补写'), `${t} 没标明是补写的`)
+  }
+  // 逐字的四条绝不能被标成补写
+  for (const t of VERBATIM_TOPICS) {
+    assert.ok(!show(t).includes('本地版按游戏规则补写'), `${t} 是原文，不该标成补写`)
+  }
+})
+
+test('补写的内容讲的是本复刻真在跑的规则', () => {
+  // 随手抽查几条硬规则，和引擎里的常量对得上
+  assert.ok(show('拥有法宝').includes('五件'), '袖里乾坤基础 5 格')
+  assert.ok(show('飞剑').includes('五把'), '同时在外默认 5 把')
+  assert.ok(show('修炼事件').includes('两项'), '普通 1 项 + VIP 1 项')
+  assert.ok(show('境界').includes('十三'), '心动期前经脉封顶 13 级')
 })
 
 test('面包屑是「游戏指南 > 词条」，右侧有后退/前进', () => {
@@ -92,9 +112,8 @@ test('正文与数据表都不会被注入（词条名来自常量，但仍走�
   assert.ok(!html.includes('<script>'))
 })
 
-test('四条有全文的词条确实带 paragraphs，其余为 null', () => {
-  for (const t of ['经脉', '银票', '秘笈', '书籍']) {
-    assert.ok(HELP_ENTRIES[t]?.paragraphs, `${t} 应该有全文`)
-  }
+test('原版逐字的就是那四条，首页仍只做目录', () => {
+  assert.deepEqual([...VERBATIM_TOPICS], ['经脉', '银票', '秘笈', '书籍'])
+  for (const t of VERBATIM_TOPICS) assert.ok(HELP_ENTRIES[t]?.paragraphs, `${t} 应该有全文`)
   assert.equal(HELP_ENTRIES['游戏指南']?.paragraphs, null)
 })

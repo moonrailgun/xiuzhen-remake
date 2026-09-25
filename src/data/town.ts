@@ -310,3 +310,67 @@ export const TOWN_NPCS: readonly TownNpc[] = [
 
 export const npcsIn = (kind: TownKind): readonly TownNpc[] =>
   TOWN_NPCS.filter((n) => n.scenes.includes(kind))
+
+/**
+ * 其余五个 NPC 的开场白。【本地版补写】
+ *
+ * **镖局老板那段是原文**（`escortDialog`，出处见其注释）；这五个零存档。
+ * 但他们各自办什么事是官方一句话表写明的（`TOWN_NPCS` 的 `purpose`），
+ * 所以这里按镖局那段的体例补写：`{地名}{称呼}：` 起头，两三句自述 + 一句引导。
+ *
+ * 和逐级消耗表、世界地形一样，是「照已知规则重建 + 标注」，不是凭空编设定：
+ * 每句话对应的都是这个复刻真在跑的规则。界面上会标明不是原文。
+ */
+export function townNpcDialog(
+  id: string,
+  town: { readonly kind: TownKind; readonly name: string; readonly x: number; readonly y: number },
+): readonly string[] | null {
+  const self = TOWN_SELF[town.kind]
+  const at = `${town.name}(${town.x},${town.y})`
+  const who = TOWN_NPCS.find((n) => n.id === id)?.nameOf(town.kind)
+  if (!who || id === 'escort') return null
+
+  const head = `${at}${who}：`
+  switch (id) {
+    case 'school':
+      return [
+        head,
+        `　　老朽在${self}设帐授徒，与人讲书解惑。`,
+        '　　书中自有古今兴废、人情冷暖，听得多了，道心自然磨得亮些。',
+        '　　只是老朽见识有限，未必本本都讲得了——你且看看要听哪一本。',
+      ]
+    case 'bank':
+      return [
+        head,
+        `　　小号在${self}开了多年，银钱往来最是稳妥。`,
+        '　　你身上的银两带着沉，不如兑成银票，轻便，也好拿去换仙石应急。',
+        '　　要兑多少，你说个数。',
+      ]
+    case 'chief':
+      return [
+        head,
+        `　　${self}地方虽小，却也是一方生计所系。`,
+        '　　道友若肯出些银两入股，商号兴旺起来，往来的镖货多了，大家都有好处。',
+        '　　入了股，按份子每个时辰给你分利；只是一个人只能在一处入股，你要想清楚。',
+      ]
+    case 'station':
+      return [
+        head,
+        '　　此处通着九州各处城池，踏上传送阵，转眼便到。',
+        '　　只是开阵要耗仙石，且你若正被人追着打，阵法是不会为你开的。',
+        '　　要去何处，报个方位。',
+      ]
+    case 'li':
+      return [
+        head,
+        '　　老夫痴长几岁，别的没有，家财还算殷实。',
+        '　　修真一途，最难的不是聚财，是舍得。你若能散尽千金而不动心，才算过了这一关。',
+        '　　一百万两，你拿得出来，也放得下么？',
+      ]
+    default:
+      return null
+  }
+}
+
+/** 镖局老板的对话是原文，其余五个是补写的。界面据此标注。 */
+export const DIALOG_VERBATIM_IDS: readonly string[] = ['escort']

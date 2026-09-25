@@ -131,6 +131,142 @@ export function ziwei(
   }
 }
 
+// —— 另外四种 ——
+//
+// **结果文案没有存档**（`PAGE-INDEX` 明列为缺口），但**推算什么是官方一句话表写明的**，
+// 所以这里按已有三种的体例补写，和全项目对待「逐级消耗表」「世界地形」「NPC 生态」
+// 同一个标准：机制照官方说明，文案标 [重建]。
+//
+// 体例沿用九宫飞星的原文首句 `你掐指一算，发现…`（`03 §1.6` 原文），
+// 后面接一张与该术数用途对应的表。
+
+/** 一条推算出来的人。四种新术数共用这个行结构。 */
+export type SpyRow = {
+  readonly name: string
+  readonly realm: string
+  readonly daoxing: string
+  readonly note: string
+}
+
+const mail = (
+  at: number,
+  byName: string,
+  targetName: string,
+  id: string,
+  body: Readonly<Record<string, unknown>>,
+): MailItem => ({
+  id: `divine:${at}:${id}`,
+  subject: `${byName}推算${targetName}`,
+  from: '系统',
+  at,
+  read: false,
+  kind: 'divine',
+  body,
+})
+
+/**
+ * 水镜玄光：按坐标推算在该地修炼的玩家。[文案重建]
+ * 官方原话「根据坐标推算在该地修炼的玩家信息」。
+ */
+export function waterMirror(
+  at: number,
+  byName: string,
+  x: number,
+  y: number,
+  here: readonly NpcState[],
+): MailItem {
+  const rows: SpyRow[] = here.map((n) => ({
+    name: n.base.name,
+    realm: n.realm,
+    daoxing: n.daoxingText,
+    note: n.suffix === 'm' ? '移动中' : '修炼中',
+  }))
+  return mail(at, byName, `(${x},${y})`, `${x}:${y}:shuijing`, {
+    kind: '水镜玄光',
+    lead: `你掐指一算，看清了(${x},${y})的景象。`,
+    title: `在(${x},${y})修炼的玩家`,
+    rows,
+    empty: '此地空无一人。',
+  })
+}
+
+/**
+ * 梅花易数：推算目标的移动情况。[文案重建]
+ * 官方原话「推算玩家移动情况」。
+ * 去向由 NPC 生成器算**明日位置**得到，所以和地图上看到的完全一致。
+ */
+export function plumBlossom(
+  target: NpcState,
+  at: number,
+  byName: string,
+  tomorrow: { readonly x: number; readonly y: number },
+): MailItem {
+  const moving = target.x !== tomorrow.x || target.y !== tomorrow.y
+  return mail(at, byName, target.base.name, `${target.base.id}:meihua`, {
+    kind: '梅花易数',
+    lead: `你掐指一算，算出了${target.base.name}的行止。`,
+    title: `${target.base.name}的移动情况`,
+    rows: [
+      { name: '当前位置', realm: '', daoxing: '', note: `(${target.x},${target.y})` },
+      moving
+        ? { name: '去向', realm: '', daoxing: '', note: `(${tomorrow.x},${tomorrow.y})` }
+        : { name: '去向', realm: '', daoxing: '', note: '原地未动' },
+    ] satisfies SpyRow[],
+  })
+}
+
+/**
+ * 六壬神定：推算目标的护法列表。[文案重建]
+ * 官方原话「可以推算目标的护法列表」（游戏指南·秘笈词条原文）。
+ */
+export function sixRen(
+  target: NpcState,
+  at: number,
+  byName: string,
+  pals: readonly NpcState[],
+): MailItem {
+  const rows: SpyRow[] = pals.map((n) => ({
+    name: n.base.name,
+    realm: n.realm,
+    daoxing: n.daoxingText,
+    note: `${n.swords} 把飞剑`,
+  }))
+  return mail(at, byName, target.base.name, `${target.base.id}:liuren`, {
+    kind: '六壬神定',
+    lead: `你掐指一算，算出了${target.base.name}身边的护法。`,
+    title: `${target.base.name}的护法`,
+    rows,
+    empty: '此人身边并无护法。',
+  })
+}
+
+/**
+ * 诰命真经：推算向目标地点移动的玩家列表。[文案重建]
+ * 官方原话「可以推算向目标地点移动的玩家列表」（同上）。
+ * 判据：明日位置比今日更靠近该地点，即视为正往这里来。
+ */
+export function edictSutra(
+  at: number,
+  byName: string,
+  x: number,
+  y: number,
+  inbound: readonly { readonly npc: NpcState; readonly distance: number }[],
+): MailItem {
+  const rows: SpyRow[] = inbound.map(({ npc, distance }) => ({
+    name: npc.base.name,
+    realm: npc.realm,
+    daoxing: npc.daoxingText,
+    note: `尚有 ${distance} 格`,
+  }))
+  return mail(at, byName, `(${x},${y})`, `${x}:${y}:gaoming`, {
+    kind: '诰命真经',
+    lead: `你掐指一算，算出了正往(${x},${y})去的人。`,
+    title: `正向(${x},${y})移动的玩家`,
+    rows,
+    empty: '无人往此地去。',
+  })
+}
+
 /**
  * 统一入口。
  *
@@ -148,6 +284,16 @@ export function divine(
     readonly targetMeridians?: readonly number[]
     readonly inSight: boolean
     readonly located: boolean
+    /** 水镜玄光 / 诰命真经要推算的坐标 */
+    readonly spot?: { readonly x: number; readonly y: number }
+    /** 水镜玄光：该坐标上的人 */
+    readonly here?: readonly NpcState[]
+    /** 梅花易数：目标的明日位置 */
+    readonly tomorrow?: { readonly x: number; readonly y: number }
+    /** 六壬神定：目标的护法 */
+    readonly pals?: readonly NpcState[]
+    /** 诰命真经：正往该地点去的人 */
+    readonly inbound?: readonly { readonly npc: NpcState; readonly distance: number }[]
   },
 ): DivineResult {
   if (!divineSucceeds(opts.myYijing, opts.theirYijing)) {
@@ -168,8 +314,22 @@ export function divine(
         ok: true,
         mail: ziwei(target, opts.at, opts.byName, opts.targetMeridians ?? Array(12).fill(0)),
       }
-    default:
-      // 其余四种没有结果文案的原文
-      return { ok: false, reason: `${kind}的推算结果在后续版本开放` }
+    case '水镜玄光': {
+      const spot = opts.spot
+      if (!spot) return { ok: false, reason: '请先在地图上选定要推算的地点' }
+      return { ok: true, mail: waterMirror(opts.at, opts.byName, spot.x, spot.y, opts.here ?? []) }
+    }
+    case '梅花易数':
+      return {
+        ok: true,
+        mail: plumBlossom(target, opts.at, opts.byName, opts.tomorrow ?? { x: target.x, y: target.y }),
+      }
+    case '六壬神定':
+      return { ok: true, mail: sixRen(target, opts.at, opts.byName, opts.pals ?? []) }
+    case '诰命真经': {
+      const spot = opts.spot
+      if (!spot) return { ok: false, reason: '请先在地图上选定要推算的地点' }
+      return { ok: true, mail: edictSutra(opts.at, opts.byName, spot.x, spot.y, opts.inbound ?? []) }
+    }
   }
 }

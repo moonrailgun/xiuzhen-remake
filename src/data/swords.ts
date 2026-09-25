@@ -59,7 +59,48 @@ const MEASURED_AS: Element = '水'
 
 // 夹具是 JSON，元组长度与可空字段在类型上宽于 `Sword`；
 // 内容由 `artifacts.test.ts` 逐项守着，这里只做一次断言收窄。
-export const SWORDS: readonly Sword[] = (fixture as unknown as { swords: readonly Sword[] }).swords
+const RAW: readonly Sword[] = (fixture as unknown as { swords: readonly Sword[] }).swords
+
+/**
+ * 两把剑的物品窗转录不全，在这里补。**夹具本身不动** —— 它是原帖的忠实转录，
+ * 补的东西一律放在这一层，各自标清楚是「原文推断」还是「重建」。
+ *
+ * 1. **冰魄寒光剑的击退 = 0，这是【原文】而不是缺失。**
+ *    对照表 `reference/text/forum162/article-95102-p1.txt`（2 楼「飞剑/属性/门派/
+ *    炼制需要/使用需要/效果」六列表）里，乌光玄铁、墨叶血浪、上善若水、太乙金光、
+ *    七星磐龙的「效果」列都写着「击退」，**唯独冰魄寒光剑那一行的效果列是空的**
+ *    —— 它本来就没有击退。之前当成「转录不全」是误判。
+ *
+ * 2. **三阴绝脉剑的速度/敏捷/炼制消耗/耗时是【重建】。**
+ *    它在**全部三项可观测数值上与天雷万磁剑完全相同**
+ *    （攻击 24~240、耐久 12~120、吸收 0~0，且同为击退 0 的特效剑），
+ *    所以按天雷万磁剑取值。这与全项目对待逐级消耗表、世界地形的做法同一个标准：
+ *    有依据的插值 + 标注，而不是留空。
+ */
+const PATCHES: Readonly<Record<string, Partial<Sword> & { readonly why: string }>> = {
+  冰魄寒光剑: {
+    knockback: 0,
+    why: '原文：reference/text/forum162/article-95102-p1.txt 对照表里它的「效果」列是空的',
+  },
+  三阴绝脉剑: {
+    speed: 5,
+    agility: 3,
+    craftCost: [700, 400, 700, 800, 300] as FiveQi,
+    craftSeconds: 2000,
+    why: 'reconstructed（三项可观测数值与天雷万磁剑完全一致，按它取值）',
+  },
+}
+
+export const SWORDS: readonly Sword[] = RAW.map((s) => {
+  const p = PATCHES[s.name]
+  if (!p) return s
+  const { why: _why, ...fields } = p
+  return { ...s, ...fields }
+})
+
+/** 哪些剑的数值是补过的，补的是什么、为什么。给出处闸门和文档用。 */
+export const SWORD_PATCH_NOTES: Readonly<Record<string, string>> =
+  Object.fromEntries(Object.entries(PATCHES).map(([k, v]) => [k, v.why]))
 
 export const SWORDS_SOURCE =
   'reference/text/forum162/article-94153-p1.txt（原版物品窗逐字，经 tools/fixtures/parse_swords.py 解析）'

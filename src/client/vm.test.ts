@@ -28,7 +28,7 @@ import {
 } from './vm.ts'
 import { newGame } from '../engine/game.ts'
 import { refillNpcOrders } from '../engine/market.ts'
-import { SWORDS } from '../data/swords.ts'
+import { SWORDS, SWORD_PATCH_NOTES, swordByName } from '../data/swords.ts'
 import { terrainAt } from '../data/world.ts'
 import type { Artifact, FiveQi, GameState } from '../engine/state.ts'
 
@@ -110,11 +110,33 @@ test('★炼制飞剑页列全 14 把剑，消耗按本命属性重投影', () =
   )
 })
 
-test('★转录不全的剑列出来但不可炼（不编数值）', () => {
-  const rows = swordCraftRows(withQi(base(), 10 ** 9))
-  const broken = rows.find((r) => r.name === '三阴绝脉剑')!
-  assert.equal(broken.craftable, null, '缺配方的剑不能炼')
-  assert.equal(broken.cost, undefined)
+test('★14 把剑全部可炼（两处缺口已按各自的依据补上）', () => {
+  // 等级拉满，这样 craftable=null 就只可能是「没有配方」而不是「等级不够」
+  const rich = withQi(base(), 10 ** 9)
+  const rows = swordCraftRows({
+    ...rich,
+    player: { ...rich.player, skills: { 铸剑之术: 20, 御剑术: 20 } },
+  })
+  assert.equal(rows.length, 14)
+  for (const r of rows) {
+    assert.notEqual(r.craftable, null, `${r.name} 还不可炼`)
+    assert.ok(r.cost, `${r.name} 没有炼制消耗`)
+  }
+})
+
+test('★补上的两处各自记了理由（一处是原文、一处是重建）', () => {
+  // 冰魄寒光的击退是对照表原文（那一行效果列为空），不是猜的
+  assert.match(SWORD_PATCH_NOTES['冰魄寒光剑']!, /原文/)
+  assert.equal(swordByName('冰魄寒光剑')!.knockback, 0)
+  // 三阴绝脉是按天雷万磁剑插值，标了 reconstructed
+  assert.match(SWORD_PATCH_NOTES['三阴绝脉剑']!, /reconstructed/)
+  const a = swordByName('三阴绝脉剑')!
+  const b = swordByName('天雷万磁剑')!
+  assert.deepEqual([...a.attack], [...b.attack], '插值的依据：三项可观测数值一致')
+  assert.deepEqual([...a.durability], [...b.durability])
+  assert.deepEqual([...a.absorb], [...b.absorb])
+  assert.equal(a.speed, b.speed)
+  assert.deepEqual([...a.craftCost!], [...b.craftCost!])
 })
 
 test('炼制数量 = 当前真气能撑几件；级别不够是 null', () => {

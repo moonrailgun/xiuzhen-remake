@@ -15,6 +15,8 @@ import {
   distanceOf,
   npcsIn,
   payoutIndex,
+  townNpcDialog,
+  DIALOG_VERBATIM_IDS,
 } from './town.ts'
 
 // —— 商业等级表（[原文-玩家整理] article-103871-p1.txt）——
@@ -175,4 +177,38 @@ test('场景移动耗时与开服出现周照官方 FAQ：村庄 20 分/1 周、
   assert.deepEqual(TOWN_SCENE['村庄'], { moveSeconds: 1200, openWeek: 1 })
   assert.deepEqual(TOWN_SCENE['小镇'], { moveSeconds: 1800, openWeek: 2 })
   assert.deepEqual(TOWN_SCENE['城池'], { moveSeconds: 2400, openWeek: 3 })
+})
+
+// —— NPC 对话：原文 vs 补写 ——
+
+test('★镖局老板是原文，其余五个是补写的（补写的不冒充原文）', () => {
+  const town = { kind: '小镇' as const, name: '地球镇', x: 84, y: 81 }
+  // 镖局走 escortDialog（原文），townNpcDialog 不接管它
+  assert.equal(townNpcDialog('escort', town), null)
+  assert.deepEqual([...DIALOG_VERBATIM_IDS], ['escort'])
+
+  for (const id of ['school', 'bank', 'chief']) {
+    const lines = townNpcDialog(id, town)
+    assert.ok(lines && lines.length >= 2, `${id} 应该有对话`)
+    // 体例照镖局那段：`{地名}({x},{y}){称呼}：` 起头
+    assert.match(lines![0]!, /^地球镇\(84,81\).+：$/)
+  }
+})
+
+test('驿站与李员外只在城池出现', () => {
+  const city = { kind: '城池' as const, name: '长安城', x: 10, y: 10 }
+  assert.ok(townNpcDialog('station', city))
+  assert.ok(townNpcDialog('li', city))
+  assert.equal(npcsIn('村庄').some((n) => n.id === 'station'), false)
+  assert.equal(npcsIn('城池').some((n) => n.id === 'station'), true)
+})
+
+test('对话里的自称随场景变（本村/本镇/本城），和镖局原文同一套', () => {
+  const v = townNpcDialog('chief', { kind: '村庄', name: '无名村', x: 1, y: 2 })!
+  const c = townNpcDialog('chief', { kind: '城池', name: '长安城', x: 1, y: 2 })!
+  assert.ok(v.join('').includes('本村'))
+  assert.ok(c.join('').includes('本城'))
+  // 称呼也要跟着变
+  assert.match(v[0]!, /村长：$/)
+  assert.match(c[0]!, /太守：$/)
 })

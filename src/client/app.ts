@@ -37,8 +37,8 @@ import {
   BANK_NOTES, type Town,
 } from '../engine/town.ts'
 import {
-  escortDialog, booksReadableIn, npcsIn, READ_BOOK_SILVER, STATION_COST_COIN,
-  LI_YUANWAI_SILVER, type TownNpc,
+  escortDialog, townNpcDialog, DIALOG_VERBATIM_IDS, booksReadableIn, npcsIn,
+  READ_BOOK_SILVER, STATION_COST_COIN, LI_YUANWAI_SILVER, type TownNpc,
 } from '../data/town.ts'
 import { daoxingText } from '../engine/state.ts'
 import { formatGameDate } from '../engine/clock.ts'
@@ -49,7 +49,7 @@ import { newGame, tick, saveGame, loadGame, resourceBarOf, MIGRATIONS } from '..
 import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
-import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
+import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation } from '../engine/quest.ts'
 import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
@@ -69,7 +69,7 @@ import { changeRate } from '../engine/game.ts'
 import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
 import { startCultivate, planUpgrade, speedUp, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
-import { formatServerTime, formatDuration } from '../engine/clock.ts'
+import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
@@ -616,6 +616,7 @@ export function installGameActions(): void {
       targetMeridians: Array(12).fill(Math.min(20, Math.floor(target.daoxing / 9000))),
       inSight: true,
       located: true,
+      ...divineContext(s, target),
     })
     if (!r.ok) {
       openWindow('mwindow', '推算失败', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
@@ -1442,6 +1443,13 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
   const pre = (text: string) =>
     `<DIV class=middle style="padding:10px;white-space:pre-wrap">${esc(text)}</DIV>`
 
+  // 镖局老板那段是原文；其余五个是本地版补写的，要标出来
+  const lines = townNpcDialog(def.id, town)
+  const dialog = lines ? pre(lines.join('\n')) : ''
+  const note = DIALOG_VERBATIM_IDS.includes(def.id)
+    ? ''
+    : '<DIV class=smallgray style="padding:4px 10px">※ 此人的对话原文没有留下存档，这段是本地版按他的职司补写的。</DIV>'
+
   switch (def.id) {
     case 'escort': {
       // 唯一一段原文对话
@@ -1455,40 +1463,37 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
     }
     case 'school': {
       const books = booksReadableIn(town.kind)
-      return box(
+      return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}　每本 ${READ_BOOK_SILVER} 两</SPAN><BR>` +
         (books.length === 0
           ? '<SPAN class=smallgray>此地无书可读。</SPAN>'
           : books.map((b) => act(`读《${b.name}》（阅历 +${b.experience}）`,
-              `readBook('${escJs(b.name)}')`)).join('')) +
-        '<BR><SPAN class=smallgray>（私塾先生的对话原文零存档，这里只列他能办的事）</SPAN>',
+              `readBook('${escJs(b.name)}')`)).join('')),
       )
     }
     case 'bank':
-      return box(
+      return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}　现有 ${s.player.silver} 两</SPAN>` +
-        BANK_NOTES.map((n) => act(`兑${n.name}（${n.value} 两）`, `exchangeNote('${escJs(n.name)}')`)).join('') +
-        '<BR><SPAN class=smallgray>（钱庄掌柜的对话原文零存档）</SPAN>',
+        BANK_NOTES.map((n) => act(`兑${n.name}（${n.value} 两）`, `exchangeNote('${escJs(n.name)}')`)).join(''),
       )
     case 'chief':
-      return box(
+      return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}</SPAN><BR>` +
         `${esc(town.name)}　商业 Lv.${level}　已投入 ${totalInvested(town)} 两<BR>` +
         `你的份额 ${(shareOf(town, s.player.name) * 100).toFixed(1)}%，` +
         `每小时 ${hourlyIncomeOf(town, s.player.name)} 两<BR>` +
         `投资 <INPUT class=small id=investsilver size=8 value="1000"> 两` +
-        act('投资', 'doInvest()') +
-        '<SPAN class=smallgray>（村长/镇长/太守的对话原文零存档）</SPAN>',
+        act('投资', 'doInvest()'),
       )
     case 'station':
-      return box(
+      return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}　每次 ${STATION_COST_COIN} 仙石</SPAN><BR>` +
         `传送到 x <INPUT class=small id=tpx size=4> y <INPUT class=small id=tpy size=4>` +
         act('传送', 'doTeleport()') +
-        '<SPAN class=smallgray>（驿站价目与对话都是重建，见 data/town.ts）</SPAN>',
+        '<SPAN class=smallgray>价目是重建的，见 data/town.ts</SPAN>',
       )
     case 'li':
-      return box(
+      return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}</SPAN><BR>` +
         `你现有 ${s.player.silver} 两，需要 ${LI_YUANWAI_SILVER} 两` +
         act('交付千金', 'payLiYuanwai()'),
@@ -1597,6 +1602,44 @@ function doRefine(rowId: number): void {
       step()
     },
   )
+}
+
+/**
+ * 四种「后补」术数要的上下文。
+ *
+ * 全部由 NPC 生成器算出来，所以和地图上看到的完全一致：
+ *  - 明日位置 = 拿明天的游戏时刻再算一次（`npcAt` 按游戏日取整，天然确定）；
+ *  - 护法 = 同道源、离他最近的几个人（原版护法是真人互相邀请，单机下只能这样模拟）。
+ */
+function divineContext(s: GameState, target: NpcState) {
+  const spot = mapSelected ?? { x: s.player.x, y: s.player.y }
+  const all = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
+  const next = allNpcsAt(s.npc, s.clock.gameT + DAY, s.worldSeed)
+  const nextOf = (id: number) => next.find((n) => n.base.id === id)
+
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+
+  return {
+    spot,
+    here: all.filter((n) => n.x === spot.x && n.y === spot.y),
+    tomorrow: nextOf(target.base.id) ?? { x: target.x, y: target.y },
+    // 护法：同道源、在他身边 6 格内、按道行取前 3 个
+    pals: all
+      .filter((n) =>
+        n.base.id !== target.base.id &&
+        n.base.school === target.base.school &&
+        dist(n, target) <= 6)
+      .sort((a, b) => b.daoxing - a.daoxing)
+      .slice(0, 3),
+    // 正往选定地点去的人：明日比今日更近
+    inbound: all
+      .map((n) => ({ npc: n, to: nextOf(n.base.id) }))
+      .filter(({ npc, to }) => to !== undefined && dist(to, spot) < dist(npc, spot))
+      .map(({ npc, to }) => ({ npc, distance: dist(to!, spot) }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 10),
+  }
 }
 
 /** 领取任务奖励（任务窗底部那个「领取奖励」按钮）。 */
@@ -1708,18 +1751,55 @@ function mailDetail(s: GameState, oneBased: number): string {
   if (!m) return '<DIV class=middle style="padding:12px">这封信已经不在了。</DIV>'
   // 读过就标已读（下次打开收件箱不再加粗）
   state = { ...s, mail: s.mail.map((x, i) => (i === oneBased - 1 ? { ...x, read: true } : x)) }
-  const body = m.body as { kind?: string; paragraphs?: readonly string[]; text?: string }
   return renderMsgDetail({
     id: oneBased,
     subject: m.subject,
     sender: m.from,
-    avatar: m.from === '系统' ? null : null,
+    avatar: null,
     sentAt: formatGameDate(m.at),
-    body: {
-      kind: 'text',
-      paragraphs: body.paragraphs ?? [body.text ?? JSON.stringify(m.body)],
-    },
+    body: { kind: 'text', paragraphs: mailParagraphs(m.body) },
   })
+}
+
+/**
+ * 把结构化信体摊成段落。
+ *
+ * 存档里存的是结构（不存 HTML，见 `state.ts`），读信页只认段落，
+ * 所以在这里做一次转换 —— 尤其是七种术数的结果，不能让它掉成一坨 JSON。
+ */
+function mailParagraphs(raw: Readonly<Record<string, unknown>>): readonly string[] {
+  const b = raw as {
+    kind?: string
+    lead?: string
+    title?: string
+    text?: string
+    paragraphs?: readonly string[]
+    empty?: string
+    rows?: readonly Record<string, unknown>[]
+  }
+  if (b.paragraphs) return b.paragraphs
+  if (b.text) return [b.text]
+
+  const out: string[] = []
+  if (b.lead) out.push(`　　${b.lead}`)
+  if (b.title) out.push(b.title)
+
+  const rows = b.rows ?? []
+  if (rows.length === 0) {
+    out.push(b.empty ?? '　　什么也没算出来。')
+    return out
+  }
+
+  for (const r of rows) {
+    // 各种术数的行字段不同，统一挑出非空的拼一行
+    const cells = ['name', 'realm', 'daoxing', 'note', 'level', 'element', 'multiplier',
+      'type', 'count', 'status']
+      .map((k) => r[k])
+      .filter((v) => v !== undefined && v !== null && v !== '')
+      .map((v) => String(v))
+    if (cells.length > 0) out.push(`　　${cells.join('　')}`)
+  }
+  return out
 }
 
 /** 物品窗。飞剑走 `swords.ts` 的原版数值表，护身走 `artifacts.ts`。 */

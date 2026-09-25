@@ -23,8 +23,8 @@ npm run dev     # 打开 http://localhost:5273
 ## 开发
 
 ```bash
-npm run check      # 类型检查 + 639 个单元测试
-npm run playtest   # 端到端试玩 54 步（需先 npm run dev）
+npm run check      # 类型检查 + 650 个单元测试
+npm run playtest   # 端到端试玩 56 步（需先 npm run dev）
 npm run smoke      # 全页面冒烟（需先 npm run dev）
 npm run parity     # 截图对齐检查（需先 npm run dev）
 ```
@@ -63,6 +63,9 @@ tools/
 **按推断**（有锚点，插值或反推）
 品质倍率与淬炼 2^N、经脉倍率曲线、丹田容量、固本暗仓、升级与炼制消耗的五行配比、
 伤害分摊（用 6944 条真实战报回归定型）、九州方位。
+
+**补写并标注**（机制有据、文案或个别数值无存档 —— 界面上标明不是原文）
+游戏指南 18 条词条、四种术数的结果表、五个城镇 NPC 的对话、三阴绝脉剑的炼制数值。
 
 **只能重建**（无证据，代码里标 `reconstructed`）
 经脉/本体/法术的逐级消耗曲线、世界地形分布、整个 NPC 生态与门派、

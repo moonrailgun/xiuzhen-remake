@@ -247,3 +247,22 @@ a.help, .help {
   background: radial-gradient(circle, #ffe680 0%, #d4a017 60%, #d4a01700 100%);
   z-index: 3;
 }
+
+/* —— 地图页 —— */
+/* 地图区：448×245 可视窗，外面一圈留给 8 个滚屏箭头（约 480×280）。
+   .mapdiv 自成层叠上下文，避免地块高达 565 的 z-index 盖住浮窗。 */
+#mapbg { position: relative; width: 480px; height: 460px; }
+#mapbg .maparrow { position: absolute; z-index: 2; }
+.mapdiv {
+  position: absolute; left: 16px; top: 170px;
+  width: 448px; height: 245px;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: pointer;
+}
+.mapdiv .tile { position: absolute; width: 64px; height: 120px; }
+.mapdiv .tilemark { position: absolute; }
+#smallinfo { display: inline-block; vertical-align: top; }
+#sceneimg { display: inline-block; vertical-align: top; }
+#mapmenu { position: absolute; z-index: 50; }
+#mapbar { width: 460px; }

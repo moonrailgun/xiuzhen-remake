@@ -358,7 +358,7 @@ def gen_placeholders() -> int:
             a = int(38 * (1 - abs(y - 15) / 12))
             d.line([(6, y), (143, y)], fill=(120, 120, 120, max(0, a)))
         d.text((12, 6), label, font=f, fill=(70, 70, 70, 255))
-        save(im, name)
+        save(im, f"title/{name}")
         n += 1
     # titlebg2 墨迹标题条 458×20
     im = Image.new("RGBA", (458, 20), (0, 0, 0, 0))
@@ -477,6 +477,155 @@ def gen_body_from_meridian_view() -> int:
     return n
 
 
+
+
+# ============================================================
+# 地图地块（img/map/*.gif）
+#
+# 原版是 64×120 的 GIF：菱形只占底部 64×35，上方 85px 透明，留给山/树「长高」。
+# 没有干净的原始素材（地块在截图里互相遮挡、还压着头像），所以程序化画：
+# 菱形底面 + 地形装饰。三套色（原色 / blue 感应范围 / green 视野内）由同一基础块调色派生，
+# 不裁三遍 —— 依据是 09 §3.4：后缀只是同一地块的染色版。
+# ============================================================
+
+TILE_W, TILE_H, DIAMOND_H = 64, 120, 35
+
+# 地形底面色（取自地图截图的菱形中心区）
+TERRAIN_BASE = {
+    "plain": (232, 238, 232),
+    "forest": (214, 232, 208),
+    "mountain": (226, 232, 236),
+    "river": (206, 226, 240),
+    "village": (232, 228, 214),
+    "town": (230, 224, 210),
+    "city": (226, 218, 204),
+    "fudi": (226, 236, 222),
+    "dongtian": (216, 224, 236),
+}
+
+
+def _diamond_points(w=TILE_W, h=DIAMOND_H, y0=TILE_H - DIAMOND_H):
+    return [(w // 2, y0), (w - 1, y0 + h // 2), (w // 2, y0 + h - 1), (0, y0 + h // 2)]
+
+
+def _make_tile(kind: str, variant: int) -> Image.Image:
+    import math
+    base = TERRAIN_BASE.get(kind, TERRAIN_BASE["plain"])
+    im = Image.new("RGBA", (TILE_W, TILE_H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    pts = _diamond_points()
+    d.polygon(pts, fill=base + (255,), outline=(208, 214, 208, 255))
+
+    cx, cy = TILE_W // 2, TILE_H - DIAMOND_H // 2
+    if kind == "forest":
+        for i, (ox, oy) in enumerate(((-14, 2), (0, -4), (13, 3), (-4, 8))[: 2 + variant]):
+            x, y = cx + ox, cy + oy
+            d.polygon([(x, y - 13), (x - 7, y + 3), (x + 7, y + 3)], fill=(96, 148, 84, 255))
+            d.rectangle((x - 1, y + 3, x + 1, y + 7), fill=(110, 90, 60, 255))
+    elif kind == "mountain":
+        for i, (ox, scale) in enumerate(((-10, 1.0), (6, 1.25), (16, 0.8))[: 1 + variant]):
+            x = cx + ox
+            hgt = int(22 * scale)
+            d.polygon([(x, cy - hgt), (x - 14, cy + 6), (x + 14, cy + 6)], fill=(158, 170, 178, 255))
+            d.polygon([(x, cy - hgt), (x - 5, cy - hgt + 8), (x + 5, cy - hgt + 8)], fill=(238, 242, 246, 255))
+    elif kind == "river":
+        for k in range(3):
+            y = cy - 6 + k * 6
+            d.arc((cx - 22, y - 4, cx + 22, y + 4), 200, 340, fill=(120, 170, 210, 255), width=2)
+    elif kind in ("village", "town", "city"):
+        n = {"village": 1, "town": 2, "city": 3}[kind]
+        for i in range(n):
+            x = cx - 12 + i * 13
+            d.rectangle((x - 5, cy - 8, x + 5, cy + 4), fill=(206, 190, 168, 255), outline=(120, 104, 84, 255))
+            d.polygon([(x - 8, cy - 8), (x + 8, cy - 8), (x, cy - 16)], fill=(128, 108, 88, 255))
+    elif kind == "plain" and variant > 0:
+        for i in range(variant * 2):
+            x = cx - 16 + i * 9
+            d.line((x, cy + 4, x, cy - 2), fill=(176, 194, 164, 255))
+    return im
+
+
+def _tint_tile(im: Image.Image, tint: tuple[int, int, int], strength: float) -> Image.Image:
+    out = im.copy()
+    px = out.load()
+    w, h = out.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            px[x, y] = (
+                round(r + (tint[0] - r) * strength),
+                round(g + (tint[1] - g) * strength),
+                round(b + (tint[2] - b) * strength),
+                a,
+            )
+    return out
+
+
+def gen_map_tiles() -> int:
+    variants = {"plain": 4, "forest": 2, "mountain": 3, "river": 2,
+                "village": 1, "town": 1, "city": 1, "fudi": 1, "dongtian": 1}
+    n = 0
+    for kind, cnt in variants.items():
+        for v in range(cnt):
+            base = _make_tile(kind, v)
+            save(base, f"map/{kind}{v}.gif")
+            # green = 视野内（略偏绿、更亮）；blue = 感应范围（偏蓝、稍暗）
+            save(_tint_tile(base, (150, 220, 140), 0.22), f"map/{kind}{v}green.gif")
+            save(_tint_tile(base, (120, 170, 220), 0.26), f"map/{kind}{v}blue.gif")
+            n += 3
+    # 选中框（蓝灰双线菱形）与悬停框（同款黄绿）
+    for name, color in (("maptarget2.gif", (70, 110, 180)), ("maptarget.gif", (150, 190, 70))):
+        im = Image.new("RGBA", (TILE_W, DIAMOND_H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        pts = _diamond_points(y0=0)
+        d.line(pts + [pts[0]], fill=color + (255,), width=2)
+        save(im, name)
+        n += 1
+    # 8 向滚屏箭头 + hover 态
+    dirs = {"lt": (-1, -1), "mt": (0, -1), "rt": (1, -1), "lm": (-1, 0),
+            "rm": (1, 0), "lb": (-1, 1), "mb": (0, 1), "rb": (1, 1)}
+    for key, (dx, dy) in dirs.items():
+        for suffix, col in (("", (110, 110, 110)), ("o", (60, 130, 60))):
+            im = Image.new("RGBA", (17, 17), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            cx = cy = 8
+            tip = (cx + dx * 7, cy + dy * 7)
+            l = (cx + dy * 5 - dx * 2, cy - dx * 5 - dy * 2)
+            r = (cx - dy * 5 - dx * 2, cy + dx * 5 - dy * 2)
+            d.polygon([tip, l, r], fill=col + (255,))
+            save(im, f"pos/{key}{suffix}.gif")
+            n += 1
+    # 地图菜单按钮
+    im = Image.new("RGBA", (70, 20), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle((0, 0, 69, 19), fill=(240, 240, 224, 255), outline=(118, 113, 109, 255))
+    centered(d, (0, 0, 70, 20), "移动到此", font(12), (0, 0, 0, 255))
+    save(im, "btn/mover1.gif")
+    n += 1
+    # people 变体：从 people11 派生（多人加一个偏移副本，视野外去饱和）
+    p11 = OUT / "people11.gif"
+    if p11.exists():
+        b = Image.open(p11).convert("RGBA")
+        two = Image.new("RGBA", (b.width + 6, b.height), (0, 0, 0, 0))
+        two.paste(b, (6, 0), b)
+        two.paste(b, (0, 2), b)
+        save(two, "people12.gif")
+        for src, dst in ((b, "people21.gif"), (two, "people22.gif")):
+            faded = src.copy()
+            px = faded.load()
+            for y in range(faded.height):
+                for x in range(faded.width):
+                    r, g, bb, a = px[x, y]
+                    if a:
+                        v = (r * 299 + g * 587 + bb * 114) // 1000
+                        px[x, y] = (v, v, v, int(a * 0.7))
+            save(faded, dst)
+        n += 4
+    return n
+
+
 def main() -> int:
     total = 0
     total += gen_element_icons()
@@ -486,6 +635,7 @@ def main() -> int:
     total += gen_body_from_meridian_view()
     total += gen_event_icons()
     total += gen_placeholders()
+    total += gen_map_tiles()
     print(f"生成 C/D 档素材 {total} 个 → public/img/")
     return 0
 

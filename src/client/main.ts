@@ -9,6 +9,8 @@
 
 import { renderShell } from '../pages/shell.ts'
 import { renderPlayer } from '../pages/player.ts'
+import { renderMap, type MapVm } from '../pages/map.ts'
+import mapFixture from './map-fixture.json' with { type: 'json' }
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { installGlobals, setPageResolver, startCountdowns } from './windows.ts'
 import {
@@ -19,6 +21,25 @@ import {
   PLAYER_BODY_2010,
   MID_2010,
 } from './fixtures.ts'
+
+/** 地图夹具：直接用从原版整页 DOM 里抽出来的真实 mapData（113 格）。 */
+function mapVm(): MapVm {
+  const f = mapFixture as unknown as {
+    cells: MapVm['cells']
+    meta: { playerX: number; playerY: number; curMapX: number; curMapY: number; playerDis: number }
+  }
+  const center = f.cells.find((c) => c.posx === f.meta.curMapX && c.posy === f.meta.curMapY)
+  return {
+    centerX: f.meta.curMapX,
+    centerY: f.meta.curMapY,
+    playerX: f.meta.playerX,
+    playerY: f.meta.playerY,
+    playerDis: f.meta.playerDis,
+    cells: f.cells,
+    selected: center ?? f.cells[0]!,
+    goByDistance: 3,
+  }
+}
 
 function pick() {
   const which = new URLSearchParams(location.search).get('fixture')
@@ -41,9 +62,12 @@ function boot(): void {
   if (!app) return
 
   const f = pick()
+  const page = new URLSearchParams(location.search).get('page')
+  const left = page === 'map' ? renderMap(mapVm()) : renderPlayer(f.player)
   app.innerHTML = renderShell({
     ...f.shell,
-    left: renderPlayer(f.player),
+    tab: page === 'map' ? 'map' : 'player',
+    left,
     mid: renderMid(f.mid),
     right: renderRight(f.right),
   })

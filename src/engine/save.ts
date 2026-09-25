@@ -13,7 +13,7 @@
  */
 
 /** 当前存档格式版本。**改 state 结构必须 +1 并加一条迁移。** */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 const KEY = 'xiuzhen.save'
 const BACKUP_KEY = 'xiuzhen.save.backup'

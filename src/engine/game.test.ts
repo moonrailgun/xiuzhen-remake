@@ -152,12 +152,51 @@ test('存档时先结算时钟：关页面再打开不会重复补一段', () =>
   assert.equal(loaded.clock.wallT, 3600_000, '墙钟基准也要更新')
 })
 
-test('存档体积：新号远小于 1.5MB 预算', () => {
-  const store = memStorage()
-  saveGame(store, fresh(), 0)
-  assert.ok(store.size() < 4000, `新号存档 ${store.size()} 字节`)
-})
-
 test('没有存档时返回 null', () => {
   assert.equal(loadGame(memStorage()), null)
+})
+
+// —— 存档迁移（改 state 结构就必须加一条，否则等于丢档）——
+
+test('v1 老存档能迁移到 v2：进度保留、补上 NPC 世界', () => {
+  const store = memStorage()
+  // 手写一份 v1 存档（那时还没有 npc 字段）
+  const v1Player = { ...fresh().player, name: '老角色', daoxing: 12345, meridians: Array(12).fill(3) }
+  store.setItem(
+    'xiuzhen.save',
+    JSON.stringify({
+      v: 1,
+      savedAt: 0,
+      state: {
+        v: 1,
+        clock: { gameT: 86400, wallT: 0, rate: 1 },
+        timeline: { events: [] },
+        rng: [1, 2, 3, 4],
+        worldSeed: 42,
+        mail: [],
+        player: v1Player,
+      },
+    }),
+  )
+
+  const loaded = loadGame(store)
+  assert.ok(loaded, '应能读出来')
+  assert.equal(loaded!.player.name, '老角色', '进度不丢')
+  assert.equal(loaded!.player.daoxing, 12345)
+  assert.deepEqual([...loaded!.player.meridians], Array(12).fill(3))
+  assert.ok(loaded!.npc, '应补上 NPC 世界')
+  assert.ok(loaded!.npc.bases.length > 0, 'NPC 按老存档的世界种子生成')
+  assert.deepEqual(loaded!.npc.patches, {})
+})
+
+test('新档自带 NPC 世界', () => {
+  const s = fresh()
+  assert.ok(s.npc.bases.length > 0)
+  assert.equal(s.npc.bases.length, 300)
+})
+
+test('存档体积：带 300 个 NPC 仍远小于 1.5MB 预算', () => {
+  const store = memStorage()
+  saveGame(store, fresh(), 0)
+  assert.ok(store.size() < 200_000, `存档 ${store.size()} 字节`)
 })

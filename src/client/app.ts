@@ -14,6 +14,7 @@ import { newGame, tick, saveGame, loadGame, resourceBarOf } from '../engine/game
 import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
+import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
 import { startCultivate, planUpgrade, speedUp, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
 import { sorted } from '../engine/timeline.ts'
@@ -90,7 +91,10 @@ function mapVm(s: GameState): MapVm {
       terrain: `${key}${terrainVariant(s.worldSeed, p.x, p.y, t)}`,
       scene: `${key}0${terrainVariant(s.worldSeed, p.x, p.y, t) + 1}`,
       qi: qiAt(s.worldSeed, p.x, p.y, t),
-      playernum: p.x === s.player.x && p.y === s.player.y ? 1 : 0,
+      // 本格的人数 = NPC + 自己
+      playernum:
+        npcsAtCell(s.npc, s.clock.gameT, s.worldSeed, p.x, p.y).length +
+        (p.x === s.player.x && p.y === s.player.y ? 1 : 0),
     }
   })
   const sel = mapSelected ?? { x: s.player.x, y: s.player.y }
@@ -131,13 +135,21 @@ function midVm(s: GameState) {
       }]
     : []
 
+  // 当前场景中的玩家：同一格上的 NPC（照原版显示名字 + 状态后缀 + 四个操作图标）
+  const here = npcsAtCell(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y)
+  const players = here.map((n) => ({
+    name: n.base.name,
+    suffix: n.suffix ?? undefined,
+    avatar: `${{ 蜀山: 'shushan', 昆仑: 'kunlun', 通天: 'tongtian' }[n.base.school]}m`,
+  }))
+
   return {
     battle: rows('battle'),
     craft: rows('craft'),
     move,
     cultivate: rows('cultivate'),
     npcs: [],
-    players: [],
+    players,
   }
 }
 

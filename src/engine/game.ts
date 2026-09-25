@@ -12,6 +12,7 @@ import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { resolveCraft } from './craft.ts'
+import { generateNpcs, type NpcWorld } from './npc.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -27,7 +28,17 @@ import { dantianCapacity } from '../data/upgrade.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
-export const MIGRATIONS: readonly Migration[] = []
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    // v1 → v2：加入 NPC 生态。老存档按它自己的世界种子补一批 NPC，
+    // 这样进度不丢、世界也和新档同一套生成规则。
+    from: 1,
+    migrate: (old) => {
+      const s = old as { worldSeed?: number }
+      return { ...(old as object), npc: { bases: generateNpcs(s.worldSeed ?? 1, 300), patches: {} } }
+    },
+  },
+]
 
 const MERIDIAN_GROUPS: readonly MeridianGroup[] = ['手三阴', '手三阳', '足三阴', '足三阳']
 
@@ -52,6 +63,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
     timeline: emptyTimeline(),
     rng: seedRng(opts.seed),
     worldSeed: opts.seed,
+    npc: { bases: generateNpcs(opts.seed, 300), patches: {} },
     mail: [],
     player: {
       name: opts.name,

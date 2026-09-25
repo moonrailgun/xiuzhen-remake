@@ -28,6 +28,7 @@ const state = (over: Partial<GameState['player']> = {}, timeline = emptyTimeline
   timeline,
   rng: seedRng(1),
   worldSeed: 1,
+  npc: { bases: [], patches: {} },
   mail: [],
   player: {
     name: '173小鱼',

@@ -1,0 +1,2822 @@
+[
+  {
+    "id": "#1",
+    "file": "reference/images/17173-live/20081028104810916/20081028061s.JPG",
+    "size": [
+      500,
+      284
+    ],
+    "md5": "3317c07cd751079d8e709d8e505c94a5",
+    "page": "整页 player.jsp 缩略图（= #2 的 0.48 缩略版）",
+    "evidence_year": "2008-10",
+    "scale": 0.476,
+    "scale_basis": "与 #2 同图，500/1051 = 0.4757",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          8,
+          6,
+          82,
+          22
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #2 同一张截图。缩略到不可读，除了确认构图之外无用。"
+  },
+  {
+    "id": "#2",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg",
+    "size": [
+      1051,
+      588
+    ],
+    "md5": "5c427a00ecf74983acf839fb308e2884",
+    "page": "整页 player.jsp（经脉态）+ #top + #gmid + #gright",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "人物信息表 / 右栏任务表 `width=220` 实测跨距 220px / 原生 220px；另：真气增长五行图标实测 15-16px / 原生 16×16；资源条图标 pitch 实测 120px",
+    "origin_offset": [
+      -5,
+      0
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          12,
+          170,
+          45
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      },
+      {
+        "rect": [
+          1004,
+          0,
+          47,
+          588
+        ],
+        "why": "页面右侧浏览器留白（#gpage 只有 1000px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "唯一一张 2008-12 基准期完整主界面，1051×588 原生。页面原点 #gpage 在图内 (5,0)。顶栏 logo 左半被水印压住。"
+  },
+  {
+    "id": "#3",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen802.jpg",
+    "size": [
+      516,
+      462
+    ],
+    "md5": "9a003ae9f391b40e531f831ff4560282",
+    "page": "player.jsp + R 窗 rwindow（经脉升级说明）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测 R 窗竖线 x=262 与 x=509，跨距 248）",
+    "origin_offset": [
+      247,
+      null
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          26,
+          168,
+          28
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12 基准期。★唯一一张基准期的 R 窗截图，证明 2008 年的弹窗边框已是『褐灰+米白双线 + 回纹角花 + 15×15 粉底红×』，与 2010 年没有差别。origin_offset y 无证据：#rwindow 的绝对 top 在丢失的 oui.css 里。"
+  },
+  {
+    "id": "#4",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen803.jpg",
+    "size": [
+      567,
+      55
+    ],
+    "md5": "744c6b4447590f48abf3d61be80fe512",
+    "page": "#top 资源条特写（#resource）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "五行图标中心间距实测 8→368 = 3×120.0px / 原生 pitch 120px；图标实测 16px",
+    "origin_offset": [
+      293,
+      -13
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          26,
+          165,
+          30
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12。origin_offset 由 #2 中金图标页面坐标 (301,41) 反推，±2px。"
+  },
+  {
+    "id": "#5",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen804.jpg",
+    "size": [
+      478,
+      427
+    ],
+    "md5": "5a2eb5008b634ff8e1ea012aa8569f85",
+    "page": "player.jsp 经脉视图（木属性女，通天水印）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "人物信息表 / 右栏任务表 `width=220` 实测跨距 220px / 原生 220px（人物信息表竖线 x=236/455）；经脉节点白盘实测中位直径 19px / 原生 19px；表格行 pitch 实测 22px / 原生 22px",
+    "origin_offset": [
+      29,
+      null
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          12,
+          170,
+          45
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12 基准期。通天门派水印（梅）的唯一原生来源。"
+  },
+  {
+    "id": "#6",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen805.jpg",
+    "size": [
+      487,
+      457
+    ],
+    "md5": "3e254be881c1ceef2fcc3e687400b740",
+    "page": "player.jsp 本体视图（女）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "本体节点白盘实测中位直径 21px / 原生 21px（实测中位 21px，与 #117 一致）",
+    "origin_offset": [
+      17,
+      110
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          8,
+          168,
+          45
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12 基准期。8 个节点与篆书名称位置；左上被 17173 水印压住，篆书标签优先临摹无水印的 #114。origin_offset 由横幅左缘估得，±5px。"
+  },
+  {
+    "id": "#7",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen806.jpg",
+    "size": [
+      498,
+      409
+    ],
+    "md5": "e3a19cdfab715dd8426d1f46bac63b9c",
+    "page": "trade.jsp 市场（购买真气）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=20→479，五列等分 137px）；行 pitch 27px",
+    "origin_offset": [
+      0,
+      105
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          12,
+          235,
+          58
+        ],
+        "why": "17173 红色 web.17173.com 水印（实测像素包围盒 x20-246,y16-65）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12 基准期，原生 1:1。★市场页的像素基准（0.5 秒/点）。"
+  },
+  {
+    "id": "#8",
+    "file": "reference/images/17173-live/20081225104603605_all/xiuzhen807.jpg",
+    "size": [
+      485,
+      407
+    ],
+    "md5": "33093b593520d2679772ff6b47107dcd",
+    "page": "skill.jsp 炼器树（丹 1/20）",
+    "evidence_year": "2008-12",
+    "scale": 1.0,
+    "scale_basis": "页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（横幅左缘 x=10，与 #118 的 x=11 同批）；与 #118 同页同版式、尺寸差 1px",
+    "origin_offset": [
+      12,
+      104
+    ],
+    "masks": [
+      {
+        "rect": [
+          18,
+          12,
+          168,
+          45
+        ],
+        "why": "17173 半透明粉色 web.17173.com 水印（实测粉色像素包围盒 x19-180,y13-52）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-12 基准期。与 2008-10 专区版 #118 是同一页面的两次截图（相关系数 0.928，数值略有不同）。左上有 17173 水印 → 临摹树背景优先用 #118。"
+  },
+  {
+    "id": "#9",
+    "file": "reference/images/17173-live/20090205145529452/xz50001.jpg",
+    "size": [
+      464,
+      402
+    ],
+    "md5": "117cbd3a189caaad77fa5cc54c1d296a",
+    "page": "L 窗 · 付费功能（payment.jsp）",
+    "evidence_year": "2009-02",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=2→461，五列等分）；正文零中间调",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-02，原生 1:1。★付费功能页的像素基准：+25% 五行吸收 / 法宝攻击·耐久·击退，含剩余天数与到期时间列。01 §2.3 提示需核对是否已出现『免战』行。"
+  },
+  {
+    "id": "#10",
+    "file": "reference/images/17173-live/20090604153531214/xzd6001.jpg",
+    "size": [
+      150,
+      150
+    ],
+    "md5": "9488873523605539a1207ddd4113bc6f",
+    "page": "疑似 `img/scene/` 或仙府建筑插画素材（150×150）",
+    "evidence_year": "2009-06",
+    "scale": 1.0,
+    "scale_basis": "图幅实测正好 150×150 = 原件尺寸",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-06。剑/铸剑场景小插图，**尚未与任何已知场景名对上**；尺寸与 `#sceneimg` 原件一致，疑为福地/剑庐一类场景插画。"
+  },
+  {
+    "id": "#11",
+    "file": "reference/images/17173-live/20090604153531214/xzd6002.jpg",
+    "size": [
+      150,
+      150
+    ],
+    "md5": "8664b0d0ee4a002810790aa95758a606",
+    "page": "疑似 `img/scene/` 或仙府建筑插画素材（150×150）",
+    "evidence_year": "2009-06",
+    "scale": 1.0,
+    "scale_basis": "图幅实测正好 150×150 = 原件尺寸",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-06。塔，同上，未与场景名对上。"
+  },
+  {
+    "id": "#12",
+    "file": "reference/images/17173-live/20090622115920789/dder51.jpg",
+    "size": [
+      400,
+      249
+    ],
+    "md5": "ca287e77afb17e86588afedd9c2f3efa",
+    "page": "map.jsp 世界地图（坐标输入 184,9，滚屏距离 3）",
+    "evidence_year": "2009-06",
+    "scale": 0.829,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 379/457 = 0.829",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          215,
+          360,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-06。★2009 年的『范围外地物呈灰度（去色）』表现，与 2010 年各图的『淡彩褪色』不同——两个时期的雾效不一样，复刻要按基准期选 2009 版。"
+  },
+  {
+    "id": "#13",
+    "file": "reference/images/17173-live/200908051106523841/yyxzc4001.jpg",
+    "size": [
+      112,
+      220
+    ],
+    "md5": "f16a8f77ef0b54c470ad7cc8f4ee9e0c",
+    "page": "item.jsp 飞剑名单（单列表格裁切）",
+    "evidence_year": "2009-08",
+    "scale": 1.0,
+    "scale_basis": "R 窗/表格文本实测无缩放痕迹（笔画 1px），但可测特征太少，置信度中等",
+    "origin_offset": null,
+    "masks": [],
+    "use": "text_only",
+    "excluded_regions": [],
+    "notes": "2009-08。★14 把飞剑的完整名单，2008-10 即已齐备 → 文案可直接用于基准期。图太窄（112×220），只能核文案不能做几何断言。"
+  },
+  {
+    "id": "#14",
+    "file": "reference/images/17173-live/200908051106523841/yyxzc4003.jpg",
+    "size": [
+      250,
+      297
+    ],
+    "md5": "52b07c8f82c4b8fc77d1833cb733de3c",
+    "page": "R 窗 rwindow · 秘笈道具详情（itemmid.jsp）",
+    "evidence_year": "2009-08",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测竖线 x=1→248）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-08，原生。【御剑飞行】秘笈。道具弹窗与飞剑弹窗的差异：【可以交易】独占一行、【无属性】【秘笈】另起一行右对齐。"
+  },
+  {
+    "id": "#15",
+    "file": "reference/images/17173-live/20090807133602217/xzc5622.jpg",
+    "size": [
+      400,
+      227
+    ],
+    "md5": "0c4da8fc156ee3c0861d740c2cb94341",
+    "page": "map.jsp 个人仙府内部地图",
+    "evidence_year": "2009-08",
+    "scale": 0.851,
+    "scale_basis": "仙府星空视口暗区实测宽 389px / 原生 457px = 0.851（沿用地图墨框尺子；高度 215/253 = 0.850 自洽）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          227
+        ],
+        "why": "个人仙府 2009-06-30 之后才有，2008-12 基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "2009-08。★本图证明仙府是 **7×7** 不是 5×5（菱形四顶点正好顶到 448×245 视口四边）。2009-08 时空地还没有祥云覆盖，露出『四角插红旗的白色地基』。"
+  },
+  {
+    "id": "#17",
+    "file": "reference/images/17173-live/20090819102417368/xzd5001.jpg",
+    "size": [
+      503,
+      453
+    ],
+    "md5": "a254c8fe181241f6f0fe3b2ec1fdfc81",
+    "page": "L 窗 · 仙府建筑弹窗（道藏 Lv.1）",
+    "evidence_year": "2009-08",
+    "scale": 1.0,
+    "scale_basis": "弹窗外框实测跨距 496px（竖线 x=3→498）；正文零中间调（位图宋体 1px 笔画）→ 判为原生",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          503,
+          453
+        ],
+        "why": "仙府 2009-06-30 之后才有，基准版没有"
+      }
+    ],
+    "notes": "2009-08，原生 1:1。★仙府建筑弹窗版式（页名横幅 / 150×150 插画 / 名称 Lv.N / 描写 / 绿链操作 / 墨迹表题 / 表）。弹窗宽 496 ≈ L 窗 490，比 05 §14.1 记的 460 内表略宽。"
+  },
+  {
+    "id": "#18",
+    "file": "reference/images/17173-live/20090819102417368/xzd5002.jpg",
+    "size": [
+      503,
+      453
+    ],
+    "md5": "ebdf115f1b618743fc7118ab62c713a5",
+    "page": "L 窗 · 仙府建筑弹窗（生死玄关 Lv.1）",
+    "evidence_year": "2009-08",
+    "scale": 1.0,
+    "scale_basis": "弹窗外框实测跨距 496px（竖线 x=3→498）；正文零中间调 → 原生",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          34,
+          192,
+          33,
+          20
+        ],
+        "why": "疑似原生控件/输入区（检出 XP 蓝灰边框，±4px）"
+      }
+    ],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          503,
+          453
+        ],
+        "why": "仙府 + 功德值，均 2009-06-30 之后"
+      }
+    ],
+    "notes": "2009-08，原生 1:1。闭关表（剩余闭关时间 / 闭关结束时间）+ 灰字规则说明。"
+  },
+  {
+    "id": "#19",
+    "file": "reference/images/17173-live/20090821130135244/jhjs.jpg",
+    "size": [
+      400,
+      378
+    ],
+    "md5": "000dc748626e4dd6fc806f48520e53aa",
+    "page": "map.jsp 世界地图（扬州 青山 134,88）",
+    "evidence_year": "2009-08",
+    "scale": 0.838,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 383/457 = 0.838",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          340,
+          360,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-08。青山地形 + 玩家数 2。"
+  },
+  {
+    "id": "#23",
+    "file": "reference/images/17173-live/20090901145427733/d4ers.jpg",
+    "size": [
+      400,
+      227
+    ],
+    "md5": "16dca1c7630f310685bc6f3de4217c92",
+    "page": "map.jsp 世界地图（格上有仙府建筑与玩家）",
+    "evidence_year": "2009-09",
+    "scale": 0.84,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 384/457 = 0.840",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          227
+        ],
+        "why": "格上的仙府建筑属 2009-06-30 之后（01 §2.3）"
+      }
+    ],
+    "notes": "2009-09。仙府建在世界地图格上的样子。"
+  },
+  {
+    "id": "#24",
+    "file": "reference/images/17173-live/20090904130719924/shenyuas.jpg",
+    "size": [
+      400,
+      221
+    ],
+    "md5": "1ad99705defb93ba54ca0f9b87c138f8",
+    "page": "map.jsp 世界地图（带后加标注）",
+    "evidence_year": "2009-09",
+    "scale": 0.84,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 与同尺寸同批的 #23 一致，取 0.840（本图墨框被标注遮挡，无法独立实测）",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          221
+        ],
+        "why": "通稿作者后加的红色标注文字『三清道前线仙府三清府』『神域仙府神域禁地』，覆盖面大，建议整图只做人工目视"
+      }
+    ],
+    "use": "text_only",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          221
+        ],
+        "why": "门派仙府山门标记，2009-06-30 之后"
+      }
+    ],
+    "notes": "2009-09。价值只在于说明门派仙府在大地图上长什么样。"
+  },
+  {
+    "id": "#25",
+    "file": "reference/images/17173-live/20090909145751871/ujiops.jpg",
+    "size": [
+      400,
+      373
+    ],
+    "md5": "f5b90d085ef87b96c01c005cef76fd79",
+    "page": "battlemap.jsp（L 窗 openLWindow）战场地图",
+    "evidence_year": "2009-09",
+    "scale": 0.92,
+    "scale_basis": "★报告未判定，本次自测：以 #29（0.875）的玩家头像为模板做多尺度归一化互相关，最佳匹配尺度 1.05 → 0.875×1.05 ≈ 0.92（尺度步长 0.05，误差 ±0.03）",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          394,
+          0,
+          6,
+          373
+        ],
+        "why": "浏览器/窗口原生竖向滚动条"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09。飞剑小箭头向目标汇聚 + 红×目标标记 + 黄白『交锋』图标。右上角露出滚动条顶端。"
+  },
+  {
+    "id": "#28",
+    "file": "reference/images/17173-live/20090915131755472/28trt.JPG",
+    "size": [
+      400,
+      373
+    ],
+    "md5": "c863c7f1e14d8bfadb3246f7aa46d945",
+    "page": "battlemap.jsp（L 窗 openLWindow）战场地图",
+    "evidence_year": "2009-09",
+    "scale": 0.92,
+    "scale_basis": "与 #25 为同一张截图的两次 JPEG 编码（PIL 实测 mean diff 2.52 / max 39，非逐像素相同但构图完全一致），沿用 #25 的 0.92",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          394,
+          0,
+          6,
+          373
+        ],
+        "why": "浏览器/窗口原生竖向滚动条"
+      }
+    ],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #25 是同一张截图（报告说法经本次实测确认，但两者 md5 与像素并不完全相同，是同源图的两次重编码）。保留 #25 即可。"
+  },
+  {
+    "id": "#29",
+    "file": "reference/images/17173-live/20090915131755472/29fe.jpg",
+    "size": [
+      400,
+      359
+    ],
+    "md5": "72728fad3ab87070faf8df5a5d074794",
+    "page": "battlemap.jsp（L 窗 openLWindow）战场地图",
+    "evidence_year": "2009-09",
+    "scale": 0.875,
+    "scale_basis": "★报告未判定，本次自测：①关闭钮红×内芯实测 7×7px / 原生 8×8px（多张原生弹窗标定）= 0.875；②右侧原生竖向滚动条实测约 14px 宽 / Windows XP 原生 16px = 0.875；③标题『战场地图』墨迹包围盒 46×11px，与 12-13px 宋体 4 字（48-52px）相符",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          384,
+          20,
+          16,
+          339
+        ],
+        "why": "浏览器/窗口原生竖向滚动条"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09。★四张战场图里唯一带完整窗口外框（浅粉双线 + 回纹角花 + 右上粉框红×）的一张，也是唯一能定标尺的一张。内容区纯白无网格无地形，约 150+ 把飞剑排成放射状射线。"
+  },
+  {
+    "id": "#31",
+    "file": "reference/images/17173-live/20090921133953494/dfdeee01s.jpg",
+    "size": [
+      400,
+      348
+    ],
+    "md5": "e16beff34fbfd95e6aef6416fb9c58cd",
+    "page": "player.jsp 本体视图（高等级状态，8 项数值）",
+    "evidence_year": "2009-09",
+    "scale": 0.85,
+    "scale_basis": "本体节点白盘实测中位直径 21px / 原生 21px → 实测中位 18px / 21px = 0.857（报告 04 §9.1 记作 0.82，取中 0.85）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09。8 项本体名称与等级（丹田气海 35 等）齐全，是本体文案的主要来源。"
+  },
+  {
+    "id": "#32",
+    "file": "reference/images/17173-live/20090921133953494/dfdeee02.jpg",
+    "size": [
+      234,
+      71
+    ],
+    "md5": "8cd7d3e654b4a4a6979f3596c2152106",
+    "page": "R 窗 · 本体升级消耗表局部",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "R 窗内表 `width=230` 实测跨距 230px（竖线 x=2→231）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09。丹田 Lv.35→36 的消耗数值属 2009-09『开放到 36 级』之后，数值不可用于基准期，版式可用。"
+  },
+  {
+    "id": "#33",
+    "file": "reference/images/17173-live/20090921133953494/dfdeee03.jpg",
+    "size": [
+      243,
+      265
+    ],
+    "md5": "a2635137e0c0a038fc7762960ecd5b2c",
+    "page": "R 窗 rwindow · 丹田气海 Lv.35 说明弹窗",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（表格行距实测 17px，文本零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [
+      {
+        "rect": [
+          8,
+          120,
+          228,
+          140
+        ],
+        "why": "Lv.35/36 的容量与消耗数值出自 2009-09 改版之后，基准期数值不同（近似框，±8px）"
+      }
+    ],
+    "notes": "2009-09。★R 窗说明弹窗的完整版式样板（标题 / 说明文案 / 数值表 / 升级消耗表）。"
+  },
+  {
+    "id": "#34",
+    "file": "reference/images/17173-live/20090921133953494/dfdeee04.jpg",
+    "size": [
+      566,
+      73
+    ],
+    "md5": "74c4084cfdaae4fe7f113663853f24ef",
+    "page": "#top 资源条特写（后期，含红字提示）",
+    "evidence_year": "2009-09",
+    "scale": 0.915,
+    "scale_basis": "同构图与 #4 比较：图标实测 ~15px / 原生 16px；行距按 #4 的 120px pitch 折算 ≈0.91",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09。丹田上限 1280000、红字『您的真气不足！』。数值属后期，仅用于核对红字样式位置。"
+  },
+  {
+    "id": "#35",
+    "file": "reference/images/17173-live/20090921133953494/dfdeee05.jpg",
+    "size": [
+      197,
+      387
+    ],
+    "md5": "500a95cd76f3725e5744e3cac0b609b0",
+    "page": "player.jsp 经脉视图局部（水属性女，15-17 级）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px（实测中位 19px，与 #2/#5/#70 一致）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "★报告 04 §9.1 把本图列为『未定』，本次用节点白盘直径判定为 **原生 1:1**。女·水属性人体剪影的唯一来源。仅含人体，不含信息表。"
+  },
+  {
+    "id": "#36",
+    "file": "reference/images/17173-live/20090923133942281/cxde222000.jpg",
+    "size": [
+      150,
+      150
+    ],
+    "md5": "d7dd7a2a869b228d6d55aed87d922a52",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测正好 150×150 = 原件尺寸",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09，未缩放原件。平原 plain01。可直接裁用。"
+  },
+  {
+    "id": "#37",
+    "file": "reference/images/17173-live/20090923133942281/cxde222001.jpg",
+    "size": [
+      300,
+      150
+    ],
+    "md5": "81ac9b398168be46c30292586f7095a5",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测 300×150 = 两张 150×150 原件并排",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09，未缩放原件。江河 river01/02（横向两张并排）。按 x=0/150 切成两张即可直接用。"
+  },
+  {
+    "id": "#38",
+    "file": "reference/images/17173-live/20090923133942281/cxde222002.jpg",
+    "size": [
+      300,
+      150
+    ],
+    "md5": "ab0feb9a23953ebd85bd71ae5b97a442",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测 300×150 = 两张 150×150 原件并排",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09，未缩放原件。森林 forest01/02。按 x=0/150 切成两张即可直接用。"
+  },
+  {
+    "id": "#39",
+    "file": "reference/images/17173-live/20090923133942281/cxde222003.jpg",
+    "size": [
+      400,
+      133
+    ],
+    "md5": "5ce396684618206dd8cf57d59d11d80b",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测 400×133：横向是 3 张 150 宽原件（450）被裁到 400，纵向 133 < 150 被裁",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09，青山 mountain01/02/03。**横竖都被裁过**（400×133 ≠ 450×150），第三张不完整 → 不能整块直接用。"
+  },
+  {
+    "id": "#40",
+    "file": "reference/images/17173-live/20090923133942281/cxde222004.jpg",
+    "size": [
+      300,
+      150
+    ],
+    "md5": "0c2c3b472c4959fa1d24843fbc3e482f",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测 300×150 = 两张 150×150 原件并排",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09，未缩放原件。小镇、村庄。按 x=0/150 切成两张即可直接用。"
+  },
+  {
+    "id": "#41",
+    "file": "reference/images/17173-live/20090923133942281/cxde222005.jpg",
+    "size": [
+      150,
+      150
+    ],
+    "md5": "78c5f80e1359c17170ffeea859117356",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "图幅实测正好 150×150 = 原件尺寸",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2009-09，未缩放原件。城池。可直接裁用。"
+  },
+  {
+    "id": "#42",
+    "file": "reference/images/17173-live/20090924132700922/xzzd600s.jpg",
+    "size": [
+      400,
+      339
+    ],
+    "md5": "019d0c573e753151f8bfe2e2dc3fcbde",
+    "page": "item.jsp 炼制飞剑页",
+    "evidence_year": "2009-09",
+    "scale": 0.853,
+    "scale_basis": "五行五列中心 pitch 实测 49.3px；新浪同图 #155 实测 55.75px，两者比 1.131 ≈ 450/400；以 #155 = 0.959（新浪按 450px 宽封顶、原图 469 宽，与同篇 #154 的 469→450 一致）反推 → 400/469 = 0.853",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          316,
+          100,
+          58,
+          200
+        ],
+        "why": "『准备炼制』原生 input 输入框列（近似 ±4px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2009-09。报告 05 §0 记作 ≈0.89，本次实测 0.853。"
+  },
+  {
+    "id": "#43",
+    "file": "reference/images/17173-live/20090928161400460/xazs402.jpg",
+    "size": [
+      458,
+      254
+    ],
+    "md5": "9e8a9566222e287160fb3c4fec1d514b",
+    "page": "map.jsp 世界地图（截图正好等于墨框宽）",
+    "evidence_year": "2009-09",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=0→456 = 457，截图左右缘即墨框）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          458,
+          254
+        ],
+        "why": "图中含门派仙府山门标记，仙府 2009-06-30 才有（01 §2.3）"
+      }
+    ],
+    "notes": "2009-09，尺寸恰为 458×254 = 墨框原件大小，判为原生；但内容含资料片后的仙府山门 → 只做区块比例核对。"
+  },
+  {
+    "id": "#45",
+    "file": "reference/images/17173-live/20100115150718173/fdgr441s.jpg",
+    "size": [
+      400,
+      374
+    ],
+    "md5": "3b7980c38a1dee12075f34ab367cb0db",
+    "page": "map.jsp 世界地图（益州 平原 116,52）",
+    "evidence_year": "2010-01",
+    "scale": 0.81,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 370/457 = 0.810",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          330,
+          360,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-01。★重复图：#45 / #51 / #66 **逐像素完全相同**（PIL 实测 bbox=None），且与新浪的 #147（0.912）、#130（0.974）是同一张截图的不同缩放。四者中 #130 最大。"
+  },
+  {
+    "id": "#46",
+    "file": "reference/images/17173-live/20100115150718173/fdgr442s.jpg",
+    "size": [
+      400,
+      390
+    ],
+    "md5": "00f81a2dbcc7edb24462e98a0f5fb9a8",
+    "page": "map.jsp 门派仙府内部地图（凌烟阁 道藏 13,11）",
+    "evidence_year": "2010-01",
+    "scale": 0.827,
+    "scale_basis": "仙府星空视口实测宽 378px / 原生 457px = 0.827",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          390
+        ],
+        "why": "门派仙府 2009-06-30 之后才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "★重复图：与 #67 **逐像素完全相同**，且与新浪的 #148（0.869）是同一张截图。同组最大的是 #148。"
+  },
+  {
+    "id": "#51",
+    "file": "reference/images/17173-live/20100204154113719/yyjjj00s.jpg",
+    "size": [
+      400,
+      374
+    ],
+    "md5": "3a94c3015ddbfde5cf4f5e58b95e69e2",
+    "page": "map.jsp 世界地图（益州 平原 116,52）",
+    "evidence_year": "2010-02",
+    "scale": 0.81,
+    "scale_basis": "与 #45 逐像素相同",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #45/#66 逐像素完全相同，可弃。"
+  },
+  {
+    "id": "#52",
+    "file": "reference/images/17173-live/20100204154113719/yyjjj01.jpg",
+    "size": [
+      482,
+      430
+    ],
+    "md5": "059f2a174e99ecb863ab17e8d3fa43a3",
+    "page": "map.jsp 世界地图（雍州 不见山 14,50，洞天）",
+    "evidence_year": "2010-02",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=15→471 = 457）",
+    "origin_offset": [
+      20,
+      112
+    ],
+    "masks": [
+      {
+        "rect": [
+          20,
+          400,
+          442,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-02，原生 1:1。★『洞天』地形插画与被框选格（maptarget2 蓝灰双线菱形）的唯一原生样本。洞天基准期已有。"
+  },
+  {
+    "id": "#53",
+    "file": "reference/images/17173-live/20100208155556062/yug8u0.jpg",
+    "size": [
+      240,
+      426
+    ],
+    "md5": "3581e1b73cc1f1d55ea05d58f1a2d133",
+    "page": "player.jsp 经脉视图局部（火属性男，4-5 级）",
+    "evidence_year": "2010-02",
+    "scale": 0.95,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px → 实测中位 18px / 19px = 0.947（该尺子分辨率 ±1px ≈ ±5%）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "报告 04 §9.1 列为原生，本次实测略小于原生（18 vs 19）。与新浪版 #134 为同一张截图（242/240 = 1.008）。男·火属性剪影来源。"
+  },
+  {
+    "id": "#62",
+    "file": "reference/images/17173-live/20100302111208628/sarff000ds.jpg",
+    "size": [
+      400,
+      187
+    ],
+    "md5": "1dcddc77be8663dba4b866b4b634475f",
+    "page": "createplayer.jsp 建号页 · 五行属性下拉局部",
+    "evidence_year": "2010-03",
+    "scale": 0.809,
+    "scale_basis": "建号内容表 `width=460` 实测跨距 372px（x=8→379）→ 372/460 = 0.809",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          14,
+          60,
+          110,
+          22
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          14,
+          96,
+          110,
+          22
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      }
+    ],
+    "use": "text_only",
+    "excluded_regions": [],
+    "notes": "2010-03。报告 04 §9.1 记作 0.85，实测 0.809（与新浪同图 #143 的 1.125 倍关系吻合）。唯一价值是把五行下拉的选项文案（随机/金/木/水/火/土）核对清楚。"
+  },
+  {
+    "id": "#65",
+    "file": "reference/images/17173-live/20100305114119694/dsfsdff00s.jpg",
+    "size": [
+      400,
+      365
+    ],
+    "md5": "c3cab6a6de5200327669b7d23090f2a8",
+    "page": "player.jsp 人物页（火属性女，昆仑水印）",
+    "evidence_year": "2010-03",
+    "scale": 0.795,
+    "scale_basis": "表格行 pitch 实测 17.5px / 原生 22px = 0.795；经脉节点直径实测 15px / 19px = 0.79",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-03。**昆仑门派水印（荷花）只有本图与 #146 两个缩放版**，重绘时必须放大描摹。"
+  },
+  {
+    "id": "#66",
+    "file": "reference/images/17173-live/20100305114119694/dsfsdff01s.jpg",
+    "size": [
+      400,
+      374
+    ],
+    "md5": "f259e7e6b12e9fda16a672134db883c4",
+    "page": "map.jsp 世界地图（益州 平原 116,52）",
+    "evidence_year": "2010-03",
+    "scale": 0.81,
+    "scale_basis": "与 #45 逐像素相同",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #45/#51 逐像素完全相同，可弃。"
+  },
+  {
+    "id": "#67",
+    "file": "reference/images/17173-live/20100305114119694/dsfsdff02s.jpg",
+    "size": [
+      400,
+      390
+    ],
+    "md5": "fc6457fb78e8416fe874801a264f41f5",
+    "page": "map.jsp 门派仙府内部地图（凌烟阁 道藏 13,11）",
+    "evidence_year": "2010-03",
+    "scale": 0.827,
+    "scale_basis": "与 #46 逐像素相同",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          400,
+          390
+        ],
+        "why": "门派仙府 2009-06-30 之后才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "★重复图：与 #46 逐像素完全相同，可弃。"
+  },
+  {
+    "id": "#68",
+    "file": "reference/images/17173-live/20100324105357917/tttttt1.jpg",
+    "size": [
+      480,
+      373
+    ],
+    "md5": "e938973850825b25a3c95b3d0b80de96",
+    "page": "item.jsp 炼制丹药页（九炼）",
+    "evidence_year": "2010-03",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=7→466）；页标题横幅实测 150 宽",
+    "origin_offset": [
+      13,
+      102
+    ],
+    "masks": [
+      {
+        "rect": [
+          316,
+          100,
+          58,
+          240
+        ],
+        "why": "『准备炼制』原生 input 输入框列（近似 ±4px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-03，原生 1:1。★炼制页 + 『正在炼制中』表的像素基准。九炼等级与炼丹之术等级绑定，基准期同结构不同等级。"
+  },
+  {
+    "id": "#69",
+    "file": "reference/images/17173-live/20100329170139157/7yuy1.jpg",
+    "size": [
+      400,
+      370
+    ],
+    "md5": "98121b8585fdb34918fa03fb8db1c753",
+    "page": "createplayer.jsp 建号页（完整）",
+    "evidence_year": "2010-03",
+    "scale": 0.848,
+    "scale_basis": "建号内容表 `width=460` 实测跨距 390px（x=3→392）→ 390/460 = 0.848",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          10,
+          22,
+          100,
+          18
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          40,
+          143,
+          36,
+          22
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          12,
+          196,
+          120,
+          20
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          168,
+          157,
+          118,
+          20
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          8,
+          258,
+          340,
+          90
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-03。报告 04 §3.2 估作 0.85，本次实测 0.848 相符。建号页正文 2008→2010 逐字未变，可借用。"
+  },
+  {
+    "id": "#70",
+    "file": "reference/images/17173-live/20100331114901844/cxxxf0.jpg",
+    "size": [
+      449,
+      450
+    ],
+    "md5": "23104731b4793eec453a93d2e9b387cc",
+    "page": "player.jsp 人物页（木属性男，蜀山水印，新号全 0 级）",
+    "evidence_year": "2010-03",
+    "scale": 1.0,
+    "scale_basis": "表格行 pitch 实测 22px / 原生 22px；经脉节点白盘实测中位直径 19px / 原生 19px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测横幅 131×26 ← 左缘被裁）",
+    "origin_offset": [
+      22,
+      108
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-03。★原生 1:1 的『全 0 级新号』人物页，是经脉 12 节点坐标与蜀山竹水印的最佳基准。"
+  },
+  {
+    "id": "#71",
+    "file": "reference/images/17173-live/20100331114901844/cxxxf1.jpg",
+    "size": [
+      469,
+      236
+    ],
+    "md5": "8721b6e37dfd950467bd5b389f5fe4fb",
+    "page": "item.jsp 炼制丹药页（一炼）",
+    "evidence_year": "2010-03",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=5→464）；行 pitch 30px",
+    "origin_offset": [
+      15,
+      null
+    ],
+    "masks": [
+      {
+        "rect": [
+          316,
+          30,
+          58,
+          200
+        ],
+        "why": "『准备炼制』原生 input 输入框列（近似 ±4px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-03，原生 1:1。一炼紫金丹等 6 种，结构与基准期一致。截图从墨迹标题条起，无页标题横幅 → y 偏移不可定。"
+  },
+  {
+    "id": "#72",
+    "file": "reference/images/17173-live/20100331114901844/cxxxf2j.jpg",
+    "size": [
+      400,
+      339
+    ],
+    "md5": "b3d3460490990930eee74a0def924126",
+    "page": "item.jsp 炼制飞剑页（重复）",
+    "evidence_year": "2010-03",
+    "scale": 0.853,
+    "scale_basis": "与 #42 解码后逐像素完全相同（ImageChops.difference bbox = None）",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          316,
+          100,
+          58,
+          200
+        ],
+        "why": "『准备炼制』原生 input 输入框列（近似 ±4px）"
+      }
+    ],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #42 **逐像素完全相同**（本次 PIL 实测确认，虽然 md5 不同——两次 JPEG 封装差异）。只保留 #42 或 #155，本条可弃。"
+  },
+  {
+    "id": "#74",
+    "file": "reference/images/17173-live/20100407170941502/trtyttttf.jpg",
+    "size": [
+      400,
+      289
+    ],
+    "md5": "1b59a468782c97fa50a4e9a588f3d825",
+    "page": "L 窗 rank.jsp 排行榜（17173 版）",
+    "evidence_year": "2010-04",
+    "scale": 0.839,
+    "scale_basis": "排行榜表 `width=460` 实测跨距 386px（竖线 x=7→392）→ 0.839；行 pitch 实测 18.5px / 22px = 0.841 自洽",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          90,
+          25,
+          310,
+          20
+        ],
+        "why": "子标签行里的『功德』一项"
+      }
+    ],
+    "notes": "★重复图：与 #158 同一张截图且更小。保留 #158。"
+  },
+  {
+    "id": "#75",
+    "file": "reference/images/17173-live/20100409145432994/uyju.jpg",
+    "size": [
+      400,
+      400
+    ],
+    "md5": "60fb062c0b4e3057872efb0e2e485e3d",
+    "page": "player.jsp 人物页（同 #70，17173 缩小版）",
+    "evidence_year": "2010-04",
+    "scale": 0.891,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px → 实测 17px / 19px = 0.895；与 #70 的尺寸比 400/449 = 0.891",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #70/#153 同一张截图，被缩到 400px。已有原生版，本图可弃。"
+  },
+  {
+    "id": "#76",
+    "file": "reference/images/17173-live/20100412150446918/ihk1.jpg",
+    "size": [
+      400,
+      200
+    ],
+    "md5": "b7c849d5147cd310b7da8e27907231a7",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2010-04",
+    "scale": 0.667,
+    "scale_basis": "与 #113（600×300 原生）为同一拼图，400/600 = 0.667",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #87 逐像素完全相同，且是 #113 的 0.67 缩小版。用 #113。"
+  },
+  {
+    "id": "#78",
+    "file": "reference/images/17173-live/20100518115250381/zzxq1.jpg",
+    "size": [
+      492,
+      383
+    ],
+    "md5": "b1ff6d118660f008d06f1fbcaa0fc9da",
+    "page": "L 窗 · 游戏商城",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=6→465）；行 pitch 20px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（155 宽 @ (0,29)）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          492,
+          383
+        ],
+        "why": "游戏商城 2009-09 才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "2010-05，原生 1:1。8 把极品飞剑 + 四象玉匣的限量供应表（剩余数量 / 刷新倒计时 / 价格）。"
+  },
+  {
+    "id": "#79",
+    "file": "reference/images/17173-live/20100518115250381/zzxq2.jpg",
+    "size": [
+      455,
+      110
+    ],
+    "md5": "ea63173be021d1995407b6130710e045",
+    "page": "L 窗 · 付费功能 · VIP 区块",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "正文零中间调（位图宋体 1px 笔画）；行 pitch 22px；与 #80 同页同批",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05，原生 1:1，局部裁切。VIP：+1 修炼队列 / 法宝上限 +5 / 自动淬炼，7 天 10 仙石。"
+  },
+  {
+    "id": "#80",
+    "file": "reference/images/17173-live/20100518115250381/zzxq3.jpg",
+    "size": [
+      457,
+      188
+    ],
+    "md5": "536fc38f993579321a34d3a559aceb9b",
+    "page": "L 窗 · 付费功能 · 高级 VIP 区块",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "正文零中间调；行 pitch 22px",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05，原生 1:1，局部裁切。高级 VIP + 修炼半/完 + 五行互化比例分配的价格表。"
+  },
+  {
+    "id": "#81",
+    "file": "reference/images/17173-live/20100521102508352/ccvvve1.jpg",
+    "size": [
+      225,
+      73
+    ],
+    "md5": "0364905df3da44baeff36de1a094ace1",
+    "page": "#gright 任务表局部",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "人物信息表 / 右栏任务表 `width=220` 实测跨距 220px / 原生 220px（实测竖线 x=4 与 x=223，跨距 220）",
+    "origin_offset": [
+      764,
+      96
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05。任务表结构与 #2 相同，表线更浅（#cacaca）。"
+  },
+  {
+    "id": "#82",
+    "file": "reference/images/17173-live/20100521102508352/ccvvve2.jpg",
+    "size": [
+      250,
+      408
+    ],
+    "md5": "24aae28fa242340ef95f1e91a4aeadcf",
+    "page": "R 窗 rwindow · 飞剑详情（itemmid.jsp）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测左右竖线跨距 248，表格行距 17px，正文零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05/06，原生 1:1。极品青龙伏魔剑。★飞剑详情弹窗的像素级基准（标题 / 描写 / 【标签】行 / 条件两行 / 基础属性 3 列 / 每小时消耗 5 列 / 炼制消耗 5 列 + 需要时间）。"
+  },
+  {
+    "id": "#83",
+    "file": "reference/images/17173-live/20100521102508352/ccvvve3.jpg",
+    "size": [
+      466,
+      417
+    ],
+    "md5": "982f083384584ffb9fe04718ee165447",
+    "page": "L 窗 quest.jsp 任务详情（《百妖记》第八回）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=5→464，五等分列宽 92px）；行 pitch 22px；正文零中间调",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05，原生 1:1。★任务窗的像素基准。底部两个图片按钮（领取奖励 / 关闭窗口）只露出上半截。百妖记领取条件 2009-02 FAQ 与其一致，可借用。"
+  },
+  {
+    "id": "#84",
+    "file": "reference/images/17173-live/20100524153452664/xzssss0.jpg",
+    "size": [
+      251,
+      358
+    ],
+    "md5": "5f01d59b7b6072e7b78257b2530bd245",
+    "page": "R 窗 rwindow · 丹药详情（itemmid.jsp）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测竖线 x=1→248）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [
+      {
+        "rect": [
+          6,
+          8,
+          238,
+          60
+        ],
+        "why": "『[荒]低阶天元丹』是 2010-03 新增道具，基准期不存在（01 §2.3）；版式可用，物品名与文案需换"
+      }
+    ],
+    "notes": "2010-05，原生。丹药弹窗独有的右下角绿链『服食丹药』。"
+  },
+  {
+    "id": "#85",
+    "file": "reference/images/17173-live/20100524153452664/xzssss1.jpg",
+    "size": [
+      251,
+      451
+    ],
+    "md5": "3063dc6df4782a21ebba9f93e73fef13",
+    "page": "R 窗 rwindow · 飞剑详情（itemmid.jsp）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测左右竖线跨距 248，表格行距 17px，正文零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05/06，原生 1:1。极品七星磐龙剑。★飞剑详情弹窗的像素级基准（标题 / 描写 / 【标签】行 / 条件两行 / 基础属性 3 列 / 每小时消耗 5 列 / 炼制消耗 5 列 + 需要时间）。"
+  },
+  {
+    "id": "#86",
+    "file": "reference/images/17173-live/20100527155609658/rrr0hj.jpg",
+    "size": [
+      400,
+      378
+    ],
+    "md5": "a95fe3739a4e00bb1ab3f58dfe0616ee",
+    "page": "createplayer.jsp 建号页（门派未选择态）",
+    "evidence_year": "2010-05",
+    "scale": 0.852,
+    "scale_basis": "建号内容表 `width=460` 实测跨距 392px（x=3→394）→ 392/460 = 0.852",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          10,
+          22,
+          100,
+          18
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          28,
+          146,
+          74,
+          12
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          35,
+          236,
+          78,
+          12
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          8,
+          258,
+          340,
+          100
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-05。门派=随机时头像为 `img/avatar/random.gif`（粗黑手写 ?），是该素材唯一来源。"
+  },
+  {
+    "id": "#87",
+    "file": "reference/images/17173-live/20100527155609658/rrr1hj.jpg",
+    "size": [
+      400,
+      200
+    ],
+    "md5": "fa22544b84c1d13e8d428a410bbbaadb",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2010-05",
+    "scale": 0.667,
+    "scale_basis": "与 #76 逐像素相同",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #76 逐像素完全相同。用 #113。"
+  },
+  {
+    "id": "#88",
+    "file": "reference/images/17173-live/20100531153113196/xazz0.jpg",
+    "size": [
+      497,
+      439
+    ],
+    "md5": "9bb7d5709d62e971b30a62f7ab48ab05",
+    "page": "map.jsp 世界地图（荆州 平原 160,9，女角色）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=23→479 = 457）",
+    "origin_offset": [
+      12,
+      104
+    ],
+    "masks": [
+      {
+        "rect": [
+          20,
+          410,
+          457,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05，原生 1:1。女性主角小人 + 黄绿色 maptarget 悬停框的样本。另：`17173-live/20100613113253918/5rr556.jpg` 与本图 **MD5 相同**（未编号，无需另列）。"
+  },
+  {
+    "id": "#89",
+    "file": "reference/images/17173-live/20100531153113196/xazz1.jpg",
+    "size": [
+      249,
+      445
+    ],
+    "md5": "2bdc72c01c4bcdcb115fbed2459846c0",
+    "page": "R 窗 rwindow · 飞剑详情（itemmid.jsp）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测左右竖线跨距 248，表格行距 17px，正文零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05/06，原生 1:1。极品乌光玄铁剑。★飞剑详情弹窗的像素级基准（标题 / 描写 / 【标签】行 / 条件两行 / 基础属性 3 列 / 每小时消耗 5 列 / 炼制消耗 5 列 + 需要时间）。"
+  },
+  {
+    "id": "#90",
+    "file": "reference/images/17173-live/20100531153113196/xazz2.jpg",
+    "size": [
+      252,
+      451
+    ],
+    "md5": "59e5a6928450dcb0e59cac80f0e6a66b",
+    "page": "R 窗 rwindow · 飞剑详情（itemmid.jsp）",
+    "evidence_year": "2010-05",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测左右竖线跨距 248，表格行距 17px，正文零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05/06，原生 1:1。上品上善若水剑+10。★飞剑详情弹窗的像素级基准（标题 / 描写 / 【标签】行 / 条件两行 / 基础属性 3 列 / 每小时消耗 5 列 / 炼制消耗 5 列 + 需要时间）。 淬炼 +10 后的数值；【不可交易】状态样本。"
+  },
+  {
+    "id": "#91",
+    "file": "reference/images/17173-live/20100603104231289/xcds0.jpg",
+    "size": [
+      243,
+      447
+    ],
+    "md5": "a2bcd972616ba1b857cfb65c6b6aa655",
+    "page": "R 窗 rwindow · 技能说明（御剑飞行 Lv.1）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（正文零中间调，位图宋体 1px 笔画）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          243,
+          447
+        ],
+        "why": "『御剑飞行』由秘笈习得，秘笈系统 2009-01 之后才齐；版式可借，技能本身非基准期"
+      }
+    ],
+    "notes": "2010-06。技能弹窗版式（说明 + Tips）样板。"
+  },
+  {
+    "id": "#92",
+    "file": "reference/images/17173-live/20100603104231289/xcds1.jpg",
+    "size": [
+      248,
+      407
+    ],
+    "md5": "9699613708b416b16f44306d6e819bea",
+    "page": "R 窗 rwindow · 技能说明（炼丹之术 Lv.3）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px；表格行距实测 17px",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-06。★最完整的技能弹窗：说明 + 3 条 Tips + 升级消耗 + 红字『升级所需真气不足』+ 底部『炼制法宝』。炼丹之术是基准期已有法术，可直接用。"
+  },
+  {
+    "id": "#93",
+    "file": "reference/images/17173-live/20100603104231289/xcds2.jpg",
+    "size": [
+      476,
+      405
+    ],
+    "md5": "6ca6dd3a6ea2aa8e2fd7a23e14356e14",
+    "page": "trade.jsp 市场（后期大额挂单）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=12→471）；行 pitch 27px",
+    "origin_offset": [
+      8,
+      101
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-06，原生 1:1。数值是后期的（131 万真气），版式与 2008 版一致。"
+  },
+  {
+    "id": "#95",
+    "file": "reference/images/17173-live/20100607143748320/cwss1.jpg",
+    "size": [
+      491,
+      451
+    ],
+    "md5": "2ea30f4ff48f8a036df734c982682734",
+    "page": "player.jsp 人物页（金属性女，蜀山，飞剑负产量）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测 144×26 @ (15,6)）",
+    "origin_offset": [
+      7,
+      105
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-06。真气增长出现负值（飞剑耗气）——复刻要覆盖这个状态。"
+  },
+  {
+    "id": "#96",
+    "file": "reference/images/17173-live/20100607143748320/cwss2.jpg",
+    "size": [
+      496,
+      430
+    ],
+    "md5": "49350fe77ccaa75ccafd0450148a8a7a",
+    "page": "map.jsp 世界地图（荆州 平原 160,9）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=27→483 = 457）",
+    "origin_offset": [
+      8,
+      112
+    ],
+    "masks": [
+      {
+        "rect": [
+          20,
+          400,
+          456,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-06，原生 1:1。与 #88 同地点不同时刻。"
+  },
+  {
+    "id": "#97",
+    "file": "reference/images/17173-live/20100608163153049/78uu0.jpg",
+    "size": [
+      387,
+      300
+    ],
+    "md5": "1163cc79bcef56a76607698ca6ce8b50",
+    "page": "battlemap.jsp（L 窗 openLWindow）战场地图",
+    "evidence_year": "2010-06",
+    "scale": 0.94,
+    "scale_basis": "★报告未判定，本次自测：同样以 #29 的玩家头像模板多尺度匹配，最佳尺度 1.05–1.10 → 0.875×1.075 ≈ 0.94（±0.04）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-06。红/灰两方飞剑排成平行斜线，是双方阵营配色的最佳样本。裁图，无窗口边框。"
+  },
+  {
+    "id": "#98",
+    "file": "reference/images/17173-live/20100608163153049/78uu1.jpg",
+    "size": [
+      508,
+      367
+    ],
+    "md5": "1da150f53a65daff908f4033a119b655",
+    "page": "ally.jsp 门派 · 仙府标签（2010）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=35→494）；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（148 宽 @ (35,10)）；行 pitch 21-22",
+    "origin_offset": [
+      -13,
+      101
+    ],
+    "masks": [
+      {
+        "rect": [
+          60,
+          55,
+          300,
+          40
+        ],
+        "why": "通稿作者把仙府名称与坐标涂抹掉了"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [
+      {
+        "rect": [
+          300,
+          30,
+          208,
+          22
+        ],
+        "why": "子标签行多出的『仙府』一项，2009-06-30 才有"
+      },
+      {
+        "rect": [
+          35,
+          105,
+          459,
+          262
+        ],
+        "why": "『仙府规模』表与『我的门派功德』表整块，功德 2009-06-30 才有"
+      }
+    ],
+    "notes": "2010-06，原生 1:1 但整页主体是资料片内容。可用于 overlay 的只有横幅 + 子标签基线。"
+  },
+  {
+    "id": "#99",
+    "file": "reference/images/17173-live/20100608163153049/78uu2.jpg",
+    "size": [
+      253,
+      453
+    ],
+    "md5": "935a390887c62b26e668d19798a2ad50",
+    "page": "R 窗 rwindow · 飞剑详情（itemmid.jsp）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "R 窗内容宽实测 248px（内表 width=231）/ 原生 248px；表格行距实测 17px（实测左右竖线跨距 248，表格行距 17px，正文零中间调）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-05/06，原生 1:1。极品七星磐龙剑+8。★飞剑详情弹窗的像素级基准（标题 / 描写 / 【标签】行 / 条件两行 / 基础属性 3 列 / 每小时消耗 5 列 / 炼制消耗 5 列 + 需要时间）。 淬炼 +8；每小时消耗真气的 0 位在土（与 #85 的 0 在火不同）。"
+  },
+  {
+    "id": "#100",
+    "file": "reference/images/17173-live/20100610154109234/67ty7677.jpg",
+    "size": [
+      489,
+      443
+    ],
+    "md5": "564b5af769e9be81470bcd1be1d2f89a",
+    "page": "player.jsp 金丹视图（第三子标签）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "金丹页右侧信息表实测跨距 200px（竖线 x=260→459）/ 原生 200px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（143×26 @ (4,2)）",
+    "origin_offset": [
+      18,
+      109
+    ],
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          489,
+          443
+        ],
+        "why": "整页『金丹』2009-01-13 才开放，2008-12 基准版不存在（01 §2.3）"
+      }
+    ],
+    "notes": "2010-06，原生 1:1。基准期取 2008-12 时整页排除；若把基准挪到 2009-03 之后则可作 overlay_2px。"
+  },
+  {
+    "id": "#101",
+    "file": "reference/images/17173-live/20100612105427483/xzcvrr0.jpg",
+    "size": [
+      496,
+      437
+    ],
+    "md5": "a5e3f66488398c9046e6ddc83561b7b8",
+    "page": "map.jsp 门派仙府内部地图（开元阵·道藏 10,11）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "仙府星空视口暗区实测宽 457px / 原生 457px = 1.0（与世界地图墨框同尺寸）",
+    "origin_offset": [
+      3,
+      null
+    ],
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          496,
+          437
+        ],
+        "why": "门派仙府 2009-06-30 之后才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "2010-06，**原生 1:1**。★星空底 + 祥云未开发格 + 建筑地块的最佳原生底稿（虽然整页属资料片）。"
+  },
+  {
+    "id": "#102",
+    "file": "reference/images/17173-live/20100612105427483/xzcvrr1.jpg",
+    "size": [
+      500,
+      353
+    ],
+    "md5": "91cbfe16faaecf3f77c5ba4dbf89f5a7",
+    "page": "L 窗 · 门派仙府建筑弹窗（开元阵·炼丹房）",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "弹窗外框实测跨距 496px（竖线 x=2→497）；正文零中间调 → 原生",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          500,
+          353
+        ],
+        "why": "门派仙府 2009-06-30 之后才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "2010-06，原生 1:1。『建造建筑 (0/5)』表：门派成员 / 法术等级 / 法术效果。"
+  },
+  {
+    "id": "#103",
+    "file": "reference/images/17173-live/20100612105427483/xzcvrr2.jpg",
+    "size": [
+      486,
+      146
+    ],
+    "md5": "a1ab56ac156b516182100b69c37e5f5c",
+    "page": "ally.jsp 门派 · 我的门派功德",
+    "evidence_year": "2010-06",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=3→462）；行 pitch 21-22",
+    "origin_offset": [
+      17,
+      null
+    ],
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          486,
+          146
+        ],
+        "why": "整块『我的门派功德』2009-06-30 才有"
+      }
+    ],
+    "notes": "2010-06，原生 1:1，但整图都是资料片内容。仅作 DOM 结构（60%/40% 列宽）的佐证。"
+  },
+  {
+    "id": "#104",
+    "file": "reference/images/17173-live/20100706111951977/z0706xz01.jpg",
+    "size": [
+      507,
+      469
+    ],
+    "md5": "816e9a6cdad038bc654cc7f3cf4cac06",
+    "page": "map.jsp 世界地图（益州 森林 95,52）",
+    "evidence_year": "2010-07",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=30→486 = 457）",
+    "origin_offset": [
+      5,
+      101
+    ],
+    "masks": [
+      {
+        "rect": [
+          20,
+          440,
+          467,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-07，原生 1:1。森林地形插画 + 地块样本。"
+  },
+  {
+    "id": "#105",
+    "file": "reference/images/17173-live/20100706111951977/z0706xz02.jpg",
+    "size": [
+      510,
+      494
+    ],
+    "md5": "bbc36efdddf426aeb67d1138fe5a5917",
+    "page": "player.jsp 人物页（土属性男，蜀山）",
+    "evidence_year": "2010-07",
+    "scale": 1.0,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px；表格行 pitch 实测 22px / 原生 22px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测 145×26 @ (23,10)）",
+    "origin_offset": [
+      -1,
+      101
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-07。男·土属性剪影（灰橄榄）的唯一原生来源。"
+  },
+  {
+    "id": "#106",
+    "file": "reference/images/17173-live/20100721110246898/z0721xz01.jpg",
+    "size": [
+      510,
+      448
+    ],
+    "md5": "0e9347f237952cf17aae42bd9da9f40f",
+    "page": "map.jsp 世界地图（益州 青山 115,6）",
+    "evidence_year": "2010-07",
+    "scale": 1.0,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线）（实测 x=31→487 = 457）",
+    "origin_offset": [
+      4,
+      121
+    ],
+    "masks": [
+      {
+        "rect": [
+          20,
+          420,
+          470,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-07，原生 1:1。★地图页的像素基准：墨框内框 448×245 与 DOM 的 mapdiv 完全吻合。注意 `17173-zone-systems-20081030/7-地图.jpg` 与本图 **MD5 完全相同**（0e9347f2…），所以 17173 专区那张不是 2008 年的图，**2008 版地图页没有任何截图**。origin_offset 由 DOM 中 8 向箭头的 #gleft 相对坐标（left 0/231/463, top 154/284/414）反推，±4px。"
+  },
+  {
+    "id": "#109",
+    "file": "reference/images/17173-live/20100803113415883/z0803xz01s.gif",
+    "size": [
+      400,
+      364
+    ],
+    "md5": "9f4b959d3d08fb8a5f27f75fcc91a16c",
+    "page": "H 窗 · 游戏指南 > 经脉",
+    "evidence_year": "2010-08",
+    "scale": 0.816,
+    "scale_basis": "★实测：指南正文框跨距 372px / 原生 456px（由原生 #111 标定）= 0.816；关闭钮红×内芯实测 6-7px / 原生 8px 亦指向 0.8 左右",
+    "origin_offset": null,
+    "masks": [],
+    "use": "text_only",
+    "excluded_regions": [],
+    "notes": "2010-08。GIF 且被缩到 400px + 抖色 → **取色不可靠、几何不可靠**，只能用来核对文案与五行配色对照表。"
+  },
+  {
+    "id": "#110",
+    "file": "reference/images/17173-live/20100803113415883/z0803xz02s.gif",
+    "size": [
+      400,
+      164
+    ],
+    "md5": "18432918560f763497d0bb291465f37a",
+    "page": "H 窗 · 游戏指南 > 银票",
+    "evidence_year": "2010-08",
+    "scale": 0.816,
+    "scale_basis": "与 #109 同篇同批（同为 400px GIF），沿用 0.816",
+    "origin_offset": null,
+    "masks": [],
+    "use": "text_only",
+    "excluded_regions": [],
+    "notes": "2010-08。GIF 抖色。只核文案。"
+  },
+  {
+    "id": "#111",
+    "file": "reference/images/17173-live/20100804111416399/z0804xz01.jpg",
+    "size": [
+      494,
+      427
+    ],
+    "md5": "bf732f9dce7395ef7d80cd7150fc35c8",
+    "page": "H 窗 · 游戏指南 > 秘笈",
+    "evidence_year": "2010-08",
+    "scale": 1.0,
+    "scale_basis": "指南正文框实测跨距 456px（竖线 x=7→462）；表格行 pitch 实测 20px / 原生 20px；正文零中间调",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          462,
+          40,
+          16,
+          370
+        ],
+        "why": "浏览器/窗口原生竖向滚动条"
+      },
+      {
+        "rect": [
+          7,
+          400,
+          455,
+          20
+        ],
+        "why": "窗口内底部原生横向滚动条"
+      },
+      {
+        "rect": [
+          400,
+          350,
+          94,
+          77
+        ],
+        "why": "右下角 `xz.yyge.com 修真` 官方红日水印（配图水印，不是 UI）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-08，原生 1:1。★指南窗的像素基准（面包屑 / ◀◀▶▶ / 墨迹标题条 / 正文框 1px #CCC / 底部历史）。秘笈用途表列宽 109/346、行高 20px。"
+  },
+  {
+    "id": "#112",
+    "file": "reference/images/17173-live/20100804111416399/z0804xz02.jpg",
+    "size": [
+      495,
+      446
+    ],
+    "md5": "ed337ed7b842cf74389cf2659aa7dc7e",
+    "page": "H 窗 · 游戏指南 > 书籍",
+    "evidence_year": "2010-08",
+    "scale": 1.0,
+    "scale_basis": "表格行 pitch 实测 20px；正文零中间调（笔画 1px 无中间调）→ 原生",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          400,
+          370,
+          95,
+          76
+        ],
+        "why": "右下角 `xz.yyge.com 修真` 官方红日水印（配图水印，不是 UI）"
+      }
+    ],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-08，原生 1:1。书籍表（含 rowspan=3 的『城池』合并格）。表内最高阅历 50000，与 2008-12 一致 → 可借用。"
+  },
+  {
+    "id": "#113",
+    "file": "reference/images/17173-live/20100805104905646/z0805xz02.jpg",
+    "size": [
+      600,
+      300
+    ],
+    "md5": "7a710d1e20b6a99cf62313fe5cf75f07",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2010-08",
+    "scale": 1.0,
+    "scale_basis": "图幅 600×300 = 4 张 150×150 原件拼成 2×2，未缩放",
+    "origin_offset": null,
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-08。★地形插画合集大图，按 150 网格切开即得 4 张原件，是本批里最干净的地形素材来源。"
+  },
+  {
+    "id": "#114",
+    "file": "reference/images/17173-live/20100811104141572/z0811xz01.jpg",
+    "size": [
+      755,
+      564
+    ],
+    "md5": "a1e4d34e0c588a8c088dfce2bfead1b9",
+    "page": "整页 player.jsp（本体态）+ #top + #gmid（右栏被裁）",
+    "evidence_year": "2010-08",
+    "scale": 1.0,
+    "scale_basis": "资源条五行图标中心实测 x=298/537/657 → pitch 119.7px / 原生 120px",
+    "origin_offset": [
+      4,
+      0
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2010-08，中栏底纹已改为中性灰 + 右上角回纹角饰（2008 版是暖灰宣纸、无角饰）；含『移动事件』块。无水印，是 logo / 本体线稿的最佳临摹底稿。"
+  },
+  {
+    "id": "#116",
+    "file": "reference/images/17173-zone-systems-20081030/1-经脉.jpg",
+    "size": [
+      487,
+      455
+    ],
+    "md5": "81d5fe69057836c3aedde520bb6229b3",
+    "page": "player.jsp 经脉视图（金属性男，蜀山）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "表格行 pitch 实测 22px / 原生 22px（实测行 pitch 22）；经脉节点白盘实测中位直径 19px / 原生 19px（实测 20px）；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）",
+    "origin_offset": [
+      9,
+      109
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10 的 17173 专区图，**无水印**，是基准期经脉页 + 『人 物』页标题横幅 + 蜀山竹水印的最佳底稿。"
+  },
+  {
+    "id": "#117",
+    "file": "reference/images/17173-zone-systems-20081030/2-本体.jpg",
+    "size": [
+      492,
+      467
+    ],
+    "md5": "66c43611c6139a9f2c7b141f0934714f",
+    "page": "player.jsp 本体视图（男）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "本体节点白盘实测中位直径 21px / 原生 21px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测横幅 148×28 @ (21,6) —— 最干净的一次横幅实测）",
+    "origin_offset": [
+      -1,
+      104
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10 专区图，无水印。**本条的横幅实测 148×28 就是『150×30 原生』这把尺子的标定值。**"
+  },
+  {
+    "id": "#118",
+    "file": "reference/images/17173-zone-systems-20081030/3-炼器.jpg",
+    "size": [
+      484,
+      406
+    ],
+    "md5": "7ada14b9d6d1ee5fdd8917d0c01e2dba",
+    "page": "skill.jsp 炼器树（专区版，无水印）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测横幅 144×? @ (11,4)）；法术图标 64×64 网格与 #8 一致",
+    "origin_offset": [
+      11,
+      107
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10，无水印。★炼器树背景（箭头 + Lv 标注）与 64×64 图标（丹/铸/未解锁?）的最佳底稿。"
+  },
+  {
+    "id": "#119",
+    "file": "reference/images/17173-zone-systems-20081030/4-术数.jpg",
+    "size": [
+      479,
+      378
+    ],
+    "md5": "62ad40077517cee6c9da68aca820c446",
+    "page": "skill.jsp 术数树（易经 0/500）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测横幅 148×? @ (12,1) —— 与 #117 的 148 吻合）",
+    "origin_offset": [
+      8,
+      109
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10，无水印，原生。『术 数』页标题横幅的最佳来源。"
+  },
+  {
+    "id": "#120",
+    "file": "reference/images/17173-zone-systems-20081030/5-剑侠.jpg",
+    "size": [
+      470,
+      486
+    ],
+    "md5": "a6084621b57ef88a867a2f11848fe28a",
+    "page": "skill.jsp 剑术树",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（实测横幅 145×26 @ (8,3)）",
+    "origin_offset": [
+      14,
+      108
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10，无水印，原生。含御剑/莲台/宽刃剑三个 64×64 图标。"
+  },
+  {
+    "id": "#121",
+    "file": "reference/images/17173-zone-systems-20081030/6-法宝.jpg",
+    "size": [
+      504,
+      218
+    ],
+    "md5": "844f23451ebde1af52aedeae4be4169e",
+    "page": "item.jsp 法宝一览",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=19→478）",
+    "origin_offset": [
+      1,
+      105
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10 基准期，无水印，原生。★法宝一览页（单选框 + 名称 + 操作列）唯一来源。"
+  },
+  {
+    "id": "#122",
+    "file": "reference/images/17173-zone-systems-20081030/8-帮派.jpg",
+    "size": [
+      484,
+      452
+    ],
+    "md5": "4abf8ae66e87457ecaff30cea8291156",
+    "page": "ally.jsp 门派概况（2008）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=13→472）；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）（横幅 149 宽 @ (13,3)）；行 pitch 22",
+    "origin_offset": [
+      9,
+      108
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10 基准期，原生 1:1。★基准期门派页唯一原生截图：子标签只有『概况|成员|攻击|新闻|功能』（**没有『仙府』**），正是 2008 基准态。左右两表等高（左 230 / 右 229）。"
+  },
+  {
+    "id": "#123",
+    "file": "reference/images/17173-zone-systems-20081030/9-交易.jpg",
+    "size": [
+      505,
+      431
+    ],
+    "md5": "3d5a6db70d914708b15c8403bddfdca4",
+    "page": "trade.jsp 市场（专区版）",
+    "evidence_year": "2008-10",
+    "scale": 1.0,
+    "scale_basis": "左栏内容表 `table width=460` 左右外框线实测跨距 460px / 原生 460px（实测竖线 x=25→484）；行 pitch 27px；页标题横幅墨迹实测 148×26 / 原生 150×30 图（墨迹内缩各 2px）",
+    "origin_offset": [
+      -5,
+      103
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "2008-10 基准期，原生 1:1，**无水印** → 比 #7 更适合做像素基准。页标题写『交 易』（后期改为『市 场』）。"
+  },
+  {
+    "id": "#130",
+    "file": "reference/images/sina-live/2010-02-04-1108372823/U2964P115T9D372823F167DT20100204110837_c.jpg",
+    "size": [
+      481,
+      450
+    ],
+    "md5": "703e9dbcb4f48a1a8a0580acc0d3f2fd",
+    "page": "map.jsp 世界地图（益州 平原 116,52，新浪版最大）",
+    "evidence_year": "2010-02",
+    "scale": 0.974,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 445/457 = 0.974",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          400,
+          441,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★同组（#45/#51/#66/#147/#130）五张里最接近原生的一张。由本图反推该截图的原件约 494×462，即 17173 的 400px 版缩了 0.81。"
+  },
+  {
+    "id": "#131",
+    "file": "reference/images/sina-live/2010-02-04-1108372823/U2964P115T9D372823F168DT20100204110837_c.jpg",
+    "size": [
+      504,
+      450
+    ],
+    "md5": "3ce6c0815b7a1ad6869bf5d205f6b824",
+    "page": "map.jsp 世界地图（雍州 不见山 14,50，洞天，新浪版）",
+    "evidence_year": "2010-02",
+    "scale": 1.044,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 477/457 = 1.044，**被放大**（新浪把高度拉到 450）",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          420,
+          464,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★与原生的 #52 是同一张截图，本图反而被上采样 1.04 倍 → 像素更糊。用 #52，不要用本图。"
+  },
+  {
+    "id": "#134",
+    "file": "reference/images/sina-live/2010-02-08-1116373982/U3895P115T9D373982F168DT20100208111642_c.jpg",
+    "size": [
+      242,
+      430
+    ],
+    "md5": "ad274e5e53aae398832e10d755789efe",
+    "page": "player.jsp 经脉视图局部（火属性男，新浪版）",
+    "evidence_year": "2010-02",
+    "scale": 0.95,
+    "scale_basis": "经脉节点白盘实测中位直径 19px / 原生 19px → 实测中位 17px / 19px = 0.895，与 #53 的尺寸比 242/240 = 1.008 冲突，取两者中值 ≈0.95（尺子分辨率 ±5%）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #53 同一张截图（相关系数 1.000），仅保留其一即可；本条保留是因为它比 #53 宽 2px。"
+  },
+  {
+    "id": "#143",
+    "file": "reference/images/sina-live/2010-03-02-1317378370/U4513P115T9D378370F167DT20100302131705_c.jpg",
+    "size": [
+      450,
+      211
+    ],
+    "md5": "b68462f1a56e55b557d9fd56d0787c50",
+    "page": "createplayer.jsp 建号页 · 五行属性下拉局部（新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.909,
+    "scale_basis": "建号内容表 `width=460` 实测跨距 418px（x=9→426）→ 418/460 = 0.909；与 #62 恰为 1.125 倍",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          16,
+          68,
+          124,
+          24
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          44,
+          129,
+          46,
+          14
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      }
+    ],
+    "use": "text_only",
+    "excluded_regions": [],
+    "notes": "与 #62 同一张截图，新浪版更大。报告 04 §9.1 记作 0.95，实测 0.909。"
+  },
+  {
+    "id": "#146",
+    "file": "reference/images/sina-live/2010-03-05-1155379510/U4513P115T9D379510F168DT20100305115548_c.jpg",
+    "size": [
+      450,
+      411
+    ],
+    "md5": "1da301b2cc4831f535a508575b1c9146",
+    "page": "player.jsp 人物页（火属性女，昆仑水印，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.9,
+    "scale_basis": "表格行 pitch 实测 20px / 原生 22px = 0.909；与 #65 恰为 1.125 倍（0.795×1.125 = 0.894）",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★与 #65 同一张截图，新浪版更大，昆仑荷花水印以本图为准。"
+  },
+  {
+    "id": "#147",
+    "file": "reference/images/sina-live/2010-03-05-1155379510/U4513P115T9D379510F169DT20100305115548_c.jpg",
+    "size": [
+      450,
+      421
+    ],
+    "md5": "37322aab9bbcdbca312b3c17a6658b2a",
+    "page": "map.jsp 世界地图（益州 平原 116,52，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.912,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 417/457 = 0.912",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          20,
+          375,
+          410,
+          26
+        ],
+        "why": "#mapbar 一行：x/y 坐标 input、滚屏距离 input 均为浏览器原生控件（近似 ±6px）"
+      }
+    ],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：同组已有更大的 #130，可弃。"
+  },
+  {
+    "id": "#148",
+    "file": "reference/images/sina-live/2010-03-05-1155379510/U4513P115T9D379510F364DT20100305115548_c.jpg",
+    "size": [
+      419,
+      409
+    ],
+    "md5": "792bf0137c90d227ed7d05edc6f43246",
+    "page": "map.jsp 门派仙府内部地图（凌烟阁，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.869,
+    "scale_basis": "仙府星空视口实测宽 397px / 原生 457px = 0.869",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [
+      {
+        "rect": [
+          0,
+          0,
+          419,
+          409
+        ],
+        "why": "门派仙府 2009-06-30 之后才有，基准版没有（01 §2.3）"
+      }
+    ],
+    "notes": "★同组（#46/#67/#148）最大的一张。含『向选中场景御剑飞行』第三条操作链接。"
+  },
+  {
+    "id": "#149",
+    "file": "reference/images/sina-live/2010-03-11-1325381227/U4513P115T9D381227F167DT20100311132553_c.jpg",
+    "size": [
+      450,
+      261
+    ],
+    "md5": "8ed115d57ad12ad515c5b420d2d61964",
+    "page": "map.jsp 世界地图（新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.915,
+    "scale_basis": "地图墨框 `#mapbg` 外缘实测宽 457px / 原生 457px（DOM: mapdiv 448×245 + 墨线） → 实测 418/457 = 0.915",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "2010-03。"
+  },
+  {
+    "id": "#150",
+    "file": "reference/images/sina-live/2010-03-24-1510385163/U4663P115T9D385163F168DT20100324151059_c.jpg",
+    "size": [
+      450,
+      350
+    ],
+    "md5": "fbed806162df9bd1678ee9d5337d2a0b",
+    "page": "item.jsp 炼制丹药页（九炼，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.9375,
+    "scale_basis": "与原生 #68（480×373）同图，450/480 = 0.9375；行 pitch 实测 28px vs #68 的 30px 自洽",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #68 同一张截图且更小。已有原生版，本条可弃。"
+  },
+  {
+    "id": "#151",
+    "file": "reference/images/sina-live/2010-03-29-1338386516/U4513P115T9D386516F168DT20100329133839_c.jpg",
+    "size": [
+      450,
+      417
+    ],
+    "md5": "d9a7e8e47bec216f0ca3064162cd9ace",
+    "page": "createplayer.jsp 建号页（完整，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.952,
+    "scale_basis": "建号内容表 `width=460` 实测跨距 438px（x=4→441）→ 438/460 = 0.952",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          12,
+          27,
+          105,
+          17
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          51,
+          167,
+          28,
+          15
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          14,
+          222,
+          132,
+          20
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          190,
+          180,
+          132,
+          20
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          39,
+          260,
+          66,
+          15
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          103,
+          261,
+          23,
+          14
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      },
+      {
+        "rect": [
+          8,
+          290,
+          430,
+          100
+        ],
+        "why": "浏览器原生控件（input/select/radio），外观随玩家系统主题而变"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★同一张截图的三个版本里最大的一个（#69 0.848 / #143 0.909 / 本图 0.952）。昆仑男头像 100×120 的最佳来源。仍非 1:1。"
+  },
+  {
+    "id": "#153",
+    "file": "reference/images/sina-live/2010-03-31-1641387364/U4514P115T9D387364F168DT20100331164134_c.jpg",
+    "size": [
+      449,
+      450
+    ],
+    "md5": "86df32e8ef44829e05416814a0c4abc1",
+    "page": "player.jsp 人物页（同 #70，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 1.0,
+    "scale_basis": "表格行 pitch 实测 22px / 原生 22px；经脉节点白盘实测中位直径 19px / 原生 19px",
+    "origin_offset": [
+      22,
+      108
+    ],
+    "masks": [],
+    "use": "overlay_2px",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #70 逐像素近乎相同（mean diff 1.69，仅 JPEG 重编码差异），尺寸同为 449×450。两张都是原生；做像素断言时任选其一，建议用 #70。"
+  },
+  {
+    "id": "#154",
+    "file": "reference/images/sina-live/2010-03-31-1641387364/U4514P115T9D387364F169DT20100331164134_c.jpg",
+    "size": [
+      450,
+      226
+    ],
+    "md5": "c2b7cc8f32fce55bb60c7a73e8f31f1f",
+    "page": "item.jsp 炼制丹药页（一炼，新浪版）",
+    "evidence_year": "2010-03",
+    "scale": 0.959,
+    "scale_basis": "与原生 #71（469×236）同图，450/469 = 0.9595；表宽实测 441/460 = 0.959 吻合",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：与 #71 同一张截图且更小。**本条同时是『新浪该篇缩放系数 = 0.959』这把尺子的标定值**，#155 的系数就是由它推出来的。"
+  },
+  {
+    "id": "#155",
+    "file": "reference/images/sina-live/2010-03-31-1641387364/U4514P115T9D387364F364DT20100331164134_c.jpg",
+    "size": [
+      450,
+      382
+    ],
+    "md5": "0ee2cdf4af26e0231e6df9d0b7e7fc0d",
+    "page": "item.jsp 炼制飞剑页（新浪版，最大最清晰）",
+    "evidence_year": "2010-03",
+    "scale": 0.959,
+    "scale_basis": "同篇新浪文章的 #154 由 469×236（=原生 #71）被缩到 450×226 → 该篇缩放系数 0.959；#155 五列 pitch 55.75px 与 #42 的 49.3px 比值 1.131 与之自洽",
+    "origin_offset": null,
+    "masks": [
+      {
+        "rect": [
+          355,
+          112,
+          66,
+          228
+        ],
+        "why": "『准备炼制』原生 input 输入框列（近似 ±4px）"
+      }
+    ],
+    "use": "ratio_4px",
+    "excluded_regions": [],
+    "notes": "★同组三张里最接近原生的一张（0.959），四把飞剑的炼制数值以本图为准。注意页标题横幅写的是『炼 器』不是『法 宝』。"
+  },
+  {
+    "id": "#158",
+    "file": "reference/images/sina-live/2010-04-07-1210388986/U4511P115T9D388986F168DT20100407121053_c.jpg",
+    "size": [
+      450,
+      325
+    ],
+    "md5": "d8ae23d50ef6631b3f1c6e58ef5157c3",
+    "page": "L 窗 rank.jsp 排行榜（新浪版，最大）",
+    "evidence_year": "2010-04",
+    "scale": 0.944,
+    "scale_basis": "同图的 #74 表宽实测 386/460 = 0.839 → 本图 = 0.839×450/400 = 0.944；本图行 pitch 实测 21px / 原生 22px = 0.955，取两者中值 ≈0.95",
+    "origin_offset": null,
+    "masks": [],
+    "use": "ratio_4px",
+    "excluded_regions": [
+      {
+        "rect": [
+          100,
+          28,
+          350,
+          22
+        ],
+        "why": "子标签行里的『功德』一项，2009-06-30 才有（01 §2.3）"
+      }
+    ],
+    "notes": "2010-04。★排行榜页只有这一张和 #74，**两张都是缩放图 → 排行榜永远做不了 ±2px 断言**。列宽比 ≈15%/50%/35%。"
+  },
+  {
+    "id": "#159",
+    "file": "reference/images/sina-live/2010-04-12-1026390246/U4511P115T9D390246F168DT20100412102615_c.jpg",
+    "size": [
+      450,
+      225
+    ],
+    "md5": "e2f5708550cf519bd06271b700bbf5e9",
+    "page": "map.jsp 顶部地形插画素材 `img/scene/*.gif`（原件 150×150）",
+    "evidence_year": "2010-04",
+    "scale": 0.75,
+    "scale_basis": "与 #113（600×300 原生）为同一拼图，450/600 = 0.75",
+    "origin_offset": null,
+    "masks": [],
+    "use": "excluded",
+    "excluded_regions": [],
+    "notes": "★重复图：#113 的 0.75 缩小版（新浪）。用 #113。"
+  }
+]

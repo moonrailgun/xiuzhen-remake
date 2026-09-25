@@ -20,10 +20,14 @@ import {
   msgVm,
   artifactLabel,
   TRADE_PAGE_SIZE,
+  townHere,
+  townKey,
+  sceneNpcNames,
 } from './vm.ts'
 import { newGame } from '../engine/game.ts'
 import { refillNpcOrders } from '../engine/market.ts'
 import { SWORDS } from '../data/swords.ts'
+import { terrainAt } from '../data/world.ts'
 import type { Artifact, FiveQi, GameState } from '../engine/state.ts'
 
 const base = (): GameState => newGame({
@@ -219,4 +223,55 @@ test('收件箱分页，未读标记跟着存档走', () => {
   assert.equal(vm.rows[0]!.unread, false)
   assert.equal(vm.rows[1]!.unread, true)
   assert.match(vm.rows[0]!.sentAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+})
+
+// —— 城镇 ——
+
+test('★不在城镇上时场景里没有 NPC；踩到城镇上才有', () => {
+  const s = base()
+  // 找一格村/镇/城，把人挪过去
+  let found: { x: number; y: number } | null = null
+  for (let x = 0; x < 60 && !found; x++) {
+    for (let y = 0; y < 60; y++) {
+      const t = terrainAt(s.worldSeed, x, y, 99)
+      if (t === '村庄' || t === '小镇' || t === '城池') { found = { x, y }; break }
+    }
+  }
+  assert.ok(found, '世界里应该有城镇')
+
+  const wild = { ...s, player: { ...s.player, x: 1, y: 1 } }
+  if (!['村庄', '小镇', '城池'].includes(terrainAt(s.worldSeed, 1, 1, 99))) {
+    assert.equal(townHere(wild), null)
+    assert.deepEqual([...sceneNpcNames(wild)], [])
+  }
+
+  const inTown = {
+    ...s,
+    clock: { ...s.clock, gameT: 40 * 86400 }, // 开服 4 周后城镇才全开
+    player: { ...s.player, x: found!.x, y: found!.y },
+  }
+  const here = townHere(inTown)
+  assert.ok(here, '站在城镇上应该取到镇')
+  assert.equal(here!.fresh, true, '第一次踩上去是新生成的')
+  assert.ok(sceneNpcNames(inTown).includes('镖局老板'))
+  assert.ok(sceneNpcNames(inTown).includes('私塾先生'))
+})
+
+test('城镇一旦入档就不再重新生成（投资不会被抹掉）', () => {
+  const s = base()
+  const town = {
+    id: '10,10', kind: '小镇' as const, name: '地球镇', x: 10, y: 10,
+    investments: [{ owner: '逆神猪', silver: 5000 }],
+  }
+  const saved = {
+    ...s,
+    clock: { ...s.clock, gameT: 40 * 86400 },
+    player: { ...s.player, x: 10, y: 10 },
+    towns: { [townKey(10, 10)]: town },
+  }
+  if (townHere(saved)) {
+    const here = townHere(saved)!
+    assert.equal(here.fresh, false)
+    assert.equal(here.town.investments.length, 1)
+  }
 })

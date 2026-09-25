@@ -9,6 +9,8 @@ import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+// 城镇坐标直接问引擎，跟游戏里用的是同一套地形函数
+import { terrainAt, WORLD_SIZE } from '../../src/data/world.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const OUT = join(ROOT, 'tools', 'parity', 'shots')
@@ -280,7 +282,64 @@ if (swordBoxes > 0) {
   check('派出去的剑变成「斩杀中」', false)
 }
 
-// 14. 产业页与排行榜浮窗能打开（原版 L 窗路由）
+// —— 14. 城镇：走进村/镇/城，场景 NPC 出现，能投资 ——
+// 城镇坐标由引擎算（同一套 terrainAt），不在浏览器里瞎扫。
+const seed = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('xiuzhen.save')).state.worldSeed)
+
+let townAt = null
+for (let x = 0; x < WORLD_SIZE && !townAt; x++) {
+  for (let y = 0; y < WORLD_SIZE; y++) {
+    const t = terrainAt(seed, x, y, 99)
+    if (t === '村庄' || t === '小镇' || t === '城池') { townAt = { x, y, kind: t }; break }
+  }
+}
+check('世界里生成了城镇', townAt !== null, townAt ? `${townAt.kind}(${townAt.x},${townAt.y})` : '')
+
+await page.evaluate((t) => {
+  const env = JSON.parse(localStorage.getItem('xiuzhen.save'))
+  const st = env.state
+  st.clock.gameT = 40 * 86400 // 开服 4 周后城镇全开
+  st.player.x = t.x
+  st.player.y = t.y
+  st.player.silver = 50000
+  st.timeline.events = []
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+}, townAt)
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(300)
+
+const sceneText = (await page.locator('#gmid').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('站在城镇里，场景 NPC 栏出现镖局老板等人',
+  sceneText.includes('镖局老板') && sceneText.includes('私塾先生'),
+  sceneText.slice(sceneText.indexOf('当前场景中的NPC'), sceneText.indexOf('当前场景中的NPC') + 50))
+
+await page.click('#gmid a[onclick*="npc.jsp?name=%E9%95%96%E5%B1%80%E8%80%81%E6%9D%BF"]')
+await page.waitForTimeout(350)
+const escortText = (await page.locator('#lwindowcontent').textContent()) ?? ''
+check('镖局老板的对话是原版逐字那一段',
+  escortText.includes('负责管理') && escortText.includes('镖货往来') && escortText.includes('运镖的收益指数'),
+  escortText.replace(/\s+/g, ' ').slice(0, 60))
+
+// 村长/镇长/太守：投资
+const chief = { 村庄: '村长', 小镇: '镇长', 城池: '太守' }[townAt.kind]
+await page.evaluate((n) => window.openLWindow('', `npc.jsp?name=${encodeURIComponent(n)}`), chief)
+await page.waitForTimeout(300)
+check('投资窗显示商业等级与份额',
+  ((await page.locator('#lwindowcontent').textContent()) ?? '').includes('商业 Lv.'))
+
+await page.fill('#investsilver', '5000')
+await page.click('#lwindowcontent a[onclick="doInvest()"]')
+await page.waitForTimeout(400)
+const invested = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  const towns = Object.values(st.towns)
+  return { silver: st.player.silver, towns: towns.length, put: towns[0]?.investments?.[0]?.silver ?? 0 }
+})
+check('投资后银两扣除、城镇入档', invested.towns === 1 && invested.put === 5000 && invested.silver === 45000,
+  JSON.stringify(invested))
+
+// 15. 产业页与排行榜浮窗能打开（原版 L 窗路由）
 await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
 await page.waitForTimeout(300)
 check('排行榜浮窗列出 NPC',

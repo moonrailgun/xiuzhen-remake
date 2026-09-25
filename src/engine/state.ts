@@ -14,6 +14,7 @@ import type { Element } from '../data/meridian.ts'
 import type { NpcWorld } from './npc.ts'
 import type { QuestLog } from './quest.ts'
 import type { Market } from './market.ts'
+import type { Town } from './town.ts'
 
 export type School = '蜀山' | '昆仑' | '通天'
 
@@ -84,6 +85,8 @@ export type GameState = {
   readonly quests: QuestLog
   /** 市场挂单：自己的 + NPC 的（`market.ts` 负责补货与结算） */
   readonly market: Market
+  /** 去过的城镇（按 `x,y` 索引）。没去过的城镇不入档，踩上去才生成 */
+  readonly towns: Readonly<Record<string, Town>>
   /** 收件箱，上限 200 封（`docs/spec/DECISIONS.md` §2 的体积预算） */
   readonly mail: readonly MailItem[]
 }

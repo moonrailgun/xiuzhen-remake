@@ -46,6 +46,7 @@ const state = (over: Partial<GameState['player']> = {}): GameState => ({
   npc: { bases: [], patches: {} },
   quests: { entries: [], line: 'qi' as const, dantianBonus: 0 },
   market: { qi: [], artifacts: [] },
+  towns: {},
   mail: [],
   player: {
     name: '逆神猪',

@@ -29,6 +29,10 @@ import { ELEMENTS, type Element } from '../data/meridian.ts'
 import { artifactSlots, BODY_SLEEVE, craftSeconds, BODY_HAND } from '../engine/craft.ts'
 import { injectSecondsFor, visibleOrders, type QiOrder } from '../engine/market.ts'
 import { allNpcsAt, type NpcState } from '../engine/npc.ts'
+import { npcsIn } from '../data/town.ts'
+import { terrainAt, sceneName } from '../data/world.ts'
+import { weekOfServer } from '../engine/clock.ts'
+import type { Town } from '../engine/town.ts'
 import { formatGameDate, formatGameDateShort } from '../engine/clock.ts'
 import type { FiveQi, GameState, Artifact } from '../engine/state.ts'
 
@@ -382,6 +386,44 @@ const SCHOOL_INTRO: Record<GameState['player']['school'], string> = {
   蜀山: '蜀山以剑仙著称，拥有最为刚猛的攻击。',
   昆仑: '昆仑以炼器著称，在炼制法宝上有所专长。',
   通天: '通天则信奉弱肉强食的自由思想，最具掠夺性。',
+}
+
+// —— 城镇 ——
+
+/** 城镇按坐标索引进存档。 */
+export const townKey = (x: number, y: number): string => `${x},${y}`
+
+/**
+ * 站在村/镇/城上时取这一格的城镇。**第一次踩上去才生成并入档**
+ * （地形本身由世界种子算，所以同一个存档每次都是同一个镇）。
+ * 不在城镇上返回 null。
+ */
+export function townHere(s: GameState): { readonly town: Town; readonly fresh: boolean } | null {
+  const t = terrainAt(s.worldSeed, s.player.x, s.player.y, weekOfServer(s.clock))
+  if (t !== '村庄' && t !== '小镇' && t !== '城池') return null
+
+  const key = townKey(s.player.x, s.player.y)
+  const known = s.towns[key]
+  if (known) return { town: known, fresh: false }
+
+  return {
+    fresh: true,
+    town: {
+      id: key,
+      kind: t,
+      // 专名用世界生成器给的场景名（「雍州 无名村」→ 取后半）
+      name: sceneName(s.worldSeed, s.player.x, s.player.y).split(' ')[1] ?? t,
+      x: s.player.x,
+      y: s.player.y,
+      investments: [],
+    },
+  }
+}
+
+/** 中栏「当前场景中的NPC」：站在城镇里才有人。 */
+export function sceneNpcNames(s: GameState): readonly string[] {
+  const here = townHere(s)
+  return here ? npcsIn(here.town.kind).map((n) => n.nameOf(here.town.kind)) : []
 }
 
 // —— 收件箱 ——

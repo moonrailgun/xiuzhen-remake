@@ -24,10 +24,21 @@ import { renderPayment } from '../pages/payment.ts'
 import { renderFight } from '../pages/fight.ts'
 import { renderEstate } from '../pages/estate.ts'
 import { renderBattleEvent } from '../pages/battleevent.ts'
-import { skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel } from './vm.ts'
+import {
+  skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel,
+  townHere, townKey, sceneNpcNames,
+} from './vm.ts'
 import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
 import { ranking } from '../engine/npc.ts'
-import { MAX_INVESTMENTS } from '../engine/town.ts'
+import {
+  MAX_INVESTMENTS, commerceLevel, totalInvested, shareOf, hourlyIncomeOf,
+  invest, readBook, canReadFree, exchangeNote, teleport, payLiYuanwai, acceptEscort, quoteEscort,
+  BANK_NOTES, type Town,
+} from '../engine/town.ts'
+import {
+  escortDialog, booksReadableIn, npcsIn, READ_BOOK_SILVER, STATION_COST_COIN,
+  LI_YUANWAI_SILVER, type TownNpc,
+} from '../data/town.ts'
 import { daoxingText } from '../engine/state.ts'
 import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
@@ -226,7 +237,7 @@ function midVm(s: GameState) {
     craft: rows('craft'),
     move,
     cultivate: rows('cultivate'),
-    npcs: [],
+    npcs: sceneNpcNames(s),
     players,
   }
 }
@@ -678,6 +689,66 @@ export function installGameActions(): void {
     openWindow('rwindow', '消息', renderMsg(msgVm(state, msgPage)))
     step()
   }
+
+  // —— 城镇 ——
+  // 城镇是踩上去才入档的，所以每个操作前先把这一格的镇写回 state。
+
+  const withTown = (fn: (town: Town, s: GameState) => GameState | { error: string }): void => {
+    if (!state) return
+    const here = townHere(state)
+    if (!here) return
+    const s0: GameState = here.fresh
+      ? { ...state, towns: { ...state.towns, [townKey(here.town.x, here.town.y)]: here.town } }
+      : state
+    const out = fn(here.town, s0)
+    if ('error' in out) {
+      openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">${esc(out.error)}</DIV>`)
+      return
+    }
+    state = out
+    closeWindow('lwindow')
+    step()
+  }
+
+  g['takeEscort'] = () => withTown((town, s) => {
+    const r = acceptEscort(s, town, { x: s.player.x, y: s.player.y })
+    return r.ok ? r.state : { error: r.reason }
+  })
+
+  g['readBook'] = (name: string) => withTown((town, s) => {
+    const r = readBook(s, name, town.kind, { free: canReadFree(town, s.player.name) })
+    return r.ok ? r.state : { error: r.reason }
+  })
+
+  g['exchangeNote'] = (name: string) => withTown((_town, s) => {
+    const r = exchangeNote(s, name)
+    return r.ok ? r.state : { error: r.reason }
+  })
+
+  g['doInvest'] = () => withTown((town, s) => {
+    const silver = Number((document.getElementById('investsilver') as HTMLInputElement | null)?.value ?? 0)
+    // 「只能投一处产业」这条规则要看别处的镇，所以把已知的镇全传进去
+    const others = Object.values(s.towns)
+    const r = invest(s, town, silver, others)
+    if (!r.ok) return { error: r.reason }
+    return {
+      ...r.state,
+      towns: { ...r.state.towns, [townKey(r.town.x, r.town.y)]: r.town },
+    }
+  })
+
+  g['doTeleport'] = () => withTown((town, s) => {
+    const x = Number((document.getElementById('tpx') as HTMLInputElement | null)?.value)
+    const y = Number((document.getElementById('tpy') as HTMLInputElement | null)?.value)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { error: '请填写目标坐标' }
+    const r = teleport(s, { x, y }, { fromKind: town.kind })
+    return r.ok ? r.state : { error: r.reason }
+  })
+
+  g['payLiYuanwai'] = () => withTown((_town, s) => {
+    const r = payLiYuanwai(s)
+    return r.ok ? r.state : { error: r.reason }
+  })
 
   /** 加为护法。 */
   g['addpal'] = (name: string) => {
@@ -1216,12 +1287,91 @@ ${list.map((n) =>
 </TBODY></TABLE>`
 }
 
-/** NPC 对话窗。基准期的 NPC 对话没有存档，只给身份行。 */
+/**
+ * NPC 对话窗。先按城镇 NPC 认（镖局老板/私塾先生/钱庄掌柜/村长/驿站/李员外），
+ * 认不出来再当成同格的修真者。
+ *
+ * **只有镖局老板的对话是原文**（`data/town.ts` 的 `escortDialog` 逐字，
+ * 出处 `reference/text/forum162/article-101916-p1.txt`）。其余五个对话零存档，
+ * 所以只写「他能办什么事」+ 操作，不编对白。
+ */
 function npcWindow(s: GameState, name: string): string {
+  const here = townHere(s)
+  if (here) {
+    const kind = here.town.kind
+    const def = npcsIn(kind).find((n) => n.nameOf(kind) === name)
+    if (def) return townNpcWindow(s, here.town, def)
+  }
+
   const n = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed).find((x) => x.base.name === name)
   if (!n) return '<DIV class=middle style="padding:12px">此人已不在此地。</DIV>'
   return `<DIV class=middle style="padding:10px">${esc(n.base.name)}　${esc(n.realm)}<BR>` +
     `<SPAN class=smallgray>道行 ${esc(n.daoxingText)}　道源 ${esc(n.base.school)}　属性 ${esc(n.base.element)}</SPAN></DIV>`
+}
+
+/** 城镇 NPC 的对话与操作。 */
+function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
+  const level = commerceLevel(town)
+  const box = (inner: string) => `<DIV class=middle style="padding:10px">${inner}</DIV>`
+  const act = (label: string, fn: string) =>
+    `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="${fn}">${esc(label)}</A></DIV>`
+  const pre = (text: string) =>
+    `<DIV class=middle style="padding:10px;white-space:pre-wrap">${esc(text)}</DIV>`
+
+  switch (def.id) {
+    case 'escort': {
+      // 唯一一段原文对话
+      const dialog = escortDialog({ kind: town.kind, name: town.name, x: town.x, y: town.y, level })
+      const quote = quoteEscort(town, { x: s.player.x, y: s.player.y })
+      return `${pre(dialog)}${box(
+        `<SPAN class=smallgray>本地商业 Lv.${level}</SPAN>` +
+        act('领取运镖任务', 'takeEscort()') +
+        `<SPAN class=smallgray>当前可接：佣金 ${quote.fee} 两，约 ${formatDuration(quote.seconds)}</SPAN>`,
+      )}`
+    }
+    case 'school': {
+      const books = booksReadableIn(town.kind)
+      return box(
+        `<SPAN class=smallgray>${esc(def.purpose)}　每本 ${READ_BOOK_SILVER} 两</SPAN><BR>` +
+        (books.length === 0
+          ? '<SPAN class=smallgray>此地无书可读。</SPAN>'
+          : books.map((b) => act(`读《${b.name}》（阅历 +${b.experience}）`,
+              `readBook('${escJs(b.name)}')`)).join('')) +
+        '<BR><SPAN class=smallgray>（私塾先生的对话原文零存档，这里只列他能办的事）</SPAN>',
+      )
+    }
+    case 'bank':
+      return box(
+        `<SPAN class=smallgray>${esc(def.purpose)}　现有 ${s.player.silver} 两</SPAN>` +
+        BANK_NOTES.map((n) => act(`兑${n.name}（${n.value} 两）`, `exchangeNote('${escJs(n.name)}')`)).join('') +
+        '<BR><SPAN class=smallgray>（钱庄掌柜的对话原文零存档）</SPAN>',
+      )
+    case 'chief':
+      return box(
+        `<SPAN class=smallgray>${esc(def.purpose)}</SPAN><BR>` +
+        `${esc(town.name)}　商业 Lv.${level}　已投入 ${totalInvested(town)} 两<BR>` +
+        `你的份额 ${(shareOf(town, s.player.name) * 100).toFixed(1)}%，` +
+        `每小时 ${hourlyIncomeOf(town, s.player.name)} 两<BR>` +
+        `投资 <INPUT class=small id=investsilver size=8 value="1000"> 两` +
+        act('投资', 'doInvest()') +
+        '<SPAN class=smallgray>（村长/镇长/太守的对话原文零存档）</SPAN>',
+      )
+    case 'station':
+      return box(
+        `<SPAN class=smallgray>${esc(def.purpose)}　每次 ${STATION_COST_COIN} 仙石</SPAN><BR>` +
+        `传送到 x <INPUT class=small id=tpx size=4> y <INPUT class=small id=tpy size=4>` +
+        act('传送', 'doTeleport()') +
+        '<SPAN class=smallgray>（驿站价目与对话都是重建，见 data/town.ts）</SPAN>',
+      )
+    case 'li':
+      return box(
+        `<SPAN class=smallgray>${esc(def.purpose)}</SPAN><BR>` +
+        `你现有 ${s.player.silver} 两，需要 ${LI_YUANWAI_SILVER} 两` +
+        act('交付千金', 'payLiYuanwai()'),
+      )
+    default:
+      return box(esc(def.purpose))
+  }
 }
 
 // —— 炼制配方 ——

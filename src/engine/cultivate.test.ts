@@ -31,6 +31,7 @@ const state = (over: Partial<GameState['player']> = {}, timeline = emptyTimeline
   npc: { bases: [], patches: {} },
   quests: { entries: [], line: 'qi' as const, dantianBonus: 0 },
   market: { qi: [], artifacts: [] },
+  towns: {},
   mail: [],
   player: {
     name: '173小鱼',

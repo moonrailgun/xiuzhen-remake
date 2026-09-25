@@ -50,6 +50,11 @@ export const MIGRATIONS: readonly Migration[] = [
     from: 3,
     migrate: (old) => ({ ...(old as object), market: emptyMarket() }),
   },
+  {
+    // v4 → v5：城镇投资进存档。城镇是踩上去才生成的，所以空表即可。
+    from: 4,
+    migrate: (old) => ({ ...(old as object), towns: {} }),
+  },
 ]
 
 const MERIDIAN_GROUPS: readonly MeridianGroup[] = ['手三阴', '手三阳', '足三阴', '足三阳']
@@ -78,6 +83,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
     npc: { bases: generateNpcs(opts.seed, 300), patches: {} },
     quests: emptyQuestLog(),
     market: emptyMarket(),
+    towns: {},
     mail: [],
     player: {
       name: opts.name,

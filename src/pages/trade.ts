@@ -18,7 +18,7 @@
  * （实见 2 / 30 / 120 / 220 / 240 / 680–720 仙石）。
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader } from './shell.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 
@@ -213,7 +213,7 @@ function buyItem(vm: TradeVm): string {
 <TD width=180><A href="${esc(href(1, 2))}">价格</A></TD>
 <TD>操作</TD></TR>
 ${each(vm.itemOffers, (o) => `<TR class="trbg middle" align=middle>
-<TD class=skillup><A onclick="openRWindow('${escJs(o.name)}', 'itemmid.jsp?item=${num(o.item)}&quality=${num(o.quality)}')" href="#">${esc(o.name)}</A></TD>
+<TD class=skillup><A onclick="openRWindow('${js(o.name)}', 'itemmid.jsp?item=${num(o.item)}&quality=${num(o.quality)}')" href="#">${esc(o.name)}</A></TD>
 <TD>${num(o.price)}仙石</TD>
 <TD><A class=middlebold onclick="${confirmBuy('buyitem', o.sheet)}" href="#">购买</A></TD></TR>`)}
 ${pagerRow((p) => href(p), vm.pager, 3)}
@@ -234,7 +234,7 @@ function sellItem(vm: TradeVm): string {
 <TD width=180>价格</TD>
 <TD>操作</TD></TR>
 ${each(vm.myItemOffers, (o) => `<TR class="trbg middle" align=middle>
-<TD><A class=middlebold onclick="openRWindow('${escJs(o.name)}', 'itemmid.jsp?item=${num(o.item)}&quality=${num(o.quality)}')" href="#">${esc(o.name)}</A></TD>
+<TD><A class=middlebold onclick="openRWindow('${js(o.name)}', 'itemmid.jsp?item=${num(o.item)}&quality=${num(o.quality)}')" href="#">${esc(o.name)}</A></TD>
 <TD>${num(o.price)}仙石 </TD>
 <TD><A class=middlebold onclick="ajaxPost('unsellitem', 'sheet=${num(o.sheet)}', refleshAll);" href="#">撤销</A></TD></TR>`)}
 </TBODY></TABLE>`

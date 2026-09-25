@@ -17,7 +17,7 @@
  * `秘笈　游戏指南　书籍　游戏指南　秘笈`），照做。
  */
 
-import { esc, escJs, each, when } from './html.ts'
+import { esc, escJs, each, when, js } from './html.ts'
 
 /** 22 条词条全集，顺序照 DOM 原文（`09 §1.18`）。 */
 export const HELP_TOPICS: readonly string[] = [
@@ -323,7 +323,7 @@ function linkify(text: string, links: readonly string[]): string {
   for (const name of links) {
     out = out.replaceAll(
       esc(name),
-      `<A class=skillup href="#" onclick="hlp('${escJs(name)}')">${esc(name)}</A>`,
+      `<A class=skillup href="#" onclick="hlp('${js(name)}')">${esc(name)}</A>`,
     )
   }
   return out
@@ -341,7 +341,7 @@ ${each(t.rows, (r) =>
 /** 22 条目录，做成词条链接（原版首页的正文没有存档，目录是本地版补的）。 */
 function topicIndex(): string {
   return `<DIV class=small style="padding:4px 0">${each(HELP_TOPICS.filter((t) => t !== '游戏指南'), (t, i) =>
-    `${i ? '　' : ''}<A class=skillup href="#" onclick="hlp('${escJs(t)}')">${esc(t)}</A>`)}</DIV>`
+    `${i ? '　' : ''}<A class=skillup href="#" onclick="hlp('${js(t)}')">${esc(t)}</A>`)}</DIV>`
 }
 
 /** 渲染游戏指南（H 窗内容；H 窗没有标题条，标题在面包屑里）。 */
@@ -379,5 +379,5 @@ ${when(entry?.table !== undefined, () => entryTable(entry!.table!))}${localNote}
 <DIV class=small style="padding:4px">历史：${each(vm.history, (h, i) =>
     `${i ? '　' : ''}${h === vm.topic && i === vm.history.length - 1
       ? `<SPAN class=middlebold>${esc(h)}</SPAN>`
-      : `<A class=skillup href="#" onclick="hlp('${escJs(h)}')">${esc(h)}</A>`}`)}</DIV>`
+      : `<A class=skillup href="#" onclick="hlp('${js(h)}')">${esc(h)}</A>`}`)}</DIV>`
 }

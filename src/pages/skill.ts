@@ -19,7 +19,7 @@
  * 子标签**没有选中态**：原版当前页与其他页同为绿色，见 `DECISIONS-ui.md` 与 `shell.pageHeader`。
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader } from './shell.ts'
 
 export type SkillTab = 'produce' | 'sword' | 'math' | 'book'
@@ -93,7 +93,7 @@ ${each(nodes, (n) => {
     const icon = isUnlocked(n, vm.levels) ? `${n.id}.gif` : 'unknown.gif'
     // 计数在图标右下角外侧：文字左缘 = 图标右缘 +1，文字底 ≈ 图标底 +3（04 §7.2）
     return `<A class=skillcell style="left:${x}px;top:${y}px" href="#" ` +
-      `onclick="openRWindow('${escJs(n.name)} Lv.${lv}','skillmid.jsp?skill=${n.id}')">` +
+      `onclick="openRWindow('${js(n.name)} Lv.${lv}','skillmid.jsp?skill=${n.id}')">` +
       `<IMG title="${esc(n.name)}" height=${CELL} width=${CELL} src="img/skill/${icon}"></A>` +
       `<SPAN class=skillcount style="left:${x + CELL + 1}px;top:${y + CELL - 11}px">` +
       `(${num(lv)}/${num(n.cap)})</SPAN>`
@@ -119,7 +119,7 @@ ${when(
     () => `<TR class="trbg middle" align=middle><TD colSpan=3><SPAN class=smallgray>目前没有任何秘笈</SPAN></TD></TR>`,
     () => each(rows, (b) =>
       `<TR class="trbg middle" align=middle>` +
-      `<TD align=left><A class=skillup href="#" onclick="openRWindow('${escJs(b.name)}','itemmid.jsp?item=${b.itemId}')">${esc(b.name)}</A></TD>` +
+      `<TD align=left><A class=skillup href="#" onclick="openRWindow('${js(b.name)}','itemmid.jsp?item=${b.itemId}')">${esc(b.name)}</A></TD>` +
       `<TD>${num(b.count)}</TD>` +
       `<TD><A class=skillup href="#" onclick="sendUseItem3()">学习</A></TD></TR>`),
   )}

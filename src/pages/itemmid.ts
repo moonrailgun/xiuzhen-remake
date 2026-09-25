@@ -23,7 +23,7 @@
  * 极品七星磐龙剑+8 攻击 = 1200×2^8 = 307200 ✓（#99）。
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { formatDuration } from '../engine/clock.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
 import type { Element } from '../data/meridian.ts'
@@ -156,6 +156,6 @@ function teachTable(skills: readonly string[]): string {
 </TBODY></TABLE>
 <TABLE class=tablebg cellSpacing=1 cellPadding=1 width="100%" align=center border=0><TBODY>
 <TR class="small titlebg"><TD class=smallbold>使用后可习得技能</TD></TR>
-${each(skills, (n) => `<TR class="trbg small" align=middle><TD><A class=skillup href="#" onclick="openRWindow('${escJs(n)}','skillmid.jsp?skill=0')">${esc(n)}</A></TD></TR>`)}
+${each(skills, (n) => `<TR class="trbg small" align=middle><TD><A class=skillup href="#" onclick="openRWindow('${js(n)}','skillmid.jsp?skill=0')">${esc(n)}</A></TD></TR>`)}
 </TBODY></TABLE>`
 }

@@ -6,7 +6,7 @@
  * 战斗事件 / 炼器事件 / 移动事件 / 修炼事件。
  */
 
-import { esc, escJs, each, when } from './html.ts'
+import { esc, escJs, each, when, js } from './html.ts'
 import { countdown } from './shell.ts'
 
 export type EventRow = {
@@ -88,7 +88,7 @@ function blockShell(opts: {
 <TR>
 <TD><TABLE cellSpacing=0 cellPadding=0 width=${opts.titleWidth} border=0><TBODY><TR>
 <TD width=8>&nbsp;</TD>
-<TD class=bigbold><A class=help href="#" onclick="hlp('${escJs(opts.helpTopic)}')">${esc(opts.title)}</A></TD>
+<TD class=bigbold><A class=help href="#" onclick="hlp('${js(opts.helpTopic)}')">${esc(opts.title)}</A></TD>
 </TR></TBODY></TABLE></TD>
 <TD align=right>${opts.corner ?? '&nbsp;'}</TD>
 </TR>
@@ -158,7 +158,7 @@ function eventRows(rows: readonly EventRow[]): string {
 
     if (r.nextLeg) {
       const cancel = r.cancelId
-        ? `<TD width=16 rowSpan=2 align=center><A href="#" onclick="cancelmove('${esc(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`
+        ? `<TD width=16 rowSpan=2 align=center><A href="#" onclick="cancelmove('${js(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`
         : '<TD width=16 rowSpan=2>&nbsp;</TD>'
       return `<TR class=middle><TD width=20 rowSpan=2 align=center>${dots}</TD>` +
         `<TD class=small width=124>${esc(r.text)}</TD>${time(r.seconds)}${cancel}</TR>` +
@@ -168,7 +168,7 @@ function eventRows(rows: readonly EventRow[]): string {
 
     const label = `　${dots} ${esc(r.text)}`
     const cell = r.openUrl
-      ? `<A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${label}</A>`
+      ? `<A style="COLOR:black" href="#" onclick="openBWindow('', '${js(r.openUrl)}')">${label}</A>`
       : label
     return `<TR class=middle><TD class=small width=140>${cell}</TD>` +
       `${time(r.seconds)}<TD>&nbsp;</TD></TR>`
@@ -192,7 +192,7 @@ export function renderMid(vm: MidVm): string {
       body: vm.npcs.length === 0
         ? emptyRow('当前场景中没有NPC')
         : `<TR><TD colSpan=2><TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
-${each(vm.npcs, (n) => `<TR class=middle><TD class=small>　<A class=skillup href="#" onclick="openLWindow('','npc.jsp?name=${encodeURIComponent(n)}')">${esc(n)}</A></TD></TR>`)}
+${each(vm.npcs, (n) => `<TR class=middle><TD class=small>　<A class=skillup href="#" onclick="openLWindow('','npc.jsp?name=${js(encodeURIComponent(n))}')">${esc(n)}</A></TD></TR>`)}
 </TBODY></TABLE></TD></TR>`,
     }),
 
@@ -209,13 +209,13 @@ ${each(vm.npcs, (n) => `<TR class=middle><TD class=small>　<A class=skillup hre
 ${each(vm.players, (p) => {
             const name = esc(p.name)
             return `<TR class=middle><TD width=28><IMG src="img/avatar/${esc(p.avatar)}.gif" width=24 height=24></TD>` +
-              `<TD noWrap><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${encodeURIComponent(p.name)}')">${name}</A>` +
+              `<TD noWrap><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${js(encodeURIComponent(p.name))}')">${name}</A>` +
               `${p.suffix ? ` <SPAN class=smallgray>(${p.suffix})</SPAN>` : ''}` +
               // 四个操作：攻击 / 推算 / 消息 / 加为护法
-              ` <A href="#" onclick="openLWindow('','fight.jsp?target=${encodeURIComponent(p.name)}')"><IMG src="img/event/attack.gif" title="攻击"></A>` +
-              ` <A href="#" onclick="spyPlayer('${esc(p.name)}')"><IMG src="img/event/spy.gif" title="推算"></A>` +
-              ` <A href="#" onclick="openLWindow('写消息','writemsg.jsp?receiver=${encodeURIComponent(p.name)}')"><IMG src="img/talk.gif" title="发送消息"></A>` +
-              ` <A href="#" onclick="addpal('${esc(p.name)}')"><IMG src="img/friend.gif" title="加为护法"></A>` +
+              ` <A href="#" onclick="openLWindow('','fight.jsp?target=${js(encodeURIComponent(p.name))}')"><IMG src="img/event/attack.gif" title="攻击"></A>` +
+              ` <A href="#" onclick="spyPlayer('${js(p.name)}')"><IMG src="img/event/spy.gif" title="推算"></A>` +
+              ` <A href="#" onclick="openLWindow('写消息','writemsg.jsp?receiver=${js(encodeURIComponent(p.name))}')"><IMG src="img/talk.gif" title="发送消息"></A>` +
+              ` <A href="#" onclick="addpal('${js(p.name)}')"><IMG src="img/friend.gif" title="加为护法"></A>` +
               `</TD></TR>`
           })}
 </TBODY></TABLE>`
@@ -239,14 +239,14 @@ ${
     vm.quests.length === 0
       ? '<TR class="trbg middle"><TD class=smallgray colSpan=3>目前没有任务</TD></TR>'
       : each(vm.quests, (q) => {
-          const body = `<A class=skillup href="#" onclick="openLWindow('','quest.jsp?questid=${esc(q.id)}')">${esc(q.title)}</A>` +
+          const body = `<A class=skillup href="#" onclick="openLWindow('','quest.jsp?questid=${js(q.id)}')">${esc(q.title)}</A>` +
             (q.detail ? `<BR><SPAN class=middle>${esc(q.detail)}</SPAN>` : '')
           return `<TR class="trbg middle"><TD width=16 vAlign=top><IMG src="img/event/quest.gif"></TD>` +
             `<TD>${body}</TD>` +
             `<TD width=30 vAlign=top align=right>${
               q.abandonable === false
                 ? ''
-                : `<A class=skillup href="#" onclick="cancelquest('${esc(q.id)}')">放弃</A>`
+                : `<A class=skillup href="#" onclick="cancelquest('${js(q.id)}')">放弃</A>`
             }</TD></TR>`
         })
   }

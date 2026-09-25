@@ -18,10 +18,8 @@
  * 删除/撤回的按钮外观原版没留下，按读信页的原生 `<INPUT type=button>` 通式【重建】。
  */
 
-import { esc, escJs, when } from './html.ts'
+import { esc, escJs, when, js } from './html.ts'
 
-/** 动态值进内联 onclick 的 JS 字符串字面量：先转 JS、再转 HTML 属性，两层都要。 */
-const js = (v: unknown): string => esc(escJs(v))
 
 export type PlayerInfoVm = {
   readonly playerId: number

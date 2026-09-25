@@ -34,6 +34,23 @@ export const escJs = (v: unknown): string =>
     .replace(/</g, '\\x3c')
     .replace(/>/g, '\\x3e')
 
+/**
+ * **内联 onclick 里的 JS 字符串字面量，必须用这个。**
+ *
+ * 浏览器对 `onclick="foo('…')"` 的处理顺序是：先把属性值做 **HTML 解码**，
+ * 再把结果当 JS 解析。所以只做一层都会破：
+ *
+ *  - 只 `escJs()`：它把 `"` 变成 `\"`，可反斜杠救不了 HTML —— 属性在那个 `"` 处就结束了，
+ *    后面的内容会被解析成新的属性（实测能塞进一个 `onmouseover=...` 直接执行）。
+ *  - 只 `esc()`：它把 `'` 变成 `&#39;`，而 HTML 解码会把它**还原成 `'`** 再交给 JS，
+ *    于是字符串被提前闭合（实测 `李'+(window.x=1)+'四` 会被求值）。
+ *
+ * 正确顺序是**先 JS 转义、再 HTML 转义**：HTML 解码之后恰好得到已经 JS 转义好的文本。
+ *
+ * 正文和普通属性用 `esc()`；URL 参数用 `encodeURIComponent()`。
+ */
+export const js = (v: unknown): string => esc(escJs(v))
+
 /** 数字按原版习惯直接输出（原版不加千分位）。 */
 export const num = (n: number): string => String(Math.floor(n))
 

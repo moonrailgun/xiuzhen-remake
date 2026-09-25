@@ -24,7 +24,7 @@
  * —— 正好与 09 §1.18 只枚举到 `tab=1|2|3|4` 吻合。**tab=1/2 记 [推断]。**
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader, countdown } from './shell.ts'
 import { formatDuration } from '../engine/clock.ts'
 
@@ -128,7 +128,7 @@ const TITLE_IMG: Record<ItemTab, string> = {
 const RES = ['gold', 'wood', 'water', 'fire', 'earth'] as const
 
 const helpLink = (topic: string): string =>
-  `<A class=help href="#" onclick="hlp('${escJs(topic)}')">${esc(topic)}</A>`
+  `<A class=help href="#" onclick="hlp('${js(topic)}')">${esc(topic)}</A>`
 
 /** 墨迹标题条。`hide` 给的是折叠钮的目标 tab 号（原版 `item.jsp?hide=1&tab=N`）。 */
 function inkBar(inner: string, hideTab?: number): string {
@@ -180,7 +180,7 @@ function itemCells(row: ItemRow, groupId: ItemGroupId): string {
   const stack = row.count !== undefined && row.count > 1 ? ` ×${num(row.count)}` : ''
   return `<TD width="5%"><INPUT type=radio value=${busy ? 0 : num(row.itemsn!)} name=selectitem${groupId}></TD>` +
     `<TD width="45%"><A class=middlebold href="#" ` +
-    `onclick="openRWindow('${escJs(row.name)}','${query}')">${esc(row.name)}</A>${stack} <BR>` +
+    `onclick="openRWindow('${js(row.name)}','${query}')">${esc(row.name)}</A>${stack} <BR>` +
     `${statusSpan(row)}</TD>`
 }
 
@@ -244,7 +244,7 @@ ${each(rows, (r) => {
       ? '<SPAN class=smallred>(未满足)</SPAN>'
       : `<A class=skillup href="#" onclick="$('${box}').value=${num(r.craftable)}">(${num(r.craftable)})</A>`
     return `<TR class=trbg>
-<TD vAlign=top width="30%"><A class=skillup href="#" onclick="openRWindow('${escJs(r.name)}','itemmid.jsp?item=${num(r.itemId)}')">${esc(r.name)}</A><BR><SPAN class=smallgray>现有:${num(r.owned)}</SPAN></TD>
+<TD vAlign=top width="30%"><A class=skillup href="#" onclick="openRWindow('${js(r.name)}','itemmid.jsp?item=${num(r.itemId)}')">${esc(r.name)}</A><BR><SPAN class=smallgray>现有:${num(r.owned)}</SPAN></TD>
 <TD width="50%"><TABLE cellSpacing=0 cellPadding=1 width="100%" border=0><TBODY>
 ${r.cost ? costRows(r.cost) : ''}
 <TR class=small><TD colSpan=5 noWrap>需要时间 ${formatDuration(r.craftSeconds)} 准备炼制: <INPUT class=craftnum id=${box} size=4> ${hint}</TD></TR>
@@ -261,7 +261,7 @@ function brewTable(title: string, head: string, rows: readonly BrewRow[]): strin
 <TR class="titlebg middlebold" align=middle><TD width="40%">${esc(head)}</TD><TD width="30%">剩余时间</TD><TD width="30%">完成时间</TD></TR>
 ${each(rows, (r) =>
     `<TR class="trbg middle" align=middle>` +
-    `<TD><A class=skillup href="#" onclick="openRWindow('${escJs(r.name)}','itemmid.jsp?item=${num(r.itemId)}')">${esc(r.name)}</A></TD>` +
+    `<TD><A class=skillup href="#" onclick="openRWindow('${js(r.name)}','itemmid.jsp?item=${num(r.itemId)}')">${esc(r.name)}</A></TD>` +
     `<TD>${countdown(r.seconds)}</TD><TD>${esc(r.finishAt)}</TD></TR>`)}
 </TBODY></TABLE>`
 }

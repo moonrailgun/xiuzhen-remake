@@ -18,7 +18,7 @@
  * 「领取奖励」的按钮图名与动作名原版没留下，取 `getreward.gif` / `finishquest`，是【重建】。
  */
 
-import { esc, escJs, each, num } from './html.ts'
+import { esc, escJs, each, num, js } from './html.ts'
 import { ELEMENTS } from '../data/meridian.ts'
 
 /** 五行图标，界面顺序「金木水火土」。 */
@@ -82,7 +82,7 @@ function progressHtml(p: QuestProgress): string {
   return (
     `击败<A class=middlebold href="map.jsp?x=${p.at[0]}&y=${p.at[1]}">(${p.at[0]},${p.at[1]})</A>处的` +
     `<SPAN class=middlestriking>${esc(p.monster)}</SPAN>${suffix}` +
-    (p.done ? '' : `　<A href="#" onclick="openLWindow('', 'fight.jsp?target=${esc(escJs(encodeURIComponent(p.monster)))}')">出击</A>`)
+    (p.done ? '' : `　<A href="#" onclick="openLWindow('', 'fight.jsp?target=${js(encodeURIComponent(p.monster))}')">出击</A>`)
   )
 }
 
@@ -106,8 +106,8 @@ function buttons(vm: QuestVm): string {
       ? `放弃此任务，需要花费${vm.giveupCoin}个仙石`
       : '确定要放弃此任务吗?'
   const left = vm.claimable
-    ? `<A onclick="ajaxPost('finishquest','questid=${esc(vm.id)}',refleshRight);closeLWindow();closeRWindow();" href="#"><IMG alt=点击领取任务奖励 src="img/getreward.gif"></A>`
-    : `<A onclick="MDialogOkCancel('', '${esc(giveupText)}', function(){ajaxPost('cancelquest','questid=${esc(escJs(vm.id))}',refleshRight);closeLWindow();closeRWindow();})" href="#"><IMG alt=点击放弃任务，慎重考虑哦~ src="img/giveupquest.gif"></A>`
+    ? `<A onclick="ajaxPost('finishquest','questid=${js(vm.id)}',refleshRight);closeLWindow();closeRWindow();" href="#"><IMG alt=点击领取任务奖励 src="img/getreward.gif"></A>`
+    : `<A onclick="MDialogOkCancel('', '${js(giveupText)}', function(){ajaxPost('cancelquest','questid=${js(vm.id)}',refleshRight);closeLWindow();closeRWindow();})" href="#"><IMG alt=点击放弃任务，慎重考虑哦~ src="img/giveupquest.gif"></A>`
   return `<TR class="trbg middle" align=middle><TD colSpan=5>${left}　<A onclick=closeLWindow() href="#"><IMG alt=点击关闭任务窗口 src="img/closewindows.gif"></A></TD></TR>`
 }
 

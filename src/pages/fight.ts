@@ -17,7 +17,7 @@
  * 没有可选项，所以这里只显示已生效的被动加成，不做下拉 —— 不编造不存在的控件。
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader } from './shell.ts'
 import { formatDuration } from '../engine/clock.ts'
 
@@ -102,7 +102,7 @@ ${when(
     () => each(vm.swords, (s) =>
       `<TR class="trbg middle" align=middle>
 <TD><INPUT type=checkbox name=sword value="${esc(s.id)}"></TD>
-<TD align=left><A class=middlebold href="#" onclick="openRWindow('${escJs(s.name)}','itemmid.jsp?itemsn=${num(s.itemId)}&item=${num(s.itemId)}')">${esc(s.name)}</A></TD>
+<TD align=left><A class=middlebold href="#" onclick="openRWindow('${js(s.name)}','itemmid.jsp?itemsn=${num(s.itemId)}&item=${num(s.itemId)}')">${esc(s.name)}</A></TD>
 <TD>${num(s.attack)}</TD><TD>${num(s.durability)}</TD><TD>${num(s.agility)}</TD>
 <TD class=small noWrap>${formatDuration(s.seconds)}</TD></TR>`),
   )}
@@ -111,7 +111,7 @@ ${when(
 <TD class=small><SPAN id=fightpreview class=smallgray></SPAN></TD>
 <TD align=right>${when(
     canSend,
-    () => `<A class=skillup href="#" onclick="sendFight('${escJs(vm.targetName)}')">${esc(TITLE[vm.kind])}</A>`,
+    () => `<A class=skillup href="#" onclick="sendFight('${js(vm.targetName)}')">${esc(TITLE[vm.kind])}</A>`,
     () => `<SPAN class=smallgray>${esc(TITLE[vm.kind])}</SPAN>`,
   )}</TD></TR></TBODY></TABLE>`
 }

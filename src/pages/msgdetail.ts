@@ -23,7 +23,7 @@
  *     这里按太乙神数表同构【重建】。
  */
 
-import { esc, escJs, each, num } from './html.ts'
+import { esc, escJs, each, num, js } from './html.ts'
 import {
   MERIDIANS,
   groupElement,
@@ -32,8 +32,6 @@ import {
   type MeridianGroup,
 } from '../data/meridian.ts'
 
-/** 动态值进内联 onclick 的 JS 字符串字面量：先转 JS、再转 HTML 属性，两层都要。 */
-const js = (v: unknown): string => esc(escJs(v))
 
 /** 五行图标与名称，界面顺序「金木水火土」。 */
 const RES = ['gold', 'wood', 'water', 'fire', 'earth'] as const

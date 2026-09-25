@@ -362,7 +362,21 @@ export function routeJsp(href: string): boolean {
 
   switch (page) {
     case 'player': tab = 'player'; break
-    case 'map': tab = 'map'; break
+    // 原版首页是登录/选服门户，本地版没有，点了就回人物页（不能让它真的跳走）
+    case 'index': tab = 'player'; break
+    case 'map': {
+      tab = 'map'
+      // 排行榜、任务窗里的 `map.jsp?x=&y=` 是「把地图跳到这个坐标」
+      if (q.has('x') && q.has('y')) {
+        const x = n('x', -1)
+        const y = n('y', -1)
+        if (x >= 0 && y >= 0) {
+          mapCenter = { x, y }
+          mapSelected = { x, y }
+        }
+      }
+      break
+    }
     case 'skill': {
       tab = 'skill'
       // 原版编号：炼器 2 / 剑术 1 / 术数 3 / 秘笈 6
@@ -1035,6 +1049,10 @@ function resolvePage(url: string): string {
       return renderMsg(msgVm(s, msgPage))
 
     case 'msgdetail':
+      return mailDetail(s, Number(q.get('msg') ?? 0))
+
+    // 门派新闻里的一条 = 收件箱里的一封战报/推算信，用同一个读信页
+    case 'allymsg':
       return mailDetail(s, Number(q.get('msg') ?? 0))
 
     case 'writemsg':

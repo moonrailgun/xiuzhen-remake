@@ -7,7 +7,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { newGame } from './game.ts'
+import { newGame, validateGameState } from './game.ts'
+import { resolveBattleEvent } from './battle.ts'
+import { DAY } from './clock.ts'
 import { artifactCapacity, artifactSpaceUsed, canAcquireArtifacts, refineArtifact } from './craft.ts'
 import { startCultivate, BODY_DANTIAN, BODY_MAX_LEVEL, DANTIAN_MAX_LEVEL } from './cultivate.ts'
 import { exchangeNote } from './town.ts'
@@ -103,4 +105,48 @@ test('★淬炼只吃空闲的法宝', () => {
 
   const idle = two.map((a) => ({ ...a, status: '空闲' }))
   assert.equal(refineArtifact({ ...s, player: { ...s.player, artifacts: idle } }, ['a', 'b']).ok, true)
+})
+
+test('★导入存档不能塞「自己挂的 npc: 单」：下次补货会把它当过期单撤掉且不退真气', () => {
+  const s = base()
+  const hostile: GameState = {
+    ...s,
+    market: { ...s.market, qi: [{
+      id: 'npc:0:0', seller: s.player.name, listed: true,
+      offer: { element: '金', amount: 100 }, want: { element: '木', amount: 100 },
+    }] },
+  }
+  assert.throws(() => validateGameState(JSON.parse(JSON.stringify(hostile))), /损坏|结构/)
+  // 正常的自己挂单（非 npc: 前缀）照旧通过
+  const fine = { ...hostile, market: { ...hostile.market, qi: [{ ...hostile.market.qi[0]!, id: 'mine:0' }] } }
+  validateGameState(JSON.parse(JSON.stringify(fine)))
+})
+
+test('★打赢但飞剑全断：不扣对方库存，真气不会凭空蒸发', () => {
+  // 战利品是飞剑驮回来的，一把都没回来就没有返航事件。
+  // 以前照样给 NPC 记 qiLost，那点真气就从世界上消失了。
+  const s = base()
+  const npcBase = s.npc.bases[0]
+  assert.ok(npcBase, '前提：世界里有 NPC')
+  // 玻璃大炮：攻击极高、耐久极低，必定打赢也必定断
+  const glass = {
+    id: 'glass', name: '青龙伏魔剑', quality: '废品' as const, refine: 0,
+    element: null, attack: [1e9, 1e9], durability: [1, 1], speed: 7, agility: 3,
+    launchedStats: { attack: 1e9, durability: 1, agility: 3, speed: 7 },
+  }
+  // 打到第 200 天：NPC 的暗仓外面才积得出可掠夺的真气（早期全在固本培元里）
+  const at = 200 * DAY
+  const event = {
+    id: 'battle:x', kind: 'battle' as const, finishAt: at,
+    payload: {
+      phase: 'fighting', swords: [glass], swordIds: ['glass'],
+      target: { kind: 'player' as const, name: npcBase.name, npcId: npcBase.id, x: 101, y: 100, hp: 1, attack: 1, agility: 1, element: null },
+    },
+  }
+  const out = resolveBattleEvent({ ...s, clock: { ...s.clock, gameT: at }, timeline: { events: [event] } }, event)
+  assert.equal(out.outcome?.won, true, '玻璃大炮应当打赢')
+  assert.deepEqual(out.outcome?.lostSwordIds, ['glass'], '剑也断了')
+  assert.equal(out.follow?.length ?? 0, 0, '没有活着的剑就没有返航事件')
+  assert.equal(out.state.npc.patches[npcBase.id]?.qiLost ?? 0, 0, '对方库存不该被扣')
+  assert.deepEqual([...out.outcome!.loot], [0, 0, 0, 0, 0], '没人驮就没有战利品')
 })

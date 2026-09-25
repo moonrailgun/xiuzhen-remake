@@ -311,6 +311,14 @@ function settleLoaded(state: GameState): GameState {
   return next.market.qi.length === 0 ? refillNpcOrders(next) : next
 }
 
+/**
+ * 挂单 id 的 `npc:` 前缀是「这是 NPC 挂的单」的唯一标记，补货时按它判断 24 小时过期。
+ * 导入一份 `seller` 是自己、id 却是 `npc:0:0` 的存档，下次补货就会把它当过期 NPC 单撤掉，
+ * 而**真气不退回**——凭空蒸发。不受信边界，挡在校验这一步。
+ */
+const mineButNpcId = (order: Record<string, unknown>, player: Record<string, unknown>): boolean =>
+  typeof order['id'] === 'string' && order['id'].startsWith('npc:') && order['seller'] === player['name']
+
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */
 export function validateGameState(value: unknown): asserts value is GameState {
   const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -384,9 +392,10 @@ export function validateGameState(value: unknown): asserts value is GameState {
         (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
         (q.coreEventId === undefined || string(q.coreEventId)) && (q.cleared === undefined || typeof q.cleared === 'boolean')) ||
       !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
-        optionalNumber(o.listedAt) &&
+        optionalNumber(o.listedAt) && !mineButNpcId(o, p) &&
         [o.offer, o.want].every((a) => object(a) && ELEMENTS.includes(a.element as Element) && number(a.amount))) ||
       !arrayOf(market.artifacts, (o) => strings(o, ['id', 'seller', 'name']) && numeric(o, ['refine', 'priceCoin']) && optionalNumber(o.listedAt) &&
+        !mineButNpcId(o, p) &&
         (o.artifact === undefined || object(o.artifact) && artifact(o.artifact))) ||
       !object(s.towns) || !Object.values(s.towns).every((t) => object(t) && strings(t, ['id', 'kind', 'name']) && numeric(t, ['x', 'y']) &&
         arrayOf(t.investments, (i) => string(i.owner) && number(i.silver))) ||

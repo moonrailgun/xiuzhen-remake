@@ -18,6 +18,12 @@ export type EventRow = {
   readonly seconds: number | null
   /** 仙石加速：修炼事件右上角的「半 完」 */
   readonly speedup?: boolean
+  /**
+   * 战斗事件行整行是个链接，点开 B 窗的战斗事件总览。
+   * 写法照原版 DOM（09 §1.7）：`<A style="COLOR:black" onclick="openBWindow('', '…')">`
+   * 包住图标与文字，倒计时留在链接外面。
+   */
+  readonly openUrl?: string
   /** 可取消（移动事件右侧的红 ×） */
   readonly cancelId?: string
   /** 多段移动的下一段 */
@@ -71,9 +77,14 @@ ${
           const cancel = r.cancelId
             ? `<TD width=16><A href="#" onclick="cancelmove('${esc(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`
             : ''
-          const main = `<TR class=middle><TD width=16>${
-            r.icon ? `<IMG src="img/${esc(r.icon)}">` : '<IMG src="img/event/mark.gif">'
-          }</TD><TD>${esc(r.text)}</TD><TD align=right noWrap>${countdown(r.seconds)}</TD>${cancel}</TR>`
+          const icon = `<IMG src="img/${esc(r.icon ?? 'event/mark.gif')}">`
+          // 原版战斗事件行：图标与文字一起被包进一个黑色链接里，倒计时在链接外
+          const main = r.openUrl
+            ? `<TR class=middle><TD width=16><A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${icon}</A></TD>` +
+              `<TD><A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${esc(r.text)}</A></TD>` +
+              `<TD align=right noWrap>${countdown(r.seconds)}</TD>${cancel}</TR>`
+            : `<TR class=middle><TD width=16>${icon}</TD>` +
+              `<TD>${esc(r.text)}</TD><TD align=right noWrap>${countdown(r.seconds)}</TD>${cancel}</TR>`
           const next = r.nextLeg
             ? `<TR class=middle><TD></TD><TD>${esc(r.nextLeg.text)}</TD><TD align=right noWrap>${countdown(r.nextLeg.seconds)}</TD></TR>`
             : ''

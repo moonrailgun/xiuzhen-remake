@@ -23,6 +23,7 @@ import { renderTurnres } from '../pages/turnres.ts'
 import { renderPayment } from '../pages/payment.ts'
 import { renderFight } from '../pages/fight.ts'
 import { renderEstate } from '../pages/estate.ts'
+import { renderBattleEvent } from '../pages/battleevent.ts'
 import { skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel } from './vm.ts'
 import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
 import { ranking } from '../engine/npc.ts'
@@ -41,7 +42,10 @@ import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation 
 import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
-import { launch, swordsOut, swordsOutLimit, flightSeconds, type LaunchSword, type BattleTarget } from '../engine/battle.ts'
+import {
+  launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
+  type LaunchSword, type BattleTarget,
+} from '../engine/battle.ts'
 import { startCraft, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, panelStat, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
@@ -173,6 +177,30 @@ function midVm(s: GameState) {
         speedup: kind === 'cultivate',
       }))
 
+  /**
+   * 战斗事件行**按阶段合并**，不是一场一行 —— 照原版 DOM（09 §1.7）：
+   * `<A style="COLOR:black" onclick="openBWindow('','battleevent.jsp?tab=N')">
+   *    <IMG src="img/event/attack.gif"> {数量} {斩杀|返回}</A>` + 倒计时。
+   * tab 实见值：2 = 斩杀（出击中）、3 = 返回。
+   */
+  const battleRows = () => {
+    const all = events.filter((e) => e.kind === 'battle')
+    const groups: { label: string; tab: number; icon: string; of: typeof all }[] = [
+      { label: '斩杀', tab: 2, icon: 'event/attack.gif',
+        of: all.filter((e) => e.payload['phase'] !== 'returning') },
+      { label: '返回', tab: 3, icon: 'event/back.gif',
+        of: all.filter((e) => e.payload['phase'] === 'returning') },
+    ]
+    return groups
+      .filter((g) => g.of.length > 0)
+      .map((g) => ({
+        icon: g.icon,
+        text: `${g.of.length} ${g.label}`,
+        seconds: Math.max(0, Math.round(Math.min(...g.of.map((e) => e.finishAt)) - s.clock.gameT)),
+        openUrl: `battleevent.jsp?tab=${g.tab}`,
+      }))
+  }
+
   // 移动事件照原版显示「当前段坐标 + 下个目标」，并带取消的红 ×
   const md = moveDisplay(s)
   const move = md
@@ -194,7 +222,7 @@ function midVm(s: GameState) {
   }))
 
   return {
-    battle: rows('battle'),
+    battle: battleRows(),
     craft: rows('craft'),
     move,
     cultivate: rows('cultivate'),
@@ -582,10 +610,15 @@ export function installGameActions(): void {
       openWindow('mwindow', '出击', '<DIV class=middle style="padding:10px">请选择出击的飞剑</DIV>')
       return
     }
-    const r = launch(state, fightTarget, swords, {
-      wanjianLevel: state.player.skills['万剑诀'] ?? 0,
-      sightRange: sightRange(state.player.body[BODY_EYE] ?? 0),
-    })
+    // 从战斗事件里点「支援 / 还击」进来的，并进原事件；否则是一次新的出击
+    const r = reinforceEventId
+      ? reinforce(state, reinforceEventId, swords, {
+          wanjianLevel: state.player.skills['万剑诀'] ?? 0,
+        })
+      : launch(state, fightTarget, swords, {
+          wanjianLevel: state.player.skills['万剑诀'] ?? 0,
+          sightRange: sightRange(state.player.body[BODY_EYE] ?? 0),
+        })
     if (!r.ok) {
       openWindow('mwindow', '无法出击', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
@@ -601,6 +634,25 @@ export function installGameActions(): void {
       },
     }
     closeWindow('lwindow')
+    step()
+  }
+
+  /**
+   * 求援。原版是「把事件通过消息发给指定的道友」，弹窗里那个输入框 id 是 `gethelpname`
+   * （`09 §1.7` 原文）。单机下没有真人可求，发出去的信留在自己的收件箱里作记录 ——
+   * 原版同一玩法里「自己支援自己」本来就是常规操作（见 `battle.ts`）。
+   */
+  g['sendEventMsg'] = (eventId: string) => {
+    if (!state) return
+    const who = (document.getElementById('gethelpname') as HTMLInputElement | null)?.value ?? ''
+    const r = requestHelp(state, eventId, who.trim())
+    if (!r.ok) {
+      openWindow('mwindow', '求援', `<DIV class=middle style="padding:10px">${esc(r.reason ?? '')}</DIV>`)
+      return
+    }
+    state = r.state
+    openWindow('mwindow', '求援',
+      `<DIV class=middle style="padding:10px">已向 ${esc(who || '道友')} 发出求援。</DIV>`)
     step()
   }
 
@@ -909,7 +961,16 @@ function resolvePage(url: string): string {
       return questWindow(s, q.get('questid') ?? q.get('quest') ?? '')
 
     case 'fight':
-      return fightWindow(s, q.get('target') ?? '')
+      // type=3 支援 / type=2 还击都带 eventid；type=1（或只带 target）是主动出击
+      return q.has('eventid')
+        ? reinforceWindow(s, q.get('eventid')!, q.get('type') === '2' ? 'counter' : 'reinforce')
+        : fightWindow(s, q.get('target') ?? '')
+
+    case 'battleevent':
+      return renderBattleEvent(battleEventVm(s, Number(q.get('tab') ?? 2)))
+
+    case 'battlemap':
+      return battleMapWindow(s, q.get('eventid') ?? '')
 
     case 'estate':
       return renderEstate(estateVm(s))
@@ -957,6 +1018,8 @@ const TURN_RES_COIN = 3
 
 /** 当前这一屏出击页对应的目标（点「出击」时反查）。 */
 let fightTarget: BattleTarget | null = null
+/** 支援/还击时对应的战斗事件 id；主动出击是 null。 */
+let reinforceEventId: string | null = null
 
 /** 背包里空闲的飞剑 → 可出击的剑，面板值已算过品质与淬炼。 */
 function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly table: Sword }[] {
@@ -992,6 +1055,7 @@ function fightWindow(s: GameState, targetName: string): string {
     return '<DIV class=middle style="padding:12px">对方已不在你的感应范围内。</DIV>'
   }
 
+  reinforceEventId = null
   fightTarget = {
     kind: 'player',
     name: npc.base.name,
@@ -1032,6 +1096,99 @@ function fightWindow(s: GameState, targetName: string): string {
     passives,
     ...(rows.length === 0 ? { blocked: '没有空闲的飞剑可以出击' } : {}),
   })
+}
+
+/** 战斗事件总览（B 窗）。四种态里本地版会出现三种：出击在途 / 缠斗 / 返回。 */
+function battleEventVm(s: GameState, tab: number) {
+  const events = sorted(s.timeline).filter((e) => e.kind === 'battle')
+  return {
+    tab,
+    events: events.map((e) => {
+      const t = e.payload['target'] as BattleTarget
+      const phase = e.payload['phase'] as string
+      const swords = (e.payload['swords'] ?? []) as readonly LaunchSword[]
+      const left = swords.map((sw) => ({
+        owner: s.player.name,
+        ownerId: 0,
+        name: `${sw.quality}${sw.name}${sw.refine > 0 ? `+${sw.refine}` : ''}`,
+        itemId: 0,
+        stats: [
+          panelStat(sw.attack, sw.quality, sw.refine),
+          panelStat(sw.durability, sw.quality, sw.refine),
+          panelStat([sw.agility, sw.agility], sw.quality, sw.refine),
+          0,
+          0,
+        ] as [number, number, number, number, number],
+        seconds: Math.max(0, Math.round(e.finishAt - s.clock.gameT)),
+        arriveAt: formatGameDate(e.finishAt),
+      }))
+      // 对方的剑看不穿 —— 原版就是整行 ???，这里如实照做
+      const right = [{
+        owner: t.name,
+        ownerId: 0,
+        seconds: null,
+        arriveAt: formatGameDate(e.finishAt),
+      }]
+      return {
+        eventId: e.id,
+        kind: (phase === 'fighting' ? 'fighting' : 'outbound') as 'fighting' | 'outbound',
+        who: t.name,
+        at: [t.x, t.y] as [number, number],
+        seconds: Math.max(0, Math.round(e.finishAt - s.clock.gameT)),
+        when: formatGameDate(e.finishAt),
+        left,
+        right: phase === 'fighting' ? right : [],
+      }
+    }),
+  }
+}
+
+/** 支援 / 还击页：与出击页同构，只是目标来自已有事件。 */
+function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'counter'): string {
+  const ev = s.timeline.events.find((e) => e.id === eventId && e.kind === 'battle')
+  if (!ev) return '<DIV class=middle style="padding:12px">这场战斗已经结束了。</DIV>'
+  const t = ev.payload['target'] as BattleTarget
+  fightTarget = t
+  reinforceEventId = eventId
+
+  const dist = Math.abs(t.x - s.player.x) + Math.abs(t.y - s.player.y)
+  const rows = launchableSwords(s).map(({ sword }) => ({
+    id: sword.id,
+    name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
+    itemId: 0,
+    attack: panelStat(sword.attack, sword.quality, sword.refine),
+    durability: panelStat(sword.durability, sword.quality, sword.refine),
+    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
+    speed: sword.speed,
+    element: sword.element ?? '无',
+    seconds: flightSeconds(dist, sword.speed),
+  }))
+
+  return renderFight({
+    kind,
+    targetName: t.name,
+    at: [t.x, t.y],
+    summary: `${t.name}　攻击:${t.attack} 敏捷:${t.agility} 生命:${t.hp} 属性:${t.element}`,
+    swords: rows,
+    limit: swordsOutLimit(s.player.skills['万剑诀'] ?? 0),
+    out: swordsOut(s),
+    passives: [],
+    ...(rows.length === 0 ? { blocked: '没有空闲的飞剑可以派出' } : {}),
+  })
+}
+
+/**
+ * 战场地图。**本体 DOM 未留存**（09 §6），只知道入口与窗标题「战场地图」。
+ * 这里给一张最小的位置示意，不编造原版没有依据的布局。
+ */
+function battleMapWindow(s: GameState, eventId: string): string {
+  const ev = s.timeline.events.find((e) => e.id === eventId)
+  if (!ev) return '<DIV class=middle style="padding:12px">这场战斗已经结束了。</DIV>'
+  const t = ev.payload['target'] as BattleTarget
+  return `<DIV class=middle style="padding:10px">
+${esc(s.player.name)} (${s.player.x},${s.player.y}) → ${esc(t.name)} (${t.x},${t.y})<BR>
+<SPAN class=smallgray>距离 ${Math.abs(t.x - s.player.x) + Math.abs(t.y - s.player.y)} 格</SPAN><BR>
+<SPAN class=smallgray>（原版战场示意图的页面结构没有留下存档）</SPAN></DIV>`
 }
 
 /** 产业页：城镇投资的每小时收益。 */

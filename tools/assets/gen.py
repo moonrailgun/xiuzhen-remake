@@ -350,6 +350,8 @@ def gen_placeholders() -> int:
         "titlerank.gif": "排 行 榜", "titlecreatechr.gif": "创 建 人 物",
         # 出击/支援/还击与战斗事件总览共用（fight.jsp / battleevent.jsp）
         "titlefight.gif": "战 斗", "titleestate.gif": "产 业",
+        # B 窗「战斗事件」总览的标题图（09 §1.7：原版 title 属性误写成「个人资料」）
+        "titlebattle.gif": "战 斗 事 件",
     }
     f = font(14)
     for name, label in titles.items():

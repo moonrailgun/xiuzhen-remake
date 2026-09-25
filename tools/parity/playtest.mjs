@@ -258,10 +258,20 @@ if (swordBoxes > 0) {
   const battleText = (await page.locator('#gmid').textContent())?.replace(/\s+/g, ' ') ?? ''
   check('出击后出现战斗事件', battleText.includes('战斗事件') && !battleText.includes('战斗事件 目前没有任何事件'),
     battleText.slice(0, 60))
-  // 事件行不能再出现「法术 Lvundefined」那种串台的标签
-  check('战斗事件行显示目标与坐标（不是升级标签）',
-    /攻击\S+\(\d+,\d+\)/.test(battleText) && !battleText.includes('undefined'),
+  // 原版战斗事件行是「{数量} {斩杀|返回}」，不是升级标签
+  check('战斗事件行照原版写「N 斩杀」',
+    /战斗事件 \d+ 斩杀/.test(battleText) && !battleText.includes('undefined'),
     battleText.slice(0, 45))
+
+  // 点这一行应打开 B 窗的战斗事件总览（标题句逐字照原版）
+  await page.click('#gmid a[onclick*="battleevent.jsp"]')
+  await page.waitForTimeout(400)
+  const bText = (await page.locator('#bwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+  check('战斗事件总览用原版标题句「你放去攻击…后于…到达」',
+    /你放去攻击\S+\(\d+,\d+\)的.*到达/.test(bText), bText.slice(0, 70))
+  check('总览里有求援 / 支援 / 战斗地图三个操作',
+    bText.includes('求援') && bText.includes('支援') && bText.includes('战斗地图'))
+  await page.evaluate(() => window.closeBWindow())
   const busy = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('xiuzhen.save')).state.player.artifacts[0].status)
   check('派出去的剑变成「斩杀中」', busy === '斩杀中', busy)

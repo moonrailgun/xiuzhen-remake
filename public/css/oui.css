@@ -189,6 +189,36 @@ a.help, .help {
   outline: 1px solid #efe8d8;
   z-index: 100;
 }
+
+/* 浮窗的落点。
+   原版的**像素位置在 oui.css 里，而那份样式表没有任何存档**（09 §2.5 明记），
+   但落在哪一栏是能反推的 —— 09 §2.5 由内容表宽推出：
+     「L 窗盖在 #gleft 上，R 窗盖在 #gmid(240) 上」，B ≈ 920 ≈ 整个 #gpage 宽。
+   以前这几个窗只写了 position:absolute 没给坐标，于是全部堆在静态流位置
+   （顶栏正下方最左边），六种窗叠在一起，看着像 bug。
+   纵向一律贴着 #gmain 顶边（y=100：墨迹 98 + 1px 黑线 + 1px 白线）。 */
+#lwindow { left: 20px;  top: 100px; width: 480px; }  /* 盖 #gleft；L ≈ 480（460 表 + padding） */
+#bwindow { left: 20px;  top: 100px; width: 920px; }  /* 900 表，横跨整个 #gpage */
+#hwindow { left: 20px;  top: 100px; }                /* 宽度在下面的 #hwindow 规则里（494） */
+
+/* R 窗是唯一有 1:1 实测的浮窗：**外框 252×452**，正好盖住中栏
+   （`04 §核心页` 第 7 条与 §438：#3 实测 x=260–511 / y=1–452，内容表 230px）。
+   高度是固定的 —— #91 内容很少也照样留白到 447。
+   这里用 min-height 而不是 height：实测高度照做，但我们重建的内容长度未必与当年一致，
+   写死会把内容裁掉。 */
+#rwindow {
+  left: 509px;
+  top: 100px;
+  width: 252px;
+  min-height: 452px;
+}
+
+/* 确认框没有位置证据，横向居中是最稳妥的默认。 */
+#mwindow, #mwindow2 {
+  left: 50%;
+  top: 160px;
+  transform: translateX(-50%);
+}
 #lwindow { z-index: 100; }
 #rwindow { z-index: 100; }
 #bwindow { z-index: 110; }

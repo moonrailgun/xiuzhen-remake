@@ -149,7 +149,7 @@ ${
             }</TD></TR>`
         })
   }
-<TR class="trbg middle"><TD colSpan=3><IMG src="img/event/mark.gif">&nbsp;<A class=skillup href="#" onclick="openLWindow('','quest.jsp?tab=avail')">查看可领取任务</A></TD></TR>
+<TR class="trbg middle"><TD colSpan=3><IMG src="img/event/mark.gif">&nbsp;<A class=skillup href="#" onclick="showAvailableQuests()">查看可领取任务</A></TD></TR>
 </TBODY></TABLE>
 <BR>
 ${guardBlock('为我护法', vm.guardingMe, vm.guardCap, '请人护法', 'guard.jsp?tab=1')}

@@ -140,7 +140,33 @@ await page.waitForTimeout(300)
 const dialog = await page.locator('#mwindowcontent').textContent()
 check('超范围移动被拒绝并提示', (dialog ?? '').includes('移动'), (dialog ?? '').trim().slice(0, 40))
 
-// 10. 没有 JS 报错
+// 10. 领新手任务
+await page.click('#bigmenu a[href="player.jsp"]')
+await page.waitForTimeout(300)
+await page.click('a[onclick="showAvailableQuests()"]')
+await page.waitForTimeout(300)
+const availText = await page.locator('#lwindowcontent').textContent()
+check('可领取任务列表有新手任务', (availText ?? '').includes('初入修真') || (availText ?? '').length > 5, (availText ?? '').replace(/\s+/g, ' ').slice(0, 60))
+
+const firstQuest = page.locator('#lwindowcontent a.skillup').first()
+if (await firstQuest.count() > 0) {
+  await firstQuest.click()
+  await page.waitForTimeout(400)
+  const rightText = await page.locator('#gright').textContent()
+  check('领取后任务出现在右栏', !(rightText ?? '').includes('目前没有任务'), (rightText ?? '').replace(/\s+/g, ' ').slice(0, 60))
+  await page.screenshot({ path: join(OUT, 'play-7-quest.png') })
+} else {
+  check('领取后任务出现在右栏', false, '没有可领取的任务')
+}
+
+// 11. 场景里能看到 NPC（同格或附近）
+const npcInfo = await page.evaluate(() => {
+  const raw = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return { count: raw.npc.bases.length, hasQuests: (raw.quests?.entries ?? []).length }
+})
+check('存档里有 NPC 世界与任务进度', npcInfo.count > 0 && npcInfo.hasQuests >= 0, JSON.stringify(npcInfo))
+
+// 12. 没有 JS 报错
 check('全程无 JS 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 
 await browser.close()

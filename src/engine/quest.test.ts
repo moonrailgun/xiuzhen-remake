@@ -71,6 +71,7 @@ function makeState(patch: Partial<Player> = {}, gameT = 0): GameState {
     player,
     worldSeed: 12345,
     npc: { bases: [], patches: {} },
+    quests: { entries: [], line: 'qi' as const, dantianBonus: 0 },
     mail: [],
   }
 }

@@ -13,6 +13,7 @@ import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { resolveCraft } from './craft.ts'
 import { generateNpcs, type NpcWorld } from './npc.ts'
+import { emptyQuestLog } from './quest.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -37,6 +38,11 @@ export const MIGRATIONS: readonly Migration[] = [
       const s = old as { worldSeed?: number }
       return { ...(old as object), npc: { bases: generateNpcs(s.worldSeed ?? 1, 300), patches: {} } }
     },
+  },
+  {
+    // v2 → v3：加入任务进度。老存档从空任务簿开始，原有等级与真气不受影响。
+    from: 2,
+    migrate: (old) => ({ ...(old as object), quests: emptyQuestLog() }),
   },
 ]
 
@@ -64,6 +70,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
     rng: seedRng(opts.seed),
     worldSeed: opts.seed,
     npc: { bases: generateNpcs(opts.seed, 300), patches: {} },
+    quests: emptyQuestLog(),
     mail: [],
     player: {
       name: opts.name,

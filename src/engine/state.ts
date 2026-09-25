@@ -12,6 +12,7 @@ import type { Timeline } from './timeline.ts'
 import type { RngState } from './rng.ts'
 import type { Element } from '../data/meridian.ts'
 import type { NpcWorld } from './npc.ts'
+import type { QuestLog } from './quest.ts'
 
 export type School = '蜀山' | '昆仑' | '通天'
 
@@ -78,6 +79,8 @@ export type GameState = {
   readonly worldSeed: number
   /** NPC 生态：基础记录入档，状态由纯函数按游戏日算出（见 `npc.ts`） */
   readonly npc: NpcWorld
+  /** 任务进度 */
+  readonly quests: QuestLog
   /** 收件箱，上限 200 封（`docs/spec/DECISIONS.md` §2 的体积预算） */
   readonly mail: readonly MailItem[]
 }

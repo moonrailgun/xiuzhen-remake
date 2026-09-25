@@ -15,13 +15,15 @@ import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../eng
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt } from '../engine/npc.ts'
+import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation } from '../engine/quest.ts'
+import { questTitle } from '../data/quests.ts'
 import { startCultivate, planUpgrade, speedUp, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
 import { sorted } from '../engine/timeline.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
-import { openWindow, setPageResolver, startCountdowns } from './windows.ts'
+import { openWindow, closeWindow, setPageResolver, startCountdowns } from './windows.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
   try {
@@ -167,6 +169,21 @@ function labelOf(s: GameState, payload: Readonly<Record<string, unknown>>): stri
   return `${String(payload['id'] ?? '法术')} Lv${to}`
 }
 
+/** 右栏：进行中的任务 + 护法。 */
+function rightVm(s: GameState) {
+  const quests = activeQuests(s.quests).map((q) => {
+    // 打怪类任务在任务栏显示目标坐标（照截图 #2「目标地点:(154,102)」）
+    const loc = q.goal.kind === 'slay' ? questLocation(s, q) : null
+    return {
+      id: q.id,
+      title: questTitle(q),
+      detail: loc ? `目标地点：(${loc[0]},${loc[1]})` : undefined,
+      abandonable: q.category !== 'realm',
+    }
+  })
+  return { quests, guardingMe: 0, guardingOthers: 0, guardCap: 7 }
+}
+
 function render(): void {
   const app = root()
   if (!app) return
@@ -184,7 +201,7 @@ function render(): void {
     version: '版本号:1.2.1-yyge',
     left: tab === 'map' ? renderMap(mapVm(s)) : renderPlayer(playerVm(s)),
     mid: renderMid(midVm(s)),
-    right: renderRight({ quests: [], guardingMe: 0, guardingOthers: 0, guardCap: 7 }),
+    right: renderRight(rightVm(s)),
   })
   startCountdowns(app)
 }
@@ -347,6 +364,41 @@ export function installGameActions(): void {
   /** 对选中场景进行推算（术数，阶段 4 接上）。 */
   g['spyScene'] = () => {
     openWindow('mwindow', '推算', '<DIV class=middle style="padding:10px">术数推算将在后续版本开放。</DIV>')
+  }
+
+  /** 查看可领取任务。 */
+  g['showAvailableQuests'] = () => {
+    if (!state) return
+    const list = availableQuests(state.quests, state)
+    const body = list.length === 0
+      ? '<DIV class=smallgray>目前没有可以领取的任务。</DIV>'
+      : list.map((q) =>
+          `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="acceptQuest('${q.id}')">${questTitle(q)}</A></DIV>`,
+        ).join('')
+    openWindow('lwindow', '可领取任务', `<DIV class=middle style="padding:10px">${body}</DIV>`)
+  }
+
+  g['acceptQuest'] = (id: string) => {
+    if (!state) return
+    const r = accept(state.quests, state, id)
+    if (!r.ok) {
+      openWindow('mwindow', '无法领取', `<DIV class=middle style="padding:10px">${r.reason}</DIV>`)
+      return
+    }
+    state = { ...state, quests: r.value }
+    closeWindow('lwindow')
+    step()
+  }
+
+  g['cancelquest'] = (id: string) => {
+    if (!state) return
+    const r = abandon(state.quests, id)
+    if (!r.ok) {
+      openWindow('mwindow', '无法放弃', `<DIV class=middle style="padding:10px">${r.reason}</DIV>`)
+      return
+    }
+    state = { ...state, quests: r.value }
+    step()
   }
 
   g['exportSave'] = () => {

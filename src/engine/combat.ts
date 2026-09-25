@@ -32,6 +32,10 @@ export type SwordOutcome = {
   readonly id: string
   readonly damageTaken: number
   readonly broken: boolean
+  /** 有效攻击 = 面板值 + 相生加成。战报打印的就是这个 */
+  readonly attack: number
+  /** 有效耐久 = 面板值 + 相生加成。伤害按它截断，所以战报也得打印它 */
+  readonly durability: number
 }
 
 export type BattleResult = {
@@ -133,19 +137,42 @@ export function resolveBattle(
     theirBonus: ReadonlyMap<string, { attack: number }>,
   ): SwordOutcome[] => {
     if (mine.length === 0) return []
-    return mine.map((s) => {
-      const dur = effDurability(s, myBonus)
-      // 官方算例（corpus/4309）：逐属性分摊，仅「我克」的那部分额外 +50%。
-      // 相生加出的攻击属于接受支援的剑，因此也按该剑属性判断。
-      const incoming = theirs.reduce((sum, t) => sum + effAttack(t, theirBonus)
-        * (isCountering(t.element, s.element) ? COUNTER_MULTIPLIER : 1), 0) / mine.length
-      const broken = incoming >= dur
-      return {
-        id: s.id,
-        damageTaken: Math.floor(Math.min(incoming, dur)),
-        broken,
-      }
-    })
+    // 官方算例（corpus/4309）：逐属性分摊，仅「我克」的那部分额外 +50%。
+    // 相生加出的攻击属于接受支援的剑，因此也按该剑属性判断。
+    const rows = mine.map((s) => ({
+      id: s.id,
+      dur: effDurability(s, myBonus),
+      total: theirs.reduce((sum, t) => sum + effAttack(t, theirBonus)
+        * (isCountering(t.element, s.element) ? COUNTER_MULTIPLIER : 1), 0),
+      incoming: 0,
+      broken: false,
+    }))
+
+    // **断一把就重新分摊。** 一次性均摊解释不了真实战报：102139#L45 里 4 把同款
+    // 古纹青石剑（同名⇒同属性⇒无相生、相克倍率一致）耐久 640/2560/20480/40960，
+    // 对方单剑攻击 108748，战报四把全断 —— 一次性均摊最多算出 108748×1.5/4 = 40780
+    // < 40960，第四把该是「完好无损」。改成断剑后幸存者重分摊：27187 先断掉前三把，
+    // 最后一把独自吃 108748 ≥ 40960，正好对上。
+    // 全库 31 场全表战报 6804 条记录：一次性均摊有 642 条「数学上不可能断」，迭代后降到 87。
+    let alive = rows
+    for (;;) {
+      const n = alive.length
+      if (n === 0) break
+      for (const r of alive) r.incoming = r.total / n
+      const broke = alive.filter((r) => r.incoming >= r.dur)
+      if (broke.length === 0) break
+      for (const r of broke) r.broken = true
+      alive = alive.filter((r) => !r.broken)
+    }
+
+    // 战报里 `受到伤害 ≤ 耐久` 且 `受到伤害 == 耐久 ⇔ 惨被斩断`，所以显示值截断到耐久。
+    return rows.map((r, i) => ({
+      id: r.id,
+      damageTaken: Math.floor(Math.min(r.incoming, r.dur)),
+      broken: r.broken,
+      attack: Math.floor(effAttack(mine[i]!, myBonus)),
+      durability: Math.floor(r.dur),
+    }))
   }
 
   return {

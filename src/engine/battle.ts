@@ -292,8 +292,13 @@ function buildReport(
     const c = toCombat(s)
     return {
       name: `${s.quality}${s.name}${s.refine > 0 ? `+${s.refine}` : ''}`,
-      attack: c.attack,
-      durability: c.durability,
+      // **打印有效值（面板 + 相生），不是面板值。**
+      // 伤害是按有效耐久截断的，打印面板耐久会出现「受到伤害 130 / 耐久 100 / 完好无损」
+      // 这种自相矛盾的行；原版战报本身也印的是有效值 —— 对同一战报里同名同品质、
+      // 只差淬炼的剑做拟合，452 组里纯 `基础×2^淬炼` 只有 1 组吻合，
+      // 带一个与淬炼无关的常数项的有 272 组，那个常数正是相生加成的形态。
+      attack: o?.attack ?? Math.floor(c.attack),
+      durability: o?.durability ?? Math.floor(c.durability),
       damage: o?.damageTaken ?? 0,
       result: o?.broken ? '惨被斩断' : '完好无损',
     }

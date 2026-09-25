@@ -227,3 +227,32 @@ test('护身能撑到护法赶来，飞剑撑不住（攻略里的对比）', ()
   const hours = guardHoldSeconds([guard]) / 3600
   assert.ok(hours > 1.5 && hours < 1.7, `护身撑 ${hours.toFixed(2)} 小时`)
 })
+
+test('★断一把就重新分摊：102139#L45 四把古纹青石剑全断', () => {
+  // 真实战报（2009-07-01）：攻方单剑攻击 108748，守方四把同款极品古纹青石剑
+  // 耐久 640/2560/20480/40960，四把**全部**「惨被斩断」。
+  // 同名 ⇒ 同属性 ⇒ 守方内部无相生、攻方对四把的相克倍率一致，所以这是个
+  // 与五行无关的干净反例：一次性均摊最多算出 108748×1.5/4 = 40780 < 40960。
+  const sword = (id: string, durability: number) => ({
+    id, name: '古纹青石剑', element: null, attack: 0, durability, agility: 1,
+  })
+  const attacker = [{ id: 'a', name: '三阳一煞剑', element: null, attack: 108748, durability: 221184, agility: 1 }]
+  const defenders = [sword('d0', 640), sword('d1', 2560), sword('d2', 20480), sword('d3', 40960)]
+  const r = resolveBattle(attacker, defenders)
+  assert.deepEqual(r.defender.map((o) => o.broken), [true, true, true, true])
+  assert.deepEqual(r.defender.map((o) => o.damageTaken), [640, 2560, 20480, 40960], '断了就是打满耐久')
+})
+
+test('★战报打印的攻击/耐久含相生，不会出现「伤害 > 同一行的耐久」', () => {
+  // 金生水：金剑把自身一半加给水剑。以前战报打面板值、伤害按有效值截断，
+  // 于是能印出「耐久 100 / 受到伤害 130 / 完好无损」这种自相矛盾的行。
+  const gold = { id: 'g', name: '金剑', element: '金' as const, attack: 0, durability: 100, agility: 1 }
+  const water = { id: 'w', name: '水剑', element: '水' as const, attack: 0, durability: 100, agility: 1 }
+  const enemy = [{ id: 'e', name: '敌剑', element: null, attack: 260, durability: 1e9, agility: 1 }]
+  const r = resolveBattle([gold, water], enemy)
+  for (const o of r.attacker) {
+    assert.ok(o.damageTaken <= o.durability, `受到伤害 ${o.damageTaken} 不该超过耐久 ${o.durability}`)
+    assert.equal(o.damageTaken === o.durability, o.broken, '伤害 == 耐久 ⇔ 惨被斩断')
+  }
+  assert.equal(r.attacker[1]!.durability, 150, '水剑有效耐久 = 100 + 金剑 100/2')
+})

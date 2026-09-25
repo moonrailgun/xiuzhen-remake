@@ -64,13 +64,19 @@ const fmt = (total: number): string => {
 }
 
 let timerId: number | null = null
+let countdownClock = () => Date.now() / 1000
+const deadlines = new WeakMap<HTMLElement, number>()
+export const setCountdownClock = (clock: () => number): void => { countdownClock = clock }
 
 /** 扫描容器里的倒计时并启动全局定时器。 */
 export function startCountdowns(root: ParentNode = document): void {
   const nodes = root.querySelectorAll<HTMLElement>('[start]')
   for (const n of nodes) {
     const start = Number(n.getAttribute('start'))
-    if (Number.isFinite(start)) n.textContent = fmt(start)
+    if (Number.isFinite(start)) {
+      if (!deadlines.has(n)) deadlines.set(n, countdownClock() + start)
+      n.textContent = fmt(Math.max(0, deadlines.get(n)! - countdownClock()))
+    }
   }
   if (timerId === null && typeof window !== 'undefined') {
     timerId = window.setInterval(tickCountdowns, 1000)
@@ -81,8 +87,7 @@ function tickCountdowns(): void {
   const nodes = document.querySelectorAll<HTMLElement>('[start]')
   if (nodes.length === 0) return
   for (const n of nodes) {
-    const left = Number(n.getAttribute('start')) - 1
-    n.setAttribute('start', String(left))
+    const left = (deadlines.get(n) ?? countdownClock()) - countdownClock()
     n.textContent = fmt(left)
     if (left <= 0) {
       n.removeAttribute('start')
@@ -131,14 +136,18 @@ export function installGlobals(): void {
   g['OnMDialogOK'] = () => {
     const f = pendingOk
     pendingOk = null
-    closeWindow('mwindow')
+    const box = boxOf('mwindow')
+    if (box) box.style.display = 'none'
     f?.()
+    if (box?.style.display === 'none') closeWindow('mwindow')
   }
   g['OnMDialog2OK'] = () => {
     const f = pendingOk2
     pendingOk2 = null
-    closeWindow('mwindow2')
+    const box = boxOf('mwindow2')
+    if (box) box.style.display = 'none'
     f?.()
+    if (box?.style.display === 'none') closeWindow('mwindow2')
   }
 }
 

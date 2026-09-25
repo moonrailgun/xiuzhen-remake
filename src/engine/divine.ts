@@ -42,7 +42,7 @@ export type DivineResult =
  * 易经「每高 1 点，对方推算成功率 −10%」。
  */
 export function divineSucceeds(myYijing: number, theirYijing: number): boolean {
-  return myYijing >= theirYijing
+  return myYijing > theirYijing
 }
 
 /** 九宫飞星：位置 + 丹田真气 + 固本培元等级。 */
@@ -279,6 +279,7 @@ export function divine(
   opts: {
     readonly at: number
     readonly byName: string
+    readonly skills: Readonly<Record<string, number>>
     readonly myYijing: number
     readonly theirYijing: number
     readonly targetMeridians?: readonly number[]
@@ -296,6 +297,8 @@ export function divine(
     readonly inbound?: readonly { readonly npc: NpcState; readonly distance: number }[]
   },
 ): DivineResult {
+  const skill = kind === '九宫飞星' ? '九宫飞星法' : kind
+  if (!((opts.skills[skill] ?? 0) > 0)) return { ok: false, reason: `尚未学会${skill}` }
   if (!divineSucceeds(opts.myYijing, opts.theirYijing)) {
     return { ok: false, reason: '你的术数修为不及对方，推算失败' }
   }

@@ -71,6 +71,20 @@ test('★缠斗标题句逐字：在({x},{y})缠斗 剩余{倒计时}于{时间}
   assert.match(html, /于2009-07-17 05:11:25结束$/)
 })
 
+test('返航事件显示回程倒计时，不再提供战斗操作', () => {
+  const returning = event({ kind: 'returning' })
+  const html = renderBattleEvent({ tab: 3, events: [returning] })
+  assert.match(html, /从道法自然\(259,14\)返航/)
+  assert.match(html, /后于2009-07-17 05:11:25返回/)
+  assert.match(html, /<SPAN class=countdown[^>]*start="13788">/)
+  assert.doesNotMatch(html, /求援|支援|还击|战斗地图/)
+  assert.equal(actionLinks(returning), '')
+})
+
+test('返航标题转义目标名', () => {
+  assert.doesNotMatch(titleLine(event({ kind: 'returning', who: '<script>x</script>' })), /<script>/)
+})
+
 test('标题句里的倒计时用原版 <SPAN start=秒> 协议', () => {
   assert.match(titleLine(event()), /<SPAN class=countdown start="13788">/)
 })

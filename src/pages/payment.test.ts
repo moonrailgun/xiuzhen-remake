@@ -59,7 +59,8 @@ test('VIP 套餐：三条功能 7 天 10 仙石，右侧三列 rowSpan 合并（
   assert.ok(h.includes('拥有法宝数量上限增加5个'))
   assert.ok(h.includes('自动淬炼'))
   assert.ok(h.includes('<TD rowSpan=3>7天</TD><TD rowSpan=3>10仙石</TD><TD rowSpan=4>'))
-  assert.ok(h.includes("ajaxPost('paycoin', 'pay=18', openPayment);"))
+  assert.ok(h.includes('暂未开放'))
+  assert.ok(!h.includes('pay=18'))
   // 套餐最后一条说明不带 colSpan，右边空一格（#79 上那道竖线）
   assert.ok(h.includes('<TD align=left>自动淬炼</TD><TD>&nbsp;</TD>'))
 })
@@ -85,15 +86,15 @@ test('修炼减半 / 完成走 M2 确认框，文案是原版 DOM 原文', () =>
   const h = renderPayment(vm())
   assert.ok(h.includes('减半所有修炼事件剩余时间，需要花费2个仙石'))
   assert.ok(h.includes('直接完成所有修炼事件，需要花费10个仙石'))
-  assert.ok(h.includes("ajaxPost('paycoin', 'pay=10', openPayment);"))
-  assert.ok(h.includes("ajaxPost('paycoin', 'pay=11', openPayment);"))
+  assert.ok(h.includes("ajaxPost(&#39;paycoin&#39;, &#39;pay=10&#39;);"))
+  assert.ok(h.includes("ajaxPost(&#39;paycoin&#39;, &#39;pay=11&#39;);"))
 })
 
 test('自由分配丹田比例：链接文字是「开始分配」，打开五行互化浮窗', () => {
   const h = renderPayment(vm())
   assert.ok(h.includes('自由分配丹田中五种真气的比例'))
   assert.ok(h.includes('>开始分配</A>'))
-  assert.ok(h.includes("openLWindow('', 'turnres.jsp')"))
+  assert.ok(h.includes("openLWindow(&#39;&#39;, &#39;turnres.jsp&#39;)"))
 })
 
 test('已购项显示剩余时间行（右对齐），未购的是空行', () => {

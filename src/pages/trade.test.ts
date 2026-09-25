@@ -109,7 +109,7 @@ test('购买法宝：名称点开右窗 itemmid，购买弹「确定购买?」�
   const h = renderTrade(vm({ view: 'buyitem' }))
   assert.ok(h.includes("openRWindow('极品古纹青石剑+4', 'itemmid.jsp?item=50504&quality=4')"))
   assert.ok(h.includes('class=skillup>'), '名称格带 skillup（绿色粗体）')
-  assert.ok(h.includes("MDialogOkCancel('', '确定购买?','ajaxPost(\\'buyitem\\', \\'sheet=44210\\', refleshAll);')"))
+  assert.ok(h.includes("MDialogOkCancel('', '确定购买?',function(){ajaxPost('buyitem', 'sheet=44210', refleshAll);})"))
 })
 
 test('购买法宝页的筛选参数是原版那五个：type/level/order/page/search', () => {
@@ -149,4 +149,18 @@ test('玩家可控的法宝名在正文与内联 onclick 里都被转义', () =>
   assert.ok(!h.includes('<img src=x'), '正文里不应出现未转义的标签')
   assert.ok(!h.includes("openRWindow('<img"), 'onclick 里也不应出现未转义的尖括号')
   assert.ok(h.includes('\\x3c'), 'escJs 把尖括号转成 \\x3c')
+})
+
+
+test('真实需求数量和收购价可见，出售表单有独立处理入口', () => {
+  const offer = { sheet: 9, give: '金' as const, want: '木' as const, amount: 19000, wantAmount: 19341, seconds: 23750 }
+  for (const view of ['buyqi', 'sellqi'] as const) {
+    const html = renderTrade(vm({ view, qiOffers: [offer], myQiOffers: [offer] }))
+    assert.ok(html.includes('金: 19000'))
+    assert.ok(html.includes('木: 19341'))
+  }
+  assert.ok(renderTrade(vm({ view: 'sellqi' })).includes('id=sellqiform'))
+  const html = renderTrade(vm({ view: 'sellitem', sellable: [{ id: 1, name: '极品飞剑', npcPrice: 20 }] }))
+  assert.ok(html.includes('id=sellitemform'))
+  assert.ok(html.includes('NPC最高收购20仙石'))
 })

@@ -22,14 +22,14 @@
  *    操作链接用全角空格分隔。
  *  - 单边事件时另一侧是 `<TD class=trbg width="50%" rowSpan=4>`。
  *
- * 只有一处是补的：原版每张表的 `colSpan` 写作 `{{6|10}}`（随单边/双边变），
- * 这里按左右各 5 列算出来，单边 5、双边 10。
+ * 补写部分：原版每张表的 `colSpan` 写作 `{{6|10}}`（随单边/双边变），
+ * 这里按左右各 5 列算出来，单边 5、双边 10。返航标题未留存，按现有返航事件重建。
  */
 
 import { esc, escJs, each, num, when } from './html.ts'
 import { countdown } from './shell.ts'
 
-export type BattleEventKind = 'outbound' | 'incoming' | 'meeting' | 'fighting'
+export type BattleEventKind = 'outbound' | 'incoming' | 'meeting' | 'fighting' | 'returning'
 
 /** 一把参战飞剑。看不穿的敌剑把 `name` 与 `stats` 留空，渲染成 `???`。 */
 export type BattleEventSword = {
@@ -71,7 +71,7 @@ export type BattleEventVm = {
 
 const STAT_HEADS = ['攻击', '耐久', '敏捷', '吸收', '击退'] as const
 
-/** 四种事件标题句。**格式逐字照原版**（09 §1.7）。 */
+/** 四种战斗标题逐字照原版（09 §1.7）；返航标题为重建。 */
 export function titleLine(e: BattleEventItem): string {
   const t = countdown(e.seconds)
   switch (e.kind) {
@@ -83,14 +83,17 @@ export function titleLine(e: BattleEventItem): string {
       return `在(${num(e.at[0])},${num(e.at[1])})还有${t}于${esc(e.when)}相遇`
     case 'fighting':
       return `在(${num(e.at[0])},${num(e.at[1])})缠斗 剩余${t}于${esc(e.when)}结束`
+    case 'returning':
+      return `你的飞剑正从${esc(e.who)}(${num(e.at[0])},${num(e.at[1])})返航，${t}后于${esc(e.when)}返回`
   }
 }
 
 /**
  * 标题行右侧的操作链接。**alt 提示与 onclick 全是原文**（09 §1.7）。
- * 来袭事件是「还击 / 战斗地图」，其余是「求援 / 支援 / 战斗地图」。
+ * 来袭事件是「还击 / 战斗地图」，其他战斗是「求援 / 支援 / 战斗地图」；返航不再提供战斗操作。
  */
 export function actionLinks(e: BattleEventItem, side: 0 | 1 = 0): string {
+  if (e.kind === 'returning') return ''
   const map = `<A class=smallbold alt="点此查看战斗示意图" href="#" ` +
     `onclick="openLWindow('战场地图', 'battlemap.jsp?eventid=${escJs(e.eventId)}&side=${side}')">战斗地图</A>`
 
@@ -102,7 +105,7 @@ export function actionLinks(e: BattleEventItem, side: 0 | 1 = 0): string {
   // 求援的弹窗是原版唯一带输入框的 MDialog，三参数形式，文案照抄
   const help = `<A class=smallbold alt="点此向他人请求援手" href="#" ` +
     `onclick="MDialog('请求援手','请输入道友的名字<br><p></p><p align=center><input id=gethelpname></input></p>', ` +
-    `'sendEventMsg(\\'${escJs(e.eventId)}\\',${side})')">求援</A>`
+    `function(){sendEventMsg('${escJs(e.eventId)}',${side})})">求援</A>`
   const back = `<A class=smallbold alt="点此帮助左方" href="#" ` +
     `onclick="openLWindow('', 'fight.jsp?type=3&eventid=${escJs(e.eventId)}&side=${side}&msg=0')">支援</A>`
   return `${help}　${back}　${map}`

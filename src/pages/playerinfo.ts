@@ -68,7 +68,7 @@ ${
     deleting
       ? `<TR class="trbg middle"><TD colSpan=3><SPAN style="COLOR:#ff0000">角色正在删除中，离完全删除还有<SPAN class=b>${esc(vm.deletingDays)}</SPAN>天。你还可以撤回你的删除命令。</SPAN></TD></TR>
 <TR class="trbg middle" align=middle><TD colSpan=3><INPUT type=button value=撤回删除 onclick="postForm('canceldelplayer', '');"></TD></TR>`
-      : `<TR class="trbg middle" align=middle><TD colSpan=3><INPUT type=button value=删除角色 onclick="MDialogOkCancel('', '确定要删除这个角色吗?', 'postForm(\\'delplayer\\', \\'\\');')"></TD></TR>`
+      : `<TR class="trbg middle" align=middle><TD colSpan=3><INPUT type=button value=删除角色 onclick="MDialogOkCancel('', '确定要删除这个角色吗?', function(){postForm('delplayer', '');})"></TD></TR>`
   }`
 }
 

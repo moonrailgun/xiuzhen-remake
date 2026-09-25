@@ -57,7 +57,7 @@ ${each(vm.rows, (r) => `<TR class="trbg middle" align=middle>
 <TD>${num(r.invested)} 两</TD>
 <TD>${esc(r.share.toFixed(1))}%</TD>
 <TD>${num(r.income)}两/小时</TD>
-<TD class=smallbold><A onclick="MDialogOkCancel('', '确定撤资?','ajaxPost(\\'unestate\\', \\'town=${num(r.x)},${num(r.y)}\\', refleshAll);')" href="#">撤资</A></TD></TR>`)}
+<TD class=smallbold><A onclick="MDialogOkCancel('', '确定撤资?',function(){ajaxPost('unestate', 'town=${num(r.x)},${num(r.y)}', refleshAll);})" href="#">撤资</A></TD></TR>`)}
 ${when(
     vm.rows.length === 0,
     () => `<TR class="trbg middle" align=middle><TD class=smallgray colSpan=6>目前没有任何产业</TD></TR>`,
@@ -65,6 +65,6 @@ ${when(
 <TR class=trbg>
 <TD class=smallbold colSpan=6 align=right>合计 ${num(total)}两/小时</TD></TR>
 <TR class=trbg>
-<TD class=smallred colSpan=6>注意：最多只能同时持有${num(vm.slotCap)}处产业；投资额更高的人可以把你挤出去。到村庄、小镇或城池找村长投资。</TD></TR>
+<TD class=smallred colSpan=6>注意：最多只能同时持有${num(vm.slotCap)}处产业。收益随游戏时间入账，撤资退还本金。到村庄、小镇或城池找村长投资。</TD></TR>
 </TBODY></TABLE>`
 }

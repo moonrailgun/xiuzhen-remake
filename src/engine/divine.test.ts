@@ -12,6 +12,7 @@ const target = npcAt(world, world.bases[0]!, 60 * DAY, SEED)
 const opts = (over = {}) => ({
   at: 1000,
   byName: '173小鱼',
+  skills: { 九宫飞星法: 1, 太乙神数: 1, 紫微斗数: 1, 水镜玄光: 1, 梅花易数: 1, 六壬神定: 1, 诰命真经: 1 },
   myYijing: 10,
   theirYijing: 5,
   inSight: true,
@@ -169,4 +170,15 @@ test('推算结果是可入收件箱的信件', () => {
   assert.ok(mail.id.length > 0)
   assert.equal(mail.read, false)
   assert.equal(mail.at, 1000)
+})
+
+test('未学术数不能推算，九宫技能名映射九宫飞星法', () => {
+  assert.equal(divine('九宫飞星', target, { ...opts(), skills: {} }).ok, false)
+  assert.equal(divine('九宫飞星', target, { ...opts(), skills: { 九宫飞星法: 1 } }).ok, true)
+})
+
+
+test('九宫飞星要求易经严格高于目标，相同等级也不能推算', () => {
+  assert.equal(divineSucceeds(5, 5), false)
+  assert.equal(divine('九宫飞星', target, opts({ myYijing: 5, theirYijing: 5 })).ok, false)
 })

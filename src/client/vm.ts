@@ -27,7 +27,7 @@ import { SWORDS, craftCostFor, canForge, isComplete } from '../data/swords.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN } from '../data/artifacts.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 import { artifactSlots, BODY_SLEEVE, craftSeconds, BODY_HAND } from '../engine/craft.ts'
-import { injectSecondsFor, visibleOrders, type QiOrder } from '../engine/market.ts'
+import { npcArtifactPrice, injectSecondsFor, visibleOrders, type QiOrder } from '../engine/market.ts'
 import { allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { npcsIn } from '../data/town.ts'
 import { terrainAt, sceneName } from '../data/world.ts'
@@ -266,6 +266,7 @@ const qiOfferOf = (s: GameState, o: QiOrder, sheet: number): QiOffer => ({
   give: o.offer.element,
   want: o.want.element,
   amount: o.offer.amount,
+  wantAmount: o.want.amount,
   seconds: injectSecondsFor(s, o.offer.amount),
 })
 
@@ -314,7 +315,7 @@ export function tradeVm(
       sellable: s.player.artifacts
         .map((a, i) => ({ a, i }))
         .filter(({ a }) => a.quality === '极品' && a.status === '空闲')
-        .map(({ a, i }) => ({ id: i, name: artifactLabel(a) })),
+        .map(({ a, i }) => ({ id: i, name: artifactLabel(a), npcPrice: npcArtifactPrice(a) })),
     },
     sheets: {
       ids: view === 'sellqi' ? mine.map((o) => o.id)

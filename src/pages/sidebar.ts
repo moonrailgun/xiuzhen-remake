@@ -72,7 +72,7 @@ ${
       : each(rows, (r) => {
           const speed = r.speedup
             // 「半」= 减半剩余时间（2 仙石），「完」= 直接完成（10 仙石）
-            ? `<TD class=smallbold align=right noWrap><A class=skillup href="#" onclick="paycoin(8)">半</A> <A class=skillup href="#" onclick="paycoin(10)">完</A></TD>`
+            ? `<TD class=smallbold align=right noWrap><A class=skillup href="#" onclick="paycoin(10)">半</A> <A class=skillup href="#" onclick="paycoin(11)">完</A></TD>`
             : ''
           const cancel = r.cancelId
             ? `<TD width=16><A href="#" onclick="cancelmove('${esc(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`

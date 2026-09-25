@@ -34,7 +34,7 @@ import { ranking } from '../engine/npc.ts'
 import {
   MAX_INVESTMENTS, commerceLevel, totalInvested, shareOf, hourlyIncomeOf,
   invest, readBook, canReadFree, exchangeNote, teleport, payLiYuanwai, acceptEscort, quoteEscort,
-  BANK_NOTES, type Town,
+  BANK_NOTES, redeemNote, withdrawInvestment, type Town,
 } from '../engine/town.ts'
 import {
   escortDialog, townNpcDialog, DIALOG_VERBATIM_IDS, booksReadableIn, npcsIn,
@@ -45,36 +45,37 @@ import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
-import { newGame, tick, saveGame, loadGame, resourceBarOf, MIGRATIONS } from '../engine/game.ts'
+import { newGame, tick, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
 import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
-import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation } from '../engine/quest.ts'
-import { questTitle, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
+import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
+import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
-  type LaunchSword, type BattleTarget,
+  launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
 import { startCraft, refineArtifact, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
-import { DEFENSIVE_ARTIFACTS, panelStat, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
+import { DEFENSIVE_ARTIFACTS, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
 import {
-  ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders,
+  ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
 } from '../engine/market.ts'
 import type { FiveQi } from '../engine/state.ts'
 import { changeRate } from '../engine/game.ts'
-import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
+import { exportSave as serializeExport, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
-import { startCultivate, planUpgrade, speedUp, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
+import { purchase } from '../engine/payment.ts'
+import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
-import { openWindow, closeWindow, setPageResolver, startCountdowns } from './windows.ts'
+import { openWindow, closeWindow, setPageResolver, startCountdowns, setCountdownClock } from './windows.ts'
 import { esc, escJs } from '../pages/html.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
@@ -93,6 +94,7 @@ let state: GameState | null = null
 /** 当前主标签 */
 let tab: MainTab = 'player'
 /** 各页的子标签（原版是 `?tab=N`，本地版拦下来记在这里） */
+let playerView: PlayerVm['view'] = 'meridian'
 let skillTab: SkillTab = 'produce'
 let itemTab: ItemTab = 'list'
 let tradeView: TradeView = 'buyqi'
@@ -129,7 +131,7 @@ function root(): HTMLElement | null {
 
 function playerVm(s: GameState): PlayerVm {
   return {
-    view: 'meridian',
+    view: playerView,
     name: s.player.name,
     element: s.player.element,
     gender: s.player.gender,
@@ -277,6 +279,7 @@ function labelOf(s: GameState, kind: string, payload: Readonly<Record<string, un
     return `${String(payload['name'] ?? '法宝')}${n > 1 ? `×${n}` : ''}`
   }
 
+  if (payload['op'] === 'goldenCore') return '压缩真元'
   const system = payload['system']
   const to = payload['toLevel'] as number
   if (system === 'meridian') {
@@ -293,8 +296,9 @@ function labelOf(s: GameState, kind: string, payload: Readonly<Record<string, un
 /** 右栏：进行中的任务 + 护法。 */
 function rightVm(s: GameState) {
   const quests = activeQuests(s.quests).map((q) => {
+    const entry = s.quests.entries.find(e => e.id === q.id)
     // 打怪类任务在任务栏显示目标坐标（照截图 #2「目标地点:(154,102)」）
-    const loc = q.goal.kind === 'slay' ? questLocation(s, q) : null
+    const loc = q.goal.kind === 'slay' ? (entry?.at ?? questLocation(s, q)) : null
     return {
       id: q.id,
       title: questTitle(q),
@@ -328,7 +332,7 @@ function leftPane(s: GameState): string {
   }
 }
 
-function render(): void {
+function render(live = false): void {
   const app = root()
   if (!app) return
 
@@ -338,7 +342,7 @@ function render(): void {
   }
 
   const s = state
-  app.innerHTML = renderShell({
+  const html = renderShell({
     tab,
     resources: resourceBarOf(s),
     serverTime: formatServerTime(s.clock),
@@ -347,6 +351,29 @@ function render(): void {
     mid: renderMid(midVm(s)),
     right: renderRight(rightVm(s)),
   })
+  if (!document.getElementById('gpage')) app.innerHTML = html
+  else {
+    const template = document.createElement('template')
+    template.innerHTML = html
+    // 浮窗独立于三栏更新；定时刷新时保留正在填写的表单。
+    for (const id of ['top', 'gleft', 'gmid', 'gright']) {
+      const current = document.getElementById(id)
+      const next = template.content.querySelector<HTMLElement>(`#${id}`)
+      if (!current || !next) continue
+      const controls = live ? [...current.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')] : []
+      const drafts = controls.map(el => ({ id: el.id, name: el.name, value: el.value, checked: el instanceof HTMLInputElement && el.checked, focused: el === document.activeElement,
+        start: el instanceof HTMLInputElement && el.type === 'text' ? el.selectionStart : null }))
+      current.innerHTML = next.innerHTML
+      if (live) [...current.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')].forEach((el, i) => {
+        const d = drafts[i]
+        if (!d || d.id !== el.id || d.name !== el.name) return
+        if (el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox')) {
+          if (el.value === d.value) el.checked = d.checked
+        } else el.value = d.value
+        if (d.focused) { el.focus(); if (d.start !== null && el instanceof HTMLInputElement) el.setSelectionRange(d.start, d.start) }
+      })
+    }
+  }
   startCountdowns(app)
 }
 
@@ -365,7 +392,7 @@ export function routeJsp(href: string): boolean {
   const n = (key: string, dflt = 0) => Number(q.get(key) ?? dflt) || dflt
 
   switch (page) {
-    case 'player': tab = 'player'; break
+    case 'player': tab = 'player'; playerView = n('tab') === 2 ? 'body' : 'meridian'; break
     // 原版首页是登录/选服门户，本地版没有，点了就回人物页（不能让它真的跳走）
     case 'index': tab = 'player'; break
     case 'map': {
@@ -427,20 +454,30 @@ export function routeJsp(href: string): boolean {
 }
 
 /** 推进到现在 → 重渲染 → 存档。所有交互都走这一条路径。 */
-function step(): void {
-  if (!state) return render()
+function advanceState(): void {
+  if (!state) return
   const out = tick(state, Date.now())
   state = out.state
-  // 人物走动后，地图视图跟着人物（除非玩家手动跳到别处看）
-  if (out.resolved.some((e) => e.kind === 'move')) mapCenter = null
+  if (out.resolved.some(e => e.kind === 'move')) mapCenter = null
+}
+
+function step(): void {
+  advanceState()
   render()
+  persist()
+}
+
+function pulse(): void {
+  if (!state) return
+  advanceState()
+  render(true)
   persist()
 }
 
 function persist(): void {
   if (!state || !STORAGE_KEY_AVAILABLE) return
   try {
-    saveGame(localStorage, state, Date.now())
+    state = saveGame(localStorage, state, Date.now())
   } catch (e) {
     // 配额不足或隐私模式：提示用户导出，不静默吞掉
     openWindow('mwindow', '存档失败', `<DIV class=middle style="padding:10px">
@@ -452,6 +489,10 @@ function persist(): void {
 
 export function installGameActions(): void {
   const g = globalThis as unknown as Record<string, unknown>
+
+  // 原版页面将这两个刷新函数作为 ajaxPost 的回调参数传入。
+  g['refleshAll'] = step
+  g['refleshRight'] = step
 
   /** 建号页的确定按钮。 */
   g['sendCreatePlayer'] = () => {
@@ -517,8 +558,8 @@ export function installGameActions(): void {
   /** 事件栏的「半 / 完」。 */
   g['paycoin'] = (pay: number) => {
     if (!state) return
-    const r = speedUp(state, pay === 10 ? 'finish' : 'half')
-    if (!r.ok) return
+    const r = purchase(state, pay)
+    if (!r.ok) return openWindow('mwindow', '无法购买', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
     state = r.state
     step()
   }
@@ -578,6 +619,7 @@ export function installGameActions(): void {
   /** 对选中场景进行推算（水镜玄光：按坐标推算该地修炼的玩家）。 */
   g['spyScene'] = () => {
     if (!state || !mapSelected) return
+    if (!((state.player.skills['水镜玄光'] ?? 0) > 0)) return openWindow('mwindow', '推算失败', '<DIV class=middle style=padding:10px>尚未学会水镜玄光。</DIV>')
     const here = npcsAtCell(state.npc, state.clock.gameT, state.worldSeed, mapSelected.x, mapSelected.y)
     const body = here.length === 0
       ? '此地空无一人。'
@@ -590,7 +632,7 @@ export function installGameActions(): void {
   g['spyPlayer'] = (name: string) => {
     if (!state) return
     const s = state
-    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
+    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
       .find((n) => n.base.name === name)
     if (!target) {
       openWindow('mwindow', '掐指一算', '<DIV class=middle style="padding:10px">对方已不在你的感应范围内。</DIV>')
@@ -606,17 +648,18 @@ export function installGameActions(): void {
   g['doDivine'] = (kind: string, name: string) => {
     if (!state) return
     const s = state
-    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
+    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
       .find((n) => n.base.name === name)
     if (!target) return
     const r = divine(kind as DivinationKind, target, {
       at: s.clock.gameT,
       byName: s.player.name,
+      skills: s.player.skills,
       myYijing: s.player.skills['易经'] ?? 0,
-      theirYijing: 0,
+      theirYijing: target.yijing,
       targetMeridians: Array(12).fill(Math.min(20, Math.floor(target.daoxing / 9000))),
       inSight: true,
-      located: true,
+      located: false,
       ...divineContext(s, target),
     })
     if (!r.ok) {
@@ -654,16 +697,7 @@ export function installGameActions(): void {
       openWindow('mwindow', '无法出击', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
     }
-    // 派出去的剑标成「斩杀中」，这样一览页与出击页都不会再选到它
-    const ids = swords.map((s) => s.id)
-    state = {
-      ...r.state,
-      player: {
-        ...r.state.player,
-        artifacts: r.state.player.artifacts.map((a) =>
-          ids.includes(a.id) ? { ...a, status: '斩杀中' } : a),
-      },
-    }
+    state = r.state
     closeWindow('lwindow')
     step()
   }
@@ -753,8 +787,8 @@ export function installGameActions(): void {
     step()
   }
 
-  g['takeEscort'] = () => withTown((town, s) => {
-    const r = acceptEscort(s, town, { x: s.player.x, y: s.player.y })
+  g['takeEscort'] = (x: number, y: number) => withTown((town, s) => {
+    const r = acceptEscort(s, town, { x, y })
     return r.ok ? r.state : { error: r.reason }
   })
 
@@ -765,6 +799,11 @@ export function installGameActions(): void {
 
   g['exchangeNote'] = (name: string) => withTown((_town, s) => {
     const r = exchangeNote(s, name)
+    return r.ok ? r.state : { error: r.reason }
+  })
+
+  g['redeemNote'] = (name: string) => withTown((_town, s) => {
+    const r = redeemNote(s, name)
     return r.ok ? r.state : { error: r.reason }
   })
 
@@ -813,7 +852,17 @@ export function installGameActions(): void {
       return
     }
     if (action === 'unsellqi' || action === 'unsellitem') {
-      doMarketCancel(Number(p.get('sheet') ?? -1))
+      doMarketCancel(action, Number(p.get('sheet') ?? -1))
+      return
+    }
+    if (action === 'unestate' && state) {
+      const town = state.towns[p.get('town') ?? '']
+      if (!town) return
+      const r = withdrawInvestment(state, town)
+      if (!r.ok) return openWindow('mwindow', '撤资', esc(r.reason))
+      state = { ...r.state, towns: { ...r.state.towns, [townKey(r.town.x, r.town.y)]: r.town } }
+      closeWindow('lwindow')
+      step()
       return
     }
     if (action === 'finishquest') {
@@ -909,7 +958,16 @@ export function installGameActions(): void {
   }
   g['sendUseItem2'] = () => usePill()
   g['sendUseItem3'] = () => tell('秘笈', '秘笈的效果没有存档，本地版暂不开放学习。')
-  g['sendUseItem5'] = () => tell('任务物品', '任务物品在对应任务完成时自动消耗。')
+  g['sendUseItem5'] = () => {
+    if (!state) return
+    const item = state.player.artifacts[selected(5) - 1]
+    if (!item) return tell('使用', '请先选中一件物品。')
+    if (!BANK_NOTES.some(note => note.name === item.name)) return tell('任务物品', '任务物品在对应任务完成时自动消耗。')
+    const r = redeemNote(state, item.name)
+    if (!r.ok) return tell('使用', r.reason)
+    state = r.state
+    step()
+  }
   g['sendRepairItem'] = () => tell('修理', '损坏的法宝会在返回后自动修理。')
   g['sendUpgradeItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
   g['sendUpgradeAllItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
@@ -958,14 +1016,47 @@ export function installGameActions(): void {
     step()
   }
 
+  g['questAnswer'] = (id: string, answer: string) => {
+    if (!state) return
+    const r = answerQuiz(state.quests, state, id, answer)
+    if (!r.ok) return openWindow('mwindow', '答题', esc(r.reason))
+    state = { ...state, quests: r.value }
+    openWindow('lwindow', '任务', questWindow(state, id))
+    step()
+  }
+  g['questChooseLine'] = (id: string, line: 'qi' | 'sword') => {
+    if (!state) return
+    state = { ...state, quests: chooseLine(state.quests, id, line) }
+    openWindow('lwindow', '任务', questWindow(state, id))
+    step()
+  }
+  g['questGatherCore'] = (id: string) => {
+    if (!state) return
+    const amount = Number((document.getElementById('core-qi-amount') as HTMLInputElement | null)?.value)
+    const r = gatherCoreQi(state, id, amount)
+    if (!r.ok) return openWindow('mwindow', '汇聚真气', esc(r.reason))
+    state = r.value
+    openWindow('lwindow', '任务', questWindow(state, id))
+    step()
+  }
+  g['questCompressCore'] = (id: string) => {
+    if (!state) return
+    const r = startCoreCompression(state, id)
+    if (!r.ok) return openWindow('mwindow', '压缩真元', esc(r.reason))
+    state = r.value
+    openWindow('lwindow', '任务', questWindow(state, id))
+    step()
+  }
+
   g['cancelquest'] = (id: string) => {
     if (!state) return
+    const eventId = state.quests.entries.find(e => e.id === id)?.coreEventId
     const r = abandon(state.quests, id)
     if (!r.ok) {
       openWindow('mwindow', '无法放弃', `<DIV class=middle style="padding:10px">${r.reason}</DIV>`)
       return
     }
-    state = { ...state, quests: r.value }
+    state = { ...state, quests: r.value, timeline: { events: state.timeline.events.filter(e => e.id !== eventId) } }
     step()
   }
 
@@ -1008,7 +1099,7 @@ export function installGameActions(): void {
       const file = input.files?.[0]
       if (!file) return
       try {
-        const loaded = importSave(await file.text(), MIGRATIONS) as GameState
+        const loaded = importGame(await file.text())
         state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
         closeWindow('lwindow')
         step()
@@ -1039,11 +1130,12 @@ export function installGameActions(): void {
 
   g['exportSave'] = () => {
     if (!state) return
-    const blob = new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' })
+    const blob = new Blob([serializeExport(state, Date.now())], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = `xiuzhen-${state.player.name}.json`
     a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 0)
   }
 }
 
@@ -1052,6 +1144,7 @@ export function installGameActions(): void {
  * 本地版按同样的 URL 分发到各页面模块（见 `windows.ts` 的 `setPageResolver`）。
  */
 function resolvePage(url: string): string {
+  advanceState()
   const s = state
   if (!s) return ''
   const [path, query] = url.replace(/&amp;/g, '&').split('?')
@@ -1203,37 +1296,30 @@ function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly
 
 /** 出击页。目标可以是同格的 NPC，也可以是任务里的怪。 */
 function fightWindow(s: GameState, targetName: string): string {
-  const npc = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
-    .find((n) => n.base.name === targetName)
-  if (!npc) {
-    fightTarget = null
-    return '<DIV class=middle style="padding:12px">对方已不在你的感应范围内。</DIV>'
-  }
-
+  const npc = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
+    .find(n => n.base.name === targetName)
+  const quest = activeQuests(s.quests).find(q => q.goal.kind === 'slay' && q.goal.monster.name === targetName)
+  const monster = quest ? questTarget(s.quests, quest.id) : null
   reinforceEventId = null
-  fightTarget = {
-    kind: 'player',
-    name: npc.base.name,
-    x: npc.x,
-    y: npc.y,
-    attack: npc.swordPower,
-    agility: Math.max(1, Math.round(npc.swordPower / 10)),
-    hp: npc.swordPower * 2,
-    element: npc.base.element,
-  }
-
-  const dist = Math.abs(npc.x - s.player.x) + Math.abs(npc.y - s.player.y)
+  fightTarget = monster ?? (npc ? {
+    kind: 'player', npcId: npc.base.id, name: npc.base.name, x: npc.x, y: npc.y,
+    attack: npc.swordPower, agility: Math.max(1, Math.round(npc.swordPower / 10)),
+    hp: npc.swordPower * 2, element: npc.base.element,
+  } : null)
+  if (!fightTarget) return '<DIV class=middle style="padding:12px">对方已不在你的感应范围内。</DIV>'
+  const target = fightTarget
+  const dist = Math.abs(target.x - s.player.x) + Math.abs(target.y - s.player.y)
   const wanjian = s.player.skills['万剑诀'] ?? 0
   const rows = launchableSwords(s).map(({ sword }) => ({
     id: sword.id,
     name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
     itemId: 0,
-    attack: panelStat(sword.attack, sword.quality, sword.refine),
-    durability: panelStat(sword.durability, sword.quality, sword.refine),
-    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
-    speed: sword.speed,
+    attack: launchedSwordStats(sword, s.player.skills).attack,
+    durability: launchedSwordStats(sword, s.player.skills).durability,
+    agility: launchedSwordStats(sword, s.player.skills).agility,
+    speed: launchedSwordStats(sword, s.player.skills).speed,
     element: sword.element ?? '无',
-    seconds: flightSeconds(dist, sword.speed),
+    seconds: flightSeconds(dist, launchedSwordStats(sword, s.player.skills).speed),
   }))
 
   const passives = Object.keys(PASSIVE_SWORD_ARTS)
@@ -1242,9 +1328,9 @@ function fightWindow(s: GameState, targetName: string): string {
 
   return renderFight({
     kind: 'attack',
-    targetName: npc.base.name,
-    at: [npc.x, npc.y],
-    summary: `${npc.base.name}　${npc.realm}　道行 ${npc.daoxingText}　属性${npc.base.element}`,
+    targetName: target.name,
+    at: [target.x, target.y],
+    summary: `${target.name}　攻击:${target.attack} 敏捷:${target.agility} 生命:${target.hp} 属性:${target.element}`,
     swords: rows,
     limit: swordsOutLimit(wanjian),
     out: swordsOut(s),
@@ -1295,9 +1381,9 @@ function battleEventVm(s: GameState, tab: number) {
         name: `${sw.quality}${sw.name}${sw.refine > 0 ? `+${sw.refine}` : ''}`,
         itemId: 0,
         stats: [
-          panelStat(sw.attack, sw.quality, sw.refine),
-          panelStat(sw.durability, sw.quality, sw.refine),
-          panelStat([sw.agility, sw.agility], sw.quality, sw.refine),
+          (sw.launchedStats ?? launchedSwordStats(sw, {})).attack,
+          (sw.launchedStats ?? launchedSwordStats(sw, {})).durability,
+          (sw.launchedStats ?? launchedSwordStats(sw, {})).agility,
           0,
           0,
         ] as [number, number, number, number, number],
@@ -1313,7 +1399,7 @@ function battleEventVm(s: GameState, tab: number) {
       }]
       return {
         eventId: e.id,
-        kind: (phase === 'fighting' ? 'fighting' : 'outbound') as 'fighting' | 'outbound',
+        kind: (phase === 'fighting' || phase === 'returning' ? phase : 'outbound') as 'fighting' | 'returning' | 'outbound',
         who: t.name,
         at: [t.x, t.y] as [number, number],
         seconds: Math.max(0, Math.round(e.finishAt - s.clock.gameT)),
@@ -1338,12 +1424,12 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
     id: sword.id,
     name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
     itemId: 0,
-    attack: panelStat(sword.attack, sword.quality, sword.refine),
-    durability: panelStat(sword.durability, sword.quality, sword.refine),
-    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
-    speed: sword.speed,
+    attack: launchedSwordStats(sword, s.player.skills).attack,
+    durability: launchedSwordStats(sword, s.player.skills).durability,
+    agility: launchedSwordStats(sword, s.player.skills).agility,
+    speed: launchedSwordStats(sword, s.player.skills).speed,
     element: sword.element ?? '无',
-    seconds: flightSeconds(dist, sword.speed),
+    seconds: flightSeconds(dist, launchedSwordStats(sword, s.player.skills).speed),
   }))
 
   return renderFight({
@@ -1465,11 +1551,22 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
     case 'escort': {
       // 唯一一段原文对话
       const dialog = escortDialog({ kind: town.kind, name: town.name, x: town.x, y: town.y, level })
-      const quote = quoteEscort(town, { x: s.player.x, y: s.player.y })
+      let destination: { x: number; y: number } | null = null
+      for (let radius = 1; radius < 200 && !destination; radius++) {
+        for (let dx = -radius; dx <= radius && !destination; dx++) {
+          for (const dy of [radius - Math.abs(dx), -(radius - Math.abs(dx))]) {
+            const x = town.x + dx, y = town.y + dy
+            if (x < 0 || x >= 200 || y < 0 || y >= 200) continue
+            if (['村庄', '小镇', '城池'].includes(terrainAt(s.worldSeed, x, y, weekOfServer(s.clock)))) { destination = { x, y }; break }
+          }
+        }
+      }
+      if (!destination) return pre(dialog) + box('暂时没有可以送达的其他州县。')
+      const quote = quoteEscort(town, destination)
       return `${pre(dialog)}${box(
-        `<SPAN class=smallgray>本地商业 Lv.${level}</SPAN>` +
-        act('领取运镖任务', 'takeEscort()') +
-        `<SPAN class=smallgray>当前可接：佣金 ${quote.fee} 两，约 ${formatDuration(quote.seconds)}</SPAN>`,
+        `<SPAN class=smallgray>本地商业 Lv.${level}，送往 ${esc(sceneName(s.worldSeed, destination.x, destination.y))} (${destination.x},${destination.y})</SPAN>` +
+        act('领取运镖任务', `takeEscort(${destination.x},${destination.y})`) +
+        `<SPAN class=smallgray>佣金 ${quote.fee} 两，约 ${formatDuration(quote.seconds)}</SPAN>`,
       )}`
     }
     case 'school': {
@@ -1485,7 +1582,7 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
     case 'bank':
       return dialog + note + box(
         `<SPAN class=smallgray>${esc(def.purpose)}　现有 ${s.player.silver} 两</SPAN>` +
-        BANK_NOTES.map((n) => act(`兑${n.name}（${n.value} 两）`, `exchangeNote('${escJs(n.name)}')`)).join(''),
+        BANK_NOTES.map((n) => act(`兑${n.name}（${n.value} 两）`, `exchangeNote('${escJs(n.name)}')`) + (s.player.artifacts.some(a => a.name === n.name) ? act(`兑回${n.name}（取回 ${n.value} 两）`, `redeemNote('${escJs(n.name)}')`) : '')).join(''),
       )
     case 'chief':
       return dialog + note + box(
@@ -1606,7 +1703,7 @@ function doRefine(rowId: number): void {
         openWindow('mwindow', '淬炼失败', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
         return
       }
-      state = r.state
+      state = applyQuestProgress(state, r.state)
       openWindow('mwindow', '淬炼', `<DIV class=middle style="padding:10px">${
         r.success ? `淬炼成功，得到 +${next}。` : `${REFINE_FAIL_TEXT}。`
       }</DIV>`)
@@ -1761,11 +1858,11 @@ function doMarketBuy(action: 'buyqi' | 'buyitem', sheet: number): void {
   step()
 }
 
-function doMarketCancel(sheet: number): void {
+function doMarketCancel(action: 'unsellqi' | 'unsellitem', sheet: number): void {
   if (!state) return
   const id = sheetId(sheet)
   if (!id) return
-  state = applyCtx(cancelQiOrders(ctxOf(state), [id]))
+  state = applyCtx((action === 'unsellitem' ? cancelArtifactOrders : cancelQiOrders)(ctxOf(state), [id]))
   step()
 }
 
@@ -1908,7 +2005,8 @@ function skillWindow(s: GameState, id: number): string {
   if (plan.toLevel > node.cap) {
     return `<DIV class=middle style="padding:10px">${esc(node.name)} 已至上限 Lv.${node.cap}。</DIV>`
   }
-  return upgradePanel(node.name, plan, { system: 'skill', index: id })
+  const blocked = skillUpgradeBlockReason(s, node.name)
+  return upgradePanel(node.name, plan, { system: 'skill', index: id }, blocked)
 }
 
 function questWindow(s: GameState, id: string): string {
@@ -1916,7 +2014,7 @@ function questWindow(s: GameState, id: string): string {
   if (!q) return '<DIV class=middle style="padding:12px">没有这个任务。</DIV>'
   const entry = s.quests.entries.find((e) => e.id === id)
   const done = entry ? goalMet(q, entry, s) : false
-  const loc = q.goal.kind === 'slay' ? questLocation(s, q) : null
+  const loc = q.goal.kind === 'slay' ? (entry?.at ?? questLocation(s, q)) : null
   return renderQuest({
     id: q.id,
     title: questTitle(q),
@@ -1925,19 +2023,15 @@ function questWindow(s: GameState, id: string): string {
       ? { kind: 'slay', monster: q.goal.kind === 'slay' ? q.goal.monster.name : '', at: loc, done }
       : { kind: 'text', text: q.summary, done },
     reward: q.reward.qi
-      ? { kind: 'qi', qi: qiRewardVector(q.reward.qi) }
+      ? { kind: 'qi', qi: qiRewardFor(q.reward.qi, s.player.element) }
       : { kind: 'text', text: q.reward.note ?? (q.reward.realm ? `境界提升为 ${q.reward.realm}` : '—') },
     description: [q.summary, ...(q.path ? [q.path] : [])],
     claimable: done,
+    interaction: q.goal.kind === 'quiz' ? { kind: 'quiz' }
+      : q.goal.kind === 'choice' ? { kind: 'choice' }
+      : q.goal.kind === 'goldenCore' ? { kind: 'goldenCore', gathered: entry?.coreQi ?? 0, cores: entry?.count ?? 0, compressing: !!entry?.coreEventId }
+      : undefined,
   })
-}
-
-/** 任务奖励的真气可能写成「各 N」或逐项，统一成五元组。 */
-function qiRewardVector(r: unknown): [number, number, number, number, number] {
-  if (typeof r === 'number') return [r, r, r, r, r]
-  if (Array.isArray(r)) return [r[0] ?? 0, r[1] ?? 0, r[2] ?? 0, r[3] ?? 0, r[4] ?? 0]
-  const o = r as Record<string, number>
-  return ELEMENTS.map((e) => o[e] ?? 0) as unknown as [number, number, number, number, number]
 }
 
 function rankVm(s: GameState, tab: 'power' | 'estate' | 'exp') {
@@ -1996,6 +2090,7 @@ function upgradePanel(
   name: string,
   plan: ReturnType<typeof planUpgrade>,
   target: { system: string; index: number },
+  blocked?: string,
 ): string {
   const icons = ['gold', 'wood', 'water', 'fire', 'earth']
   return `<DIV class=middle style="padding:6px">
@@ -2007,7 +2102,7 @@ function upgradePanel(
 </TBODY></TABLE>
 <DIV id=upgradeMsg style="text-align:center;padding:6px"></DIV>
 <DIV style="text-align:center">
-<A class=skillup href="#" onclick="doUpgrade('${target.system}',${target.index})">升级</A>
+${blocked ? `<SPAN class=smallred>${esc(blocked)}</SPAN>` : `<A class=skillup href="#" onclick="doUpgrade('${target.system}',${target.index})">升级</A>`}
 </DIV>
 </DIV>`
 }
@@ -2015,6 +2110,9 @@ function upgradePanel(
 export function boot(): void {
   installGameActions()
   setPageResolver(resolvePage)
+  setCountdownClock(() => state ? state.clock.gameT + Math.max(0, Date.now() - state.clock.wallT) / 1000 * state.clock.rate : Date.now() / 1000)
+  document.addEventListener('click', () => advanceState(), true)
+  document.addEventListener('submit', () => advanceState(), true)
 
   // 页面里的原版 .jsp 链接统一在这里拦一次（子标签、分页、筛选都走它）
   document.addEventListener('click', (ev) => {
@@ -2031,6 +2129,8 @@ export function boot(): void {
     if (!state || !form || !action || !action.includes('.jsp')) return
     ev.preventDefault()
     const q = new URLSearchParams(new FormData(form) as unknown as Record<string, string>)
+    if (form.id === 'sellqiform') return doListQi()
+    if (form.id === 'sellitemform') return doListArtifact()
     if (action.includes('turnres.jsp')) {
       doTurnRes(q)
       return
@@ -2048,7 +2148,9 @@ export function boot(): void {
   step()
 
   // 事件到点时自动推进（倒计时归零会冒泡这个事件）
-  document.addEventListener('countdown-done', () => step())
+  window.setInterval(pulse, 1000)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse() })
+  window.addEventListener('pagehide', () => { advanceState(); persist() })
   // 另一个标签页存了档 → 重新读，避免互相覆盖
   window.addEventListener('storage', () => {
     if (!STORAGE_KEY_AVAILABLE) return

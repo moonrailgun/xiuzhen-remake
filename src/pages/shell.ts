@@ -103,7 +103,7 @@ function windows(): string {
   const frame = (key: string, withTitle: boolean, buttons: string) => `
 <IFRAME id=${key}iframe style="DISPLAY: none" src="about:blank"></IFRAME>
 <DIV id=${key} style="DISPLAY: none"><DIV id=${key}inner>
-<DIV class=dlgclosebtn><A onclick=close${key.charAt(0).toUpperCase()}${key.slice(1, -6)}Window() href="#"><IMG src="img/closewindow.gif"></A></DIV>
+<DIV class=dlgclosebtn><A onclick="${key === 'mwindow2' ? 'closeMWindow2' : `close${key[0]!.toUpperCase()}Window`}()" href="#"><IMG src="img/closewindow.gif"></A></DIV>
 <DIV id=${key}content></DIV>
 ${withTitle ? `<DIV id=${key}title><SPAN id=${key}text class=title3></SPAN></DIV>` : ''}
 ${buttons}

@@ -45,13 +45,15 @@ test('收益写作「630两/小时」（与产业排行榜同一写法），并�
   assert.ok(h.includes('990000 两'), '投资额用银两，写法同人物信息表')
 })
 
-test('撤资走确认框；红字写明 5 处上限与「投得多的能把你挤出去」', () => {
+test('撤资走确认框；红字写明 5 处上限、收益入账与退还本金', () => {
   const h = renderEstate(vm())
   assert.ok(h.includes('>撤资</A>'))
   assert.ok(h.includes('确定撤资?'))
   assert.ok(h.includes('class=smallred'))
   assert.ok(h.includes('最多只能同时持有5处产业'))
-  assert.ok(h.includes('挤出去'))
+  assert.ok(h.includes('收益随游戏时间入账'))
+  assert.ok(h.includes('撤资退还本金'))
+  assert.ok(h.includes("function(){ajaxPost('unestate'"))
 })
 
 test('没有产业时显示空态（沿用事件栏「目前没有任何…」的口吻）', () => {

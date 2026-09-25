@@ -142,13 +142,14 @@ export type PaymentVm = {
 
 /** 操作列的链接。默认走 paycoin；有 confirm 的先弹 M2 窗；openWindow 的改开浮窗。 */
 function actionLink(it: PayItem): string {
-  const call = `ajaxPost('paycoin', 'pay=${num(it.pay)}', openPayment);`
+  if (!it.instant) return '<SPAN class=smallgray title="历史套餐尚未实现；VIP可在怀旧版设置中切换">暂未开放</SPAN>'
+  const call = `ajaxPost('paycoin', 'pay=${num(it.pay)}');`
   const onclick = it.openWindow
     ? `openLWindow('', '${it.openWindow}')`
     : it.confirm
-      ? `MDialogOkCancel('', '${esc(it.confirm)}', '${call}')`
+      ? `MDialogOkCancel('', ${JSON.stringify(it.confirm)}, function(){${call}})`
       : call
-  return `<A class=smallbold onclick="${onclick}" href="#">${esc(it.action)}</A>`
+  return `<A class=smallbold onclick="${esc(onclick)}" href="#">${esc(it.action)}</A>`
 }
 
 function itemRows(it: PayItem, vm: PaymentVm): string {

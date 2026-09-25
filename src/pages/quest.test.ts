@@ -62,6 +62,13 @@ test('完成奖励：金木水火土各 800，占满 5 个等分格', () => {
   }
 })
 
+test('未完成的斩妖任务能从详情直接出击，完成后隐藏入口', () => {
+  const h = renderQuest(vm({ claimable: false, progress: { kind: 'slay', monster: '白骷髅', at: [161, 7], done: false } }))
+  assert.ok(h.includes(`onclick="openLWindow('', 'fight.jsp?target=${encodeURIComponent('白骷髅')}')"`))
+  assert.ok(h.includes('>出击</A>'))
+  assert.ok(!renderQuest(vm()).includes('fight.jsp'))
+})
+
 test('文字奖励（境界任务）用 middlestriking 高亮境界名', () => {
   const h = renderQuest(
     vm({
@@ -93,6 +100,7 @@ test('不可领奖时底部是「放弃」，确认框文案照原版', () => {
   const h = renderQuest(vm({ claimable: false }))
   assert.ok(h.includes('src="img/giveupquest.gif"'))
   assert.ok(h.includes("MDialogOkCancel('', '确定要放弃此任务吗?'"))
+  assert.ok(h.includes("function(){ajaxPost('cancelquest'"))
   assert.ok(h.includes("cancelquest"))
   assert.ok(h.includes('questid=2201'))
 })
@@ -100,4 +108,18 @@ test('不可领奖时底部是「放弃」，确认框文案照原版', () => {
 test('要花仙石的任务换另一句确认文案', () => {
   const h = renderQuest(vm({ claimable: false, giveupCoin: 10 }))
   assert.ok(h.includes('放弃此任务，需要花费10个仙石'))
+})
+
+
+test('答题、选线和结丹任务提供实际操作，完成后隐藏操作', () => {
+  const quiz = renderQuest(vm({ claimable: false, interaction: { kind: 'quiz' } }))
+  assert.ok(quiz.includes('questAnswer('))
+  assert.ok(quiz.includes('你的本命属性是什么'))
+  const choice = renderQuest(vm({ claimable: false, interaction: { kind: 'choice' } }))
+  assert.ok(choice.includes('questChooseLine('))
+  assert.ok(choice.includes('先炼气') && choice.includes('先炼剑'))
+  const core = renderQuest(vm({ claimable: false, interaction: { kind: 'goldenCore', gathered: 1200, cores: 2, compressing: false } }))
+  assert.ok(core.includes('1200/286000'))
+  assert.ok(core.includes('questGatherCore(') && core.includes('questCompressCore('))
+  assert.ok(!renderQuest(vm({ interaction: { kind: 'quiz' } })).includes('questAnswer('))
 })

@@ -18,7 +18,8 @@
  * 「领取奖励」的按钮图名与动作名原版没留下，取 `getreward.gif` / `finishquest`，是【重建】。
  */
 
-import { esc, each, num } from './html.ts'
+import { esc, escJs, each, num } from './html.ts'
+import { ELEMENTS } from '../data/meridian.ts'
 
 /** 五行图标，界面顺序「金木水火土」。 */
 const RES = ['gold', 'wood', 'water', 'fire', 'earth'] as const
@@ -54,6 +55,10 @@ export type QuestVm = {
   readonly claimable: boolean
   /** 放弃要花的仙石数，决定确认框文案；0 或不给则用「确定要放弃此任务吗?」 */
   readonly giveupCoin?: number
+  readonly interaction?:
+    | { readonly kind: 'quiz' }
+    | { readonly kind: 'choice' }
+    | { readonly kind: 'goldenCore'; readonly gathered: number; readonly cores: number; readonly compressing: boolean }
 }
 
 /** 《百妖记》任务概要的写法 [原文]（`03 §1.10` 逐回游戏内粘贴格式）。 */
@@ -76,7 +81,8 @@ function progressHtml(p: QuestProgress): string {
   // 坐标是绿粗体链接（点了跳地图），怪名是 middlestriking 深蓝粗体
   return (
     `击败<A class=middlebold href="map.jsp?x=${p.at[0]}&y=${p.at[1]}">(${p.at[0]},${p.at[1]})</A>处的` +
-    `<SPAN class=middlestriking>${esc(p.monster)}</SPAN>${suffix}`
+    `<SPAN class=middlestriking>${esc(p.monster)}</SPAN>${suffix}` +
+    (p.done ? '' : `　<A href="#" onclick="openLWindow('', 'fight.jsp?target=${esc(escJs(encodeURIComponent(p.monster)))}')">出击</A>`)
   )
 }
 
@@ -101,8 +107,18 @@ function buttons(vm: QuestVm): string {
       : '确定要放弃此任务吗?'
   const left = vm.claimable
     ? `<A onclick="ajaxPost('finishquest','questid=${esc(vm.id)}',refleshRight);closeLWindow();closeRWindow();" href="#"><IMG alt=点击领取任务奖励 src="img/getreward.gif"></A>`
-    : `<A onclick="MDialogOkCancel('', '${esc(giveupText)}', 'ajaxPost(\\'cancelquest\\',\\'questid=${esc(vm.id)}\\',refleshRight);closeLWindow();closeRWindow();')" href="#"><IMG alt=点击放弃任务，慎重考虑哦~ src="img/giveupquest.gif"></A>`
+    : `<A onclick="MDialogOkCancel('', '${esc(giveupText)}', function(){ajaxPost('cancelquest','questid=${esc(escJs(vm.id))}',refleshRight);closeLWindow();closeRWindow();})" href="#"><IMG alt=点击放弃任务，慎重考虑哦~ src="img/giveupquest.gif"></A>`
   return `<TR class="trbg middle" align=middle><TD colSpan=5>${left}　<A onclick=closeLWindow() href="#"><IMG alt=点击关闭任务窗口 src="img/closewindows.gif"></A></TD></TR>`
+}
+
+function interactionRows(vm: QuestVm): string {
+  const action = vm.interaction
+  if (!action || vm.claimable) return ''
+  const button = (label: string, handler: string): string => `<BUTTON type=button onclick="${esc(handler)}">${esc(label)}</BUTTON>`
+  const id = escJs(vm.id)
+  if (action.kind === 'quiz') return section('请作答', '你的本命属性是什么？（可在人物页面查看）<BR>' + each(ELEMENTS, e => button(e, `questAnswer('${id}','${e}')`)))
+  if (action.kind === 'choice') return section('选择修炼路线', button('先炼气', `questChooseLine('${id}','qi')`) + '　' + button('先炼剑', `questChooseLine('${id}','sword')`))
+  return section('汇聚本命真气', `已得真元：${num(action.cores)}/10；已汇聚：${num(action.gathered)}/286000<BR>每份真元需压缩12小时，汇聚后不能退回丹田。<BR><INPUT id=core-qi-amount type=number min=1 step=1 value="${Math.max(1, 286000 - action.gathered)}"> ${button('汇聚真气', `questGatherCore('${id}')`)}　${action.compressing ? '正在压缩真元' : button('压缩真元', `questCompressCore('${id}')`)}`)
 }
 
 /** 渲染任务详情。 */
@@ -112,6 +128,7 @@ export function renderQuest(vm: QuestVm): string {
 <TABLE class=tablebg cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
 ${section('任务概要', esc(vm.summary))}
 ${section('完成情况', progressHtml(vm.progress))}
+${interactionRows(vm)}
 ${rewardRows(vm.reward)}
 ${section('任务描述', each(vm.description, (p, i) => `${i > 0 ? '<BR><BR>' : ''}${esc(p)}`))}
 ${buttons(vm)}

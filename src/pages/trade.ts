@@ -14,7 +14,7 @@
  *  - 出售真气页（tab=2）【零截图零 DOM，整页是重建】，按 `05 §18.3` 的通式：
  *    与购买页同构的表 + 「我用 X 数量 换 Y」表单。
  *
- * 货币：真气市场按 1:1 等量互换（`02 §1.9`），法宝市场一律以仙石计价
+ * 货币：真气市场显示挂单实际交换数量，法宝市场一律以仙石计价
  * （实见 2 / 30 / 120 / 220 / 240 / 680–720 仙石）。
  */
 
@@ -36,7 +36,7 @@ export const RES_ICON: Record<Element, string> = {
   土: 'earth',
 }
 
-/** 真气挂单。原版全部是 1:1 等量互换，所以只有一个数量。 */
+/** 真气挂单：提供和需求的数量分别显示。 */
 export type QiOffer = {
   /** 挂单号（原版参数名 sheet） */
   readonly sheet: number
@@ -45,6 +45,7 @@ export type QiOffer = {
   /** 需求 —— 卖家想换的那一种 */
   readonly want: Element
   readonly amount: number
+  readonly wantAmount?: number
   /**
    * 「需要时间」列：买下后注入丹田要多久（秒）。
    * 速率只取决于买家的经脉，与真气种类无关 —— 同一页所有行速率相同，
@@ -90,7 +91,7 @@ export type TradeVm = {
   /** 出售法宝页：我挂出去的法宝单 */
   readonly myItemOffers: readonly ItemOffer[]
   /** 出售法宝页表单里可选的法宝（空闲的才能挂） */
-  readonly sellable: readonly { readonly id: number; readonly name: string }[]
+  readonly sellable: readonly { readonly id: number; readonly name: string; readonly npcPrice?: number }[]
 }
 
 /** 「需要时间」列的格式：h:mm:ss，小时不补零也不进位（#93 见过 454:51:40）。 */
@@ -128,7 +129,7 @@ function pagerRow(href: (page: number | null) => string, p: Pager, cols: number)
 
 /** 市场的确认框。法宝页的文案是【原文】：`MDialogOkCancel('', '确定购买?', …)`。 */
 const confirmBuy = (endpoint: string, sheet: number): string =>
-  `MDialogOkCancel('', '确定购买?','ajaxPost(\\'${endpoint}\\', \\'sheet=${num(sheet)}\\', refleshAll);')`
+  `MDialogOkCancel('', '确定购买?',function(){ajaxPost('${endpoint}', 'sheet=${num(sheet)}', refleshAll);})`
 
 // ───────────────────────── 购买真气（默认 tab）─────────────────────────
 
@@ -157,7 +158,7 @@ function buyQi(vm: TradeVm): string {
 <TD width=47 noWrap>操作</TD></TR>
 ${each(vm.qiOffers, (o) => `<TR class="trbg middle" align=middle>
 <TD>${qiCell(o.give, o.amount)}</TD>
-<TD>${qiCell(o.want, o.amount)}</TD>
+<TD>${qiCell(o.want, o.wantAmount ?? o.amount)}</TD>
 <TD>${hms(o.seconds)}</TD>
 <TD noWrap><A class=skillup onclick="${confirmBuy('buyqi', o.sheet)}" href="#">购买</A></TD></TR>`)}
 ${pagerRow(href, vm.pager, 4)}
@@ -170,7 +171,7 @@ function sellQi(vm: TradeVm): string {
   // 【重建】按 `05 §18.3`：借购买页的「我用…换…」措辞 + 法宝出售页的撤销表。
   // 原版这页的红字提示文案没有任何留存，所以宁可不写，不编。
   return `<TABLE cellSpacing=0 cellPadding=3 width=460 border=0><TBODY><TR>
-<TD class=middle><FORM style="DISPLAY: inline" action="trade.jsp" method=get><INPUT type=hidden name=tab value=2>我用 ${elementSelect('give', vm.filterGive, false)} <INPUT class=small name=amount size=8 value=""> 换 ${elementSelect('want', vm.filterWant, false)} 等量 <INPUT type=submit name=Submit value=出售></FORM></TD>
+<TD class=middle><FORM id=sellqiform style="DISPLAY: inline" action="trade.jsp" method=get><INPUT type=hidden name=tab value=2>我用 ${elementSelect('give', vm.filterGive, false)} <INPUT class=small name=amount size=8 value=""> 换 ${elementSelect('want', vm.filterWant, false)} 等量 <INPUT type=submit name=Submit value=出售></FORM></TD>
 </TR></TBODY></TABLE>
 <TABLE class="titlebg2 bigbold" cellSpacing=0 cellPadding=0 width=460 border=0><TBODY><TR align=middle><TD>我的挂单</TD></TR></TBODY></TABLE>
 <TABLE class=tablebg cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
@@ -180,7 +181,7 @@ function sellQi(vm: TradeVm): string {
 <TD>操作</TD></TR>
 ${each(vm.myQiOffers, (o) => `<TR class="trbg middle" align=middle>
 <TD>${qiCell(o.give, o.amount)}</TD>
-<TD>${qiCell(o.want, o.amount)}</TD>
+<TD>${qiCell(o.want, o.wantAmount ?? o.amount)}</TD>
 <TD><A class=middlebold onclick="ajaxPost('unsellqi', 'sheet=${num(o.sheet)}', refleshAll);" href="#">撤销</A></TD></TR>`)}
 </TBODY></TABLE>`
 }
@@ -224,7 +225,7 @@ ${pagerRow((p) => href(p), vm.pager, 3)}
 function sellItem(vm: TradeVm): string {
   // 上半的出售表单【零证据，重建】；下半的「我的挂单」表是【照原版 DOM】。
   return `<TABLE cellSpacing=0 cellPadding=3 width=460 border=0><TBODY><TR>
-<TD class=middle><FORM style="DISPLAY: inline" action="trade.jsp" method=get><INPUT type=hidden name=tab value=4>出售 <SELECT name=item>${each(vm.sellable, (it) => `<OPTION value="${num(it.id)}">${esc(it.name)}</OPTION>`)}</SELECT> 售价 <INPUT class=small name=price size=6 value=""> 仙石 <INPUT type=submit name=Submit value=出售></FORM></TD>
+<TD class=middle><FORM id=sellitemform style="DISPLAY: inline" action="trade.jsp" method=get><INPUT type=hidden name=tab value=4>出售 <SELECT name=item>${each(vm.sellable, (it) => `<OPTION value="${num(it.id)}">${esc(it.name)}${it.npcPrice === undefined ? '' : `（NPC最高收购${num(it.npcPrice)}仙石）`}</OPTION>`)}</SELECT> 售价 <INPUT class=small name=price size=6 value=""> 仙石 <INPUT type=submit name=Submit value=出售></FORM><BR><SPAN class=small>NPC在挂牌一小时后收购合理标价的法宝；高于收购价的挂单可撤销重挂。</SPAN></TD>
 </TR></TBODY></TABLE>
 <TABLE class="titlebg2 bigbold" cellSpacing=0 cellPadding=0 width=460 border=0><TBODY><TR align=middle><TD>我的挂单</TD></TR></TBODY></TABLE>
 <TABLE class=tablebg cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>

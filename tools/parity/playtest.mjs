@@ -214,6 +214,68 @@ await page.waitForTimeout(250)
 check('消息按钮打开收件箱浮窗',
   (await page.locator('#rwindowcontent').textContent())?.includes('收件箱') ?? false)
 
+// —— 13. 出击：选剑 → 派出去 → 变成战斗事件 ——
+// 给自己塞一把剑，然后对感应范围内的人出击。
+await page.evaluate(() => {
+  const env = JSON.parse(localStorage.getItem('xiuzhen.save'))
+  const st = env.state
+  st.player.artifacts = [{
+    id: 'sw1', kind: 'sword', name: '玉虚桃木剑',
+    quality: '上品', refine: 0, status: '空闲', count: 1,
+  }]
+  // 走到某个「羊」的驻点上 —— 羊不游走，必定还在那儿（狼每天会跑出感应范围）
+  const sheep = st.npc.bases.find((b) => b.profile === '羊' && b.bornAt <= st.clock.gameT)
+    ?? st.npc.bases[0]
+  st.player.x = sheep.homeX
+  st.player.y = sheep.homeY
+  st.timeline.events = st.timeline.events.filter((e) => e.kind !== 'move')
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(300)
+
+// 用「更多玩家」窗拿一个确实在感应范围内的名字
+await page.evaluate(() => window.openLWindow('', 'playerlist.jsp'))
+await page.waitForTimeout(300)
+const targetName = await page.evaluate(() => {
+  const a = document.querySelector('#lwindowcontent a.skillup')
+  return a ? a.textContent.trim() : null
+})
+check('「更多玩家」窗列出感应范围内的人', targetName !== null, targetName ?? '范围内无人')
+
+await page.evaluate((n) => window.openLWindow('', `fight.jsp?target=${encodeURIComponent(n)}`), targetName)
+await page.waitForTimeout(400)
+const fightText = (await page.locator('#lwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('出击页列出可派的飞剑',
+  fightText.includes('选择飞剑') && fightText.includes('玉虚桃木剑'),
+  fightText.slice(0, 70))
+
+const swordBoxes = await page.locator('#lwindowcontent input[name=sword]').count()
+if (swordBoxes > 0) {
+  await page.check('#lwindowcontent input[name=sword]')
+  await page.click('#lwindowcontent a[onclick^="sendFight"]')
+  await page.waitForTimeout(400)
+  const battleText = (await page.locator('#gmid').textContent())?.replace(/\s+/g, ' ') ?? ''
+  check('出击后出现战斗事件', battleText.includes('战斗事件') && !battleText.includes('战斗事件 目前没有任何事件'),
+    battleText.slice(0, 60))
+  // 事件行不能再出现「法术 Lvundefined」那种串台的标签
+  check('战斗事件行显示目标与坐标（不是升级标签）',
+    /攻击\S+\(\d+,\d+\)/.test(battleText) && !battleText.includes('undefined'),
+    battleText.slice(0, 45))
+  const busy = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('xiuzhen.save')).state.player.artifacts[0].status)
+  check('派出去的剑变成「斩杀中」', busy === '斩杀中', busy)
+} else {
+  check('出击后出现战斗事件', false, '出击页没有可选的飞剑')
+  check('派出去的剑变成「斩杀中」', false)
+}
+
+// 14. 产业页与排行榜浮窗能打开（原版 L 窗路由）
+await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
+await page.waitForTimeout(300)
+check('排行榜浮窗列出 NPC',
+  ((await page.locator('#lwindowcontent').textContent()) ?? '').length > 20)
+
 // 12. 没有 JS 报错
 check('全程无 JS 报错', errors.length === 0, errors.slice(0, 2).join(' | '))
 

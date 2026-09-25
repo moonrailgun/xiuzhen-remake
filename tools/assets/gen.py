@@ -348,6 +348,8 @@ def gen_placeholders() -> int:
         "titleplayer.gif": "人 物", "titleskill.gif": "法 术", "titleitem.gif": "法 宝",
         "titlemap.gif": "地 图", "titleally.gif": "门 派", "titletrade.gif": "市 场",
         "titlerank.gif": "排 行 榜", "titlecreatechr.gif": "创 建 人 物",
+        # 出击/支援/还击与战斗事件总览共用（fight.jsp / battleevent.jsp）
+        "titlefight.gif": "战 斗", "titleestate.gif": "产 业",
     }
     f = font(14)
     for name, label in titles.items():

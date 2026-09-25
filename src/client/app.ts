@@ -21,9 +21,12 @@ import { renderRank } from '../pages/rank.ts'
 import { renderPlayerInfo } from '../pages/playerinfo.ts'
 import { renderTurnres } from '../pages/turnres.ts'
 import { renderPayment } from '../pages/payment.ts'
+import { renderFight } from '../pages/fight.ts'
+import { renderEstate } from '../pages/estate.ts'
 import { skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel } from './vm.ts'
-import { SWORDS, swordByName, craftCostFor, isComplete } from '../data/swords.ts'
+import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
 import { ranking } from '../engine/npc.ts'
+import { MAX_INVESTMENTS } from '../engine/town.ts'
 import { daoxingText } from '../engine/state.ts'
 import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
@@ -38,10 +41,10 @@ import { availableQuests, activeQuests, accept, abandon, goalMet, questLocation 
 import { questTitle } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
-import { launch, type LaunchSword } from '../engine/battle.ts'
+import { launch, swordsOut, swordsOutLimit, flightSeconds, type LaunchSword, type BattleTarget } from '../engine/battle.ts'
 import { startCraft, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../pages/item.ts'
-import { DEFENSIVE_ARTIFACTS } from '../data/artifacts.ts'
+import { DEFENSIVE_ARTIFACTS, panelStat, PASSIVE_SWORD_ARTS } from '../data/artifacts.ts'
 import {
   ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders,
 } from '../engine/market.ts'
@@ -164,8 +167,8 @@ function midVm(s: GameState) {
     events
       .filter((e) => e.kind === kind)
       .map((e) => ({
-        icon: 'event/mark.gif',
-        text: labelOf(s, e.payload),
+        icon: iconOf(kind, e.payload),
+        text: labelOf(s, kind, e.payload),
         seconds: Math.max(0, Math.round(e.finishAt - s.clock.gameT)),
         speedup: kind === 'cultivate',
       }))
@@ -200,7 +203,36 @@ function midVm(s: GameState) {
   }
 }
 
-function labelOf(s: GameState, payload: Readonly<Record<string, unknown>>): string {
+/**
+ * 事件行图标。战斗行按阶段换图，这两个文件名是原版的
+ * （`09 §资源表`：`event/attack.gif` = 出击/斩杀中，`event/back.gif` = 返回中）。
+ */
+function iconOf(kind: string, payload: Readonly<Record<string, unknown>>): string {
+  if (kind !== 'battle') return 'event/mark.gif'
+  return payload['phase'] === 'returning' ? 'event/back.gif' : 'event/attack.gif'
+}
+
+/**
+ * 事件行文字。
+ *
+ * 原版战斗事件的完整句子是 B 窗（`battleevent.jsp`）里的整行，如
+ * 「你放去攻击道法自然(259,14)的 3:49:48 后于…到达」（`03 §1.11` 原文）；
+ * 中栏只有 252px 宽，放的是压缩版，所以这里只取目标与阶段。
+ */
+function labelOf(s: GameState, kind: string, payload: Readonly<Record<string, unknown>>): string {
+  if (kind === 'battle') {
+    const t = payload['target'] as { name?: string; x?: number; y?: number } | undefined
+    const name = t?.name ?? '目标'
+    const phase = payload['phase']
+    if (phase === 'fighting') return `与${name}缠斗`
+    if (phase === 'returning') return `${name} 返回中`
+    return `攻击${name}(${t?.x ?? 0},${t?.y ?? 0})`
+  }
+  if (kind === 'craft') {
+    const n = payload['count'] as number
+    return `${String(payload['name'] ?? '法宝')}${n > 1 ? `×${n}` : ''}`
+  }
+
   const system = payload['system']
   const to = payload['toLevel'] as number
   if (system === 'meridian') {
@@ -538,6 +570,63 @@ export function installGameActions(): void {
     step()
   }
 
+  /** 出击：把勾选的飞剑派出去。 */
+  g['sendFight'] = () => {
+    if (!state || !fightTarget) return
+    const picked = [...document.querySelectorAll<HTMLInputElement>('input[name=sword]:checked')]
+      .map((el) => el.value)
+    const swords = launchableSwords(state)
+      .filter(({ sword }) => picked.includes(sword.id))
+      .map(({ sword }) => sword)
+    if (swords.length === 0) {
+      openWindow('mwindow', '出击', '<DIV class=middle style="padding:10px">请选择出击的飞剑</DIV>')
+      return
+    }
+    const r = launch(state, fightTarget, swords, {
+      wanjianLevel: state.player.skills['万剑诀'] ?? 0,
+      sightRange: sightRange(state.player.body[BODY_EYE] ?? 0),
+    })
+    if (!r.ok) {
+      openWindow('mwindow', '无法出击', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+      return
+    }
+    // 派出去的剑标成「斩杀中」，这样一览页与出击页都不会再选到它
+    const ids = swords.map((s) => s.id)
+    state = {
+      ...r.state,
+      player: {
+        ...r.state.player,
+        artifacts: r.state.player.artifacts.map((a) =>
+          ids.includes(a.id) ? { ...a, status: '斩杀中' } : a),
+      },
+    }
+    closeWindow('lwindow')
+    step()
+  }
+
+  g['selectAllSwords'] = (checked: boolean) => {
+    for (const el of document.querySelectorAll<HTMLInputElement>('input[name=sword]')) {
+      el.checked = checked
+    }
+  }
+
+  /** 收件箱的全选与删除。 */
+  g['selectAllMsg'] = (checked: boolean) => {
+    for (const el of document.querySelectorAll<HTMLInputElement>('#msgform input[name=ids]')) {
+      el.checked = checked
+    }
+  }
+  g['removeSelectMsg'] = () => {
+    if (!state) return
+    // 复选框的 value 是当页的 1 起序号，换算回 mail 数组下标
+    const picked = [...document.querySelectorAll<HTMLInputElement>('#msgform input[name=ids]:checked')]
+      .map((el) => Number(el.value) - 1)
+    if (picked.length === 0) return
+    state = { ...state, mail: state.mail.filter((_, i) => !picked.includes(i)) }
+    openWindow('rwindow', '消息', renderMsg(msgVm(state, msgPage)))
+    step()
+  }
+
   /** 加为护法。 */
   g['addpal'] = (name: string) => {
     openWindow('mwindow', '护法',
@@ -816,13 +905,33 @@ function resolvePage(url: string): string {
     }
 
     case 'quest':
-      return questWindow(s, q.get('quest') ?? '')
+      // 原版参数名是 questid（09 §1.18 的全量路由表）
+      return questWindow(s, q.get('questid') ?? q.get('quest') ?? '')
+
+    case 'fight':
+      return fightWindow(s, q.get('target') ?? '')
+
+    case 'estate':
+      return renderEstate(estateVm(s))
+
+    case 'playerlist':
+      return playerListWindow(s)
+
+    case 'npc':
+      return npcWindow(s, q.get('name') ?? '')
+
+    case 'allyinfo':
+      return renderAlly(allyVm(s, 'overview', 1))
 
     case 'rank':
       return renderRank(rankVm(s, (q.get('tab') as 'power' | 'estate' | 'exp' | null) ?? 'power'))
 
     case 'playerinfo':
-      return playerInfoWindow(s, Number(q.get('playerid') ?? 0))
+      // 侧栏按名字点进来，门派名册按 id —— 两种都接
+      return playerInfoWindow(s, q.has('name')
+        ? (allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
+            .find((n) => n.base.name === q.get('name'))?.base.id ?? 0)
+        : Number(q.get('playerid') ?? 0))
 
     case 'turnres':
       return renderTurnres({
@@ -843,6 +952,120 @@ function resolvePage(url: string): string {
 
 /** 「五行互化」的仙石开销。付费页原文「自由分配…比例」是 3 仙石。 */
 const TURN_RES_COIN = 3
+
+// —— 出击 ——
+
+/** 当前这一屏出击页对应的目标（点「出击」时反查）。 */
+let fightTarget: BattleTarget | null = null
+
+/** 背包里空闲的飞剑 → 可出击的剑，面板值已算过品质与淬炼。 */
+function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly table: Sword }[] {
+  const out: { sword: LaunchSword; table: Sword }[] = []
+  s.player.artifacts.forEach((a) => {
+    if (a.kind !== 'sword' || a.status !== '空闲') return
+    const t = swordByName(a.name)
+    if (!t || t.speed === null || t.agility === null) return
+    out.push({
+      table: t,
+      sword: {
+        id: a.id,
+        name: a.name,
+        quality: a.quality,
+        refine: a.refine,
+        attack: t.attack,
+        durability: t.durability,
+        speed: t.speed,
+        agility: t.agility,
+        element: (t.element ?? '无') as LaunchSword['element'],
+      },
+    })
+  })
+  return out
+}
+
+/** 出击页。目标可以是同格的 NPC，也可以是任务里的怪。 */
+function fightWindow(s: GameState, targetName: string): string {
+  const npc = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, 8)
+    .find((n) => n.base.name === targetName)
+  if (!npc) {
+    fightTarget = null
+    return '<DIV class=middle style="padding:12px">对方已不在你的感应范围内。</DIV>'
+  }
+
+  fightTarget = {
+    kind: 'player',
+    name: npc.base.name,
+    x: npc.x,
+    y: npc.y,
+    attack: npc.swordPower,
+    agility: Math.max(1, Math.round(npc.swordPower / 10)),
+    hp: npc.swordPower * 2,
+    element: npc.base.element,
+  }
+
+  const dist = Math.abs(npc.x - s.player.x) + Math.abs(npc.y - s.player.y)
+  const wanjian = s.player.skills['万剑诀'] ?? 0
+  const rows = launchableSwords(s).map(({ sword }) => ({
+    id: sword.id,
+    name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
+    itemId: 0,
+    attack: panelStat(sword.attack, sword.quality, sword.refine),
+    durability: panelStat(sword.durability, sword.quality, sword.refine),
+    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
+    speed: sword.speed,
+    element: sword.element ?? '无',
+    seconds: flightSeconds(dist, sword.speed),
+  }))
+
+  const passives = Object.keys(PASSIVE_SWORD_ARTS)
+    .filter((k) => (s.player.skills[k] ?? 0) > 0)
+    .map((k) => `${k} Lv.${s.player.skills[k]}`)
+
+  return renderFight({
+    kind: 'attack',
+    targetName: npc.base.name,
+    at: [npc.x, npc.y],
+    summary: `${npc.base.name}　${npc.realm}　道行 ${npc.daoxingText}　属性${npc.base.element}`,
+    swords: rows,
+    limit: swordsOutLimit(wanjian),
+    out: swordsOut(s),
+    passives,
+    ...(rows.length === 0 ? { blocked: '没有空闲的飞剑可以出击' } : {}),
+  })
+}
+
+/** 产业页：城镇投资的每小时收益。 */
+function estateVm(s: GameState) {
+  // 基准期只有投资一种产业，没有投资时是空表（原版同样显示空表）
+  return { rows: [], slotCap: MAX_INVESTMENTS, ...(s ? {} : {}) }
+}
+
+/** 「点击此处查看更多玩家」：视野内的人，按道行排。 */
+function playerListWindow(s: GameState): string {
+  const range = sightRange(s.player.body[BODY_EYE] ?? 0)
+  const list = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, range)
+    .sort((a, b) => b.daoxing - a.daoxing)
+    .slice(0, 30)
+  if (list.length === 0) {
+    return '<DIV class=middle style="padding:12px">感应范围内没有别人。</DIV>'
+  }
+  return `<TABLE class="tablebg middle" cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
+<TR class="titlebg middlebold" align=middle><TD width="30%">玩家</TD><TD width="20%">境界</TD><TD width="25%">道行</TD><TD width="25%">位置</TD></TR>
+${list.map((n) =>
+    `<TR class="trbg middle" align=middle>` +
+    `<TD><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${encodeURIComponent(n.base.name)}')">${esc(n.base.name)}</A></TD>` +
+    `<TD>${esc(n.realm)}</TD><TD>${esc(n.daoxingText)}</TD>` +
+    `<TD class=small>(${n.x},${n.y})</TD></TR>`).join('\n')}
+</TBODY></TABLE>`
+}
+
+/** NPC 对话窗。基准期的 NPC 对话没有存档，只给身份行。 */
+function npcWindow(s: GameState, name: string): string {
+  const n = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed).find((x) => x.base.name === name)
+  if (!n) return '<DIV class=middle style="padding:12px">此人已不在此地。</DIV>'
+  return `<DIV class=middle style="padding:10px">${esc(n.base.name)}　${esc(n.realm)}<BR>` +
+    `<SPAN class=smallgray>道行 ${esc(n.daoxingText)}　道源 ${esc(n.base.school)}　属性 ${esc(n.base.element)}</SPAN></DIV>`
+}
 
 // —— 炼制配方 ——
 

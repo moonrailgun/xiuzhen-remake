@@ -142,7 +142,7 @@ const DANTIAN_ANCHORS: readonly Anchor[] = [
   { level: 3, value: 3500, source: 'docs/spec/DECISIONS-rules.md §5（2008-11 序列）' },
   { level: 10, value: 8600, source: '同上' },
   { level: 20, value: 400000, source: 'docs/research/02-guides-and-rules.md §2.1（筑基→辟谷奖励「充满丹田」≈40 万）' },
-  { level: 27, value: 270000 * 1 + 0, source: 'docs/research/04-ui-core-pages.md（Lv.27 容量 270000）' },
+  { level: 27, value: 270000, source: 'docs/research/04-ui-core-pages.md（Lv.27 容量 270000）' },
   { level: 28, value: 330000, source: '同上' },
   { level: 35, value: 1200000, source: 'reference/images/17173-live/20090921133953494/dfdeee03.jpg（#33）' },
   { level: 36, value: 1400000, source: '同上' },

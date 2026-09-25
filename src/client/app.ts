@@ -518,7 +518,9 @@ export function routeJsp(href: string): boolean {
       tab = 'ally'
       const byNum: Record<number, AllyTab> = { 1: 'attack', 2: 'member', 3: 'news', 4: 'feature' }
       allyTab = q.has('tab') ? (byNum[n('tab')] ?? 'overview') : 'overview'
-      allyPage = n('page', 1)
+      // 「尾页」原版传 page=0，服务端解释成最后一页（trade.jsp 同一约定）。
+      // n() 会把 0 当缺省值吞掉，所以这里显式还原成「要多少有多少」，交给 allyVm 去夹。
+      allyPage = q.has('page') ? (n('page') || Number.MAX_SAFE_INTEGER) : 1
       break
     }
     case 'msg':

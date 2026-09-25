@@ -22,11 +22,12 @@
  *    操作链接用全角空格分隔。
  *  - 单边事件时另一侧是 `<TD class=trbg width="50%" rowSpan=4>`。
  *
- * 补写部分：原版每张表的 `colSpan` 写作 `{{6|10}}`（随单边/双边变），
- * 这里按左右各 5 列算出来，单边 5、双边 10。返航标题未留存，按现有返航事件重建。
+ * 补写部分：原版每张表的 `colSpan` 写作 `{{6|10}}`（随单边/双边变）。
+ * 对得上：一侧 5 列，双边就是 10；单边是 5 列**加上那个 `rowSpan=4` 的占位格** = 6。
+ * 返航标题未留存，按现有返航事件重建。
  */
 
-import { esc, escJs, each, num, when } from './html.ts'
+import { esc, escJs, each, num, when, js } from './html.ts'
 import { countdown } from './shell.ts'
 
 export type BattleEventKind = 'outbound' | 'incoming' | 'meeting' | 'fighting' | 'returning'
@@ -95,19 +96,19 @@ export function titleLine(e: BattleEventItem): string {
 export function actionLinks(e: BattleEventItem, side: 0 | 1 = 0): string {
   if (e.kind === 'returning') return ''
   const map = `<A class=smallbold alt="点此查看战斗示意图" href="#" ` +
-    `onclick="openLWindow('战场地图', 'battlemap.jsp?eventid=${escJs(e.eventId)}&side=${side}')">战斗地图</A>`
+    `onclick="openLWindow('战场地图', 'battlemap.jsp?eventid=${js(e.eventId)}&side=${side}')">战斗地图</A>`
 
   if (e.kind === 'incoming') {
     return `<A class=smallbold alt="点击进行还击" href="#" ` +
-      `onclick="openLWindow('', 'fight.jsp?type=2&eventid=${escJs(e.eventId)}&side=1')">还击</A>　${map}`
+      `onclick="openLWindow('', 'fight.jsp?type=2&eventid=${js(e.eventId)}&side=1')">还击</A>　${map}`
   }
 
   // 求援的弹窗是原版唯一带输入框的 MDialog，三参数形式，文案照抄
   const help = `<A class=smallbold alt="点此向他人请求援手" href="#" ` +
     `onclick="MDialog('请求援手','请输入道友的名字<br><p></p><p align=center><input id=gethelpname></input></p>', ` +
-    `function(){sendEventMsg('${escJs(e.eventId)}',${side})})">求援</A>`
+    `function(){sendEventMsg('${js(e.eventId)}',${side})})">求援</A>`
   const back = `<A class=smallbold alt="点此帮助左方" href="#" ` +
-    `onclick="openLWindow('', 'fight.jsp?type=3&eventid=${escJs(e.eventId)}&side=${side}&msg=0')">支援</A>`
+    `onclick="openLWindow('', 'fight.jsp?type=3&eventid=${js(e.eventId)}&side=${side}&msg=0')">支援</A>`
   return `${help}　${back}　${map}`
 }
 
@@ -116,7 +117,7 @@ function swordRows(s: BattleEventSword): readonly string[] {
   const nameCell = s.name === undefined
     ? `来自<A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?playerid=${num(s.ownerId)}')">${esc(s.owner)}</A>的???`
     : `来自<A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?playerid=${num(s.ownerId)}')">${esc(s.owner)}</A>` +
-      `的<A class=skillup href="#" onclick="openRWindow('${escJs(s.name)}','itemmid.jsp?item=${num(s.itemId ?? 0)}')">${esc(s.name)}</A>`
+      `的<A class=skillup href="#" onclick="openRWindow('${js(s.name)}','itemmid.jsp?item=${num(s.itemId ?? 0)}')">${esc(s.name)}</A>`
 
   const fromLine = s.from
     ? `<BR><SPAN class=small>从${esc(s.from.name)} (${num(s.from.x)},${num(s.from.y)})而来</SPAN>`
@@ -145,7 +146,7 @@ const EMPTY_SIDE = '<TD class=trbg width="50%" rowSpan=4></TD>'
 function eventTable(e: BattleEventItem): string {
   const pairs = Math.max(e.left.length, e.right.length, 1)
   const twoSided = e.left.length > 0 && e.right.length > 0
-  const cols = twoSided ? 10 : 5
+  const cols = twoSided ? 10 : 6
 
   const blocks: string[] = []
   for (let i = 0; i < pairs; i++) {

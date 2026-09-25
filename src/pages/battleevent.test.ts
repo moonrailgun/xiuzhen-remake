@@ -145,9 +145,10 @@ test('单边事件另一侧是 TD.trbg width="50%" rowSpan=4（原版写法）',
   assert.match(html, /<TD class=trbg width="50%" rowSpan=4><\/TD>/)
 })
 
-test('双边时每张表 colSpan=10，单边时 colSpan=5', () => {
+test('双边时每张表 colSpan=10，单边时 colSpan=6（原版写作 {{6|10}}）', () => {
+  // 单边不是 5：一侧 5 列之外还有那个 rowSpan=4 的空白占位格，合起来 6 列。
   const one = renderBattleEvent({ tab: 2, events: [event()] })
-  assert.match(one, /<TD colSpan=5>你放去攻击/)
+  assert.match(one, /<TD colSpan=6>你放去攻击/)
   const two = renderBattleEvent({ tab: 2, events: [event({ kind: 'fighting', right: [theirSword] })] })
   assert.match(two, /<TD colSpan=10>在\(259,14\)缠斗/)
 })

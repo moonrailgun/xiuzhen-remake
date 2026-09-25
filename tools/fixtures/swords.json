@@ -1,0 +1,559 @@
+{
+  "source": "reference/text/forum162/article-94153-p1.txt",
+  "sourceNote": "水属性角色、手熟无他 0 级；五行顺序 金木水火土；攻击/耐久/吸收为 [废品, 极品] 区间",
+  "date": "2009-04-16",
+  "swords": [
+    {
+      "name": "玉虚桃木剑",
+      "flavor": [
+        "东昆仑玉虚宫取西昆仑瑶池蟠桃木所制飞剑，蕴含两家无上仙力，威力无穷。后为斩妖除魔，将其制法流传与世，故曰玉虚桃木剑。"
+      ],
+      "element": "木",
+      "tradable": false,
+      "forgeLevel": 0,
+      "wieldLevel": 0,
+      "attack": [
+        8,
+        80
+      ],
+      "durability": [
+        16,
+        160
+      ],
+      "absorb": [
+        12,
+        120
+      ],
+      "speed": 10,
+      "agility": 3,
+      "knockback": 2,
+      "upkeepPerHour": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "craftCost": [
+        95,
+        95,
+        140,
+        120,
+        48
+      ],
+      "craftSeconds": 667
+    },
+    {
+      "name": "青龙伏魔剑",
+      "flavor": [
+        "青龙者，东方甲乙木水银也，澄之不情，搅之不浊，近不可取，远不可舍，潜藏变化无尽，故言龙也。"
+      ],
+      "element": "木",
+      "tradable": false,
+      "forgeLevel": 1,
+      "wieldLevel": 1,
+      "attack": [
+        16,
+        160
+      ],
+      "durability": [
+        8,
+        80
+      ],
+      "absorb": [
+        24,
+        240
+      ],
+      "speed": 7,
+      "agility": 3,
+      "knockback": 2,
+      "upkeepPerHour": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "craftCost": [
+        89,
+        107,
+        130,
+        110,
+        54
+      ],
+      "craftSeconds": 667
+    },
+    {
+      "name": "古纹青石剑",
+      "flavor": [
+        "以青石所雕刻而成的巨剑，剑身上凿刻着密密麻麻的符箓，比钢铁更加坚硬。"
+      ],
+      "element": "土",
+      "tradable": false,
+      "forgeLevel": 4,
+      "wieldLevel": 4,
+      "attack": [
+        32,
+        320
+      ],
+      "durability": [
+        64,
+        640
+      ],
+      "absorb": [
+        64,
+        640
+      ],
+      "speed": 11,
+      "agility": 2,
+      "knockback": 2,
+      "upkeepPerHour": [
+        2,
+        2,
+        2,
+        2,
+        0
+      ],
+      "craftCost": [
+        510,
+        380,
+        760,
+        640,
+        380
+      ],
+      "craftSeconds": 4000
+    },
+    {
+      "name": "破山断岳剑",
+      "flavor": [
+        "此剑威力极强，传闻能破开山峰、斩断山岳，故以此为名。"
+      ],
+      "element": "土",
+      "tradable": false,
+      "forgeLevel": 8,
+      "wieldLevel": 8,
+      "attack": [
+        64,
+        640
+      ],
+      "durability": [
+        32,
+        320
+      ],
+      "absorb": [
+        128,
+        1280
+      ],
+      "speed": 8,
+      "agility": 2,
+      "knockback": 2,
+      "upkeepPerHour": [
+        2,
+        2,
+        2,
+        2,
+        0
+      ],
+      "craftCost": [
+        480,
+        380,
+        670,
+        570,
+        480
+      ],
+      "craftSeconds": 4000
+    },
+    {
+      "name": "三阳一煞剑",
+      "flavor": [
+        "此剑集阳明、少阳、太阳布于剑身，三阳合一，劲力连绵不绝。"
+      ],
+      "element": "火",
+      "tradable": false,
+      "forgeLevel": 12,
+      "wieldLevel": 12,
+      "attack": [
+        36,
+        360
+      ],
+      "durability": [
+        72,
+        720
+      ],
+      "absorb": [
+        108,
+        1080
+      ],
+      "speed": 12,
+      "agility": 2,
+      "knockback": 2,
+      "upkeepPerHour": [
+        3,
+        3,
+        3,
+        3,
+        0
+      ],
+      "craftCost": [
+        860,
+        640,
+        1300,
+        1310,
+        430
+      ],
+      "craftSeconds": 2250
+    },
+    {
+      "name": "南明离火剑",
+      "flavor": [
+        "取西方真金采南方离火之精融炼而成，炼时融会金火，由有质炼到无质又炼到有质达十九次。"
+      ],
+      "element": "火",
+      "tradable": true,
+      "forgeLevel": 16,
+      "wieldLevel": 16,
+      "attack": [
+        72,
+        720
+      ],
+      "durability": [
+        36,
+        360
+      ],
+      "absorb": [
+        216,
+        2160
+      ],
+      "speed": 9,
+      "agility": 2,
+      "knockback": 2,
+      "upkeepPerHour": [
+        3,
+        3,
+        3,
+        3,
+        0
+      ],
+      "craftCost": [
+        800,
+        640,
+        1100,
+        1280,
+        480
+      ],
+      "craftSeconds": 2250
+    },
+    {
+      "name": "天雷万磁剑",
+      "flavor": [
+        "此剑所需雷电之气惊人，只能在青山中令之出鞘"
+      ],
+      "element": "无属性",
+      "tradable": false,
+      "forgeLevel": 20,
+      "wieldLevel": 20,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        12,
+        120
+      ],
+      "absorb": [
+        0,
+        0
+      ],
+      "speed": 5,
+      "agility": 3,
+      "knockback": 0,
+      "upkeepPerHour": [
+        3,
+        3,
+        3,
+        3,
+        0
+      ],
+      "craftCost": [
+        700,
+        400,
+        700,
+        800,
+        300
+      ],
+      "craftSeconds": 2000
+    },
+    {
+      "name": "三阴绝脉剑",
+      "flavor": [],
+      "element": null,
+      "tradable": null,
+      "forgeLevel": 20,
+      "wieldLevel": 20,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        12,
+        120
+      ],
+      "absorb": [
+        0,
+        0
+      ],
+      "speed": null,
+      "agility": null,
+      "knockback": 0,
+      "upkeepPerHour": [
+        6,
+        6,
+        6,
+        6,
+        0
+      ],
+      "craftCost": null,
+      "craftSeconds": null
+    },
+    {
+      "name": "墨叶血浪剑",
+      "flavor": [
+        "剑身通体如墨，状似柳叶，隐隐现出血红色的浪形纹理。"
+      ],
+      "element": "水",
+      "tradable": false,
+      "forgeLevel": 1,
+      "wieldLevel": 1,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        12,
+        120
+      ],
+      "absorb": [
+        72,
+        720
+      ],
+      "speed": 7,
+      "agility": 3,
+      "knockback": 2,
+      "upkeepPerHour": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "craftCost": [
+        180,
+        140,
+        321,
+        210,
+        110
+      ],
+      "craftSeconds": 1000
+    },
+    {
+      "name": "冰魄寒光剑",
+      "flavor": [
+        "以西极玄冰精英凝炼而成，寒冰之气可以阻碍对手行动，妙用无方。"
+      ],
+      "element": "水",
+      "tradable": false,
+      "forgeLevel": 1,
+      "wieldLevel": 1,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        12,
+        120
+      ],
+      "absorb": [
+        24,
+        240
+      ],
+      "speed": 7,
+      "agility": 3,
+      "knockback": null,
+      "upkeepPerHour": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "craftCost": [
+        180,
+        140,
+        321,
+        210,
+        110
+      ],
+      "craftSeconds": 1000
+    },
+    {
+      "name": "上善若水剑",
+      "flavor": [
+        "【道德经】有云：上善若水。水善利万物而不争，处众人之所恶，故几于道。"
+      ],
+      "element": "水",
+      "tradable": false,
+      "forgeLevel": 4,
+      "wieldLevel": 4,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        48,
+        480
+      ],
+      "absorb": [
+        48,
+        480
+      ],
+      "speed": 11,
+      "agility": 5,
+      "knockback": 2,
+      "upkeepPerHour": [
+        2,
+        2,
+        2,
+        2,
+        0
+      ],
+      "craftCost": [
+        380,
+        290,
+        665,
+        480,
+        190
+      ],
+      "craftSeconds": 2000
+    },
+    {
+      "name": "太乙金光剑",
+      "flavor": [
+        "剑身行云流水，驱使时能放万丈金光，如流星般划过天际，其速眼不可追。"
+      ],
+      "element": "金",
+      "tradable": true,
+      "forgeLevel": 12,
+      "wieldLevel": 12,
+      "attack": [
+        36,
+        360
+      ],
+      "durability": [
+        72,
+        720
+      ],
+      "absorb": [
+        72,
+        720
+      ],
+      "speed": 15,
+      "agility": 2,
+      "knockback": 2,
+      "upkeepPerHour": [
+        3,
+        3,
+        3,
+        3,
+        0
+      ],
+      "craftCost": [
+        710,
+        430,
+        860,
+        710,
+        290
+      ],
+      "craftSeconds": 2250
+    },
+    {
+      "name": "乌光玄铁剑",
+      "flavor": [
+        "以天外玄铁所铸，通体青色发乌光照人，其重千斤，无人可御。"
+      ],
+      "element": "金",
+      "tradable": false,
+      "forgeLevel": 1,
+      "wieldLevel": 1,
+      "attack": [
+        24,
+        240
+      ],
+      "durability": [
+        12,
+        120
+      ],
+      "absorb": [
+        48,
+        480
+      ],
+      "speed": 7,
+      "agility": 3,
+      "knockback": 5,
+      "upkeepPerHour": [
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "craftCost": [
+        251,
+        140,
+        250,
+        210,
+        110
+      ],
+      "craftSeconds": 1000
+    },
+    {
+      "name": "七星磐龙剑",
+      "flavor": [
+        "百炼精钢所铸，上有黄铜镶北斗七星，剑身又有龙鳞暗纹，故曰七星磐龙剑。"
+      ],
+      "element": "金",
+      "tradable": true,
+      "forgeLevel": 20,
+      "wieldLevel": 20,
+      "attack": [
+        120,
+        1200
+      ],
+      "durability": [
+        60,
+        600
+      ],
+      "absorb": [
+        208,
+        2080
+      ],
+      "speed": 11,
+      "agility": 1,
+      "knockback": 2,
+      "upkeepPerHour": [
+        5,
+        5,
+        5,
+        5,
+        0
+      ],
+      "craftCost": [
+        1080,
+        610,
+        1100,
+        920,
+        460
+      ],
+      "craftSeconds": 4286
+    }
+  ]
+}

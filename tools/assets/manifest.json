@@ -1,0 +1,2232 @@
+[
+ {
+  "path": "img/1.gif",
+  "tier": "C",
+  "purpose": "1×1 全透明垫图（每个地图格 <IMG src=img/1.gif> + background 贴地块）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 1×1 全透明 GIF",
+  "issues": "",
+  "confidence": "high"
+ },
+ {
+  "path": "img/loading.gif",
+  "tier": "D",
+  "purpose": "全局 ajax「请求中」浮层里唯一的图",
+  "source": null,
+  "bbox": null,
+  "method": "占位：静态米灰小条「载入中…」（按钮通式），不做动画",
+  "issues": "零截图（loading 出现时不会被截屏）；原版尺寸/是否动画 [未知]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/closewindow.gif",
+  "tier": "C",
+  "purpose": "L/R/B/H/M/M2 六种浮窗右上角关闭 ×，15×15",
+  "source": null,
+  "bbox": null,
+  "method": "SVG/PIL 生成 15×15：1px 边框 #a2a39e + 浅灰底 + 居中暗红 × #a02838（规格实测自 #3 的 [487,11,15,15]，原生 1:1）",
+  "issues": "",
+  "confidence": "high"
+ },
+ {
+  "path": "img/closewindows.gif",
+  "tier": "C",
+  "purpose": "quest.jsp 任务详情底部「关闭」图片钮（alt=点击关闭任务窗口）",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮，字「关闭」，约 60×20",
+  "issues": "#83 只露出按钮上半截，尺寸为估读 ±4px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/top.gif",
+  "tier": "C",
+  "purpose": "分页四键之「首页」（收件箱等列表）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成黑色实心三角（到头的两键加一道竖线），压在按钮通式底上",
+  "issues": "分页条零截图，尺寸与式样 [未知]，按行内 12px 文字估 16×16",
+  "confidence": "low"
+ },
+ {
+  "path": "img/ahead.gif",
+  "tier": "C",
+  "purpose": "分页四键之「前一页」（收件箱等列表）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成黑色实心三角（到头的两键加一道竖线），压在按钮通式底上",
+  "issues": "分页条零截图，尺寸与式样 [未知]，按行内 12px 文字估 16×16",
+  "confidence": "low"
+ },
+ {
+  "path": "img/back.gif",
+  "tier": "C",
+  "purpose": "分页四键之「后一页」（收件箱等列表）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成黑色实心三角（到头的两键加一道竖线），压在按钮通式底上",
+  "issues": "分页条零截图，尺寸与式样 [未知]，按行内 12px 文字估 16×16",
+  "confidence": "low"
+ },
+ {
+  "path": "img/bottom.gif",
+  "tier": "C",
+  "purpose": "分页四键之「尾页」（收件箱等列表）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成黑色实心三角（到头的两键加一道竖线），压在按钮通式底上",
+  "issues": "分页条零截图，尺寸与式样 [未知]，按行内 12px 文字估 16×16",
+  "confidence": "low"
+ },
+ {
+  "path": "img/talk.gif",
+  "tier": "B",
+  "purpose": "玩家行 / 个人资料页「发送消息」图标 16×16",
+  "source": "reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg (#2)",
+  "bbox": [
+   713,
+   328,
+   16,
+   16
+  ],
+  "method": "裁切后从中栏暖灰宣纸底抠出转透明；只去 JPEG 块噪，不做阈值化",
+  "issues": "16×16 JPEG 已严重模糊；烧在暖灰底上；bbox ±2px；效果不可用时退化为 C（重画对话泡）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/friend.gif",
+  "tier": "B",
+  "purpose": "玩家行 / 个人资料页「加为护法」图标 16×16（双人头）",
+  "source": "reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg (#2)",
+  "bbox": [
+   736,
+   328,
+   16,
+   16
+  ],
+  "method": "同 talk.gif：裁切 + 抠底 + 去块噪",
+  "issues": "同 talk.gif；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/halftime.gif",
+  "tier": "D",
+  "purpose": "移动事件「减半剩余时间」钮（1 仙石）",
+  "source": null,
+  "bbox": null,
+  "method": "占位：不落图，事件栏按 #2 实测改用绿色粗体文字「半」",
+  "issues": "原版 DOM 里该 img 已被注释掉（功能改成绿字链接）；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/end.gif",
+  "tier": "D",
+  "purpose": "移动事件「立即完成」钮（5 仙石）",
+  "source": null,
+  "bbox": null,
+  "method": "占位：不落图，事件栏按 #2 实测改用绿色粗体文字「完」",
+  "issues": "同 halftime.gif",
+  "confidence": "low"
+ },
+ {
+  "path": "img/giveupquest.gif",
+  "tier": "C",
+  "purpose": "任务详情底部「放弃任务」图片钮（alt=点击放弃任务，慎重考虑哦~）",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮，字「放弃任务」，约 72×20",
+  "issues": "#83 底部被裁，只露上半截",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/people11.gif",
+  "tier": "B",
+  "purpose": "地图他人标记：视野内·单人（黑发髻男头，约 15×18，贴 64×35 地块底部）",
+  "source": "reference/images/17173-live/20100721110246898/z0721xz01.jpg (#106)",
+  "bbox": [
+   187,
+   198,
+   15,
+   19
+  ],
+  "method": "裁切后把地块背景抠成透明，4 倍放大描边修补 JPEG 毛刺，再放回 64×35 画布",
+  "issues": "全部截图里只有这一款男头，未见女头；15×18 的 JPEG；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/people12.gif",
+  "tier": "C",
+  "purpose": "地图他人标记：视野内·多人",
+  "source": "img/people11.gif（本清单内产物）",
+  "bbox": null,
+  "method": "脚本由 people11.gif 复制两个头错位叠放生成",
+  "issues": "原版多人画面未见 [推断]；语义 people{1视野内,2视野外}{1单人,2多人}",
+  "confidence": "low"
+ },
+ {
+  "path": "img/people21.gif",
+  "tier": "C",
+  "purpose": "地图他人标记：视野外·单人（褪色）",
+  "source": "img/people11.gif（本清单内产物）",
+  "bbox": null,
+  "method": "脚本由 people11.gif 调色生成：去色 + 提亮（与地块 faded 规则同一套参数）",
+  "issues": "#88 [92,210,20,22] 有褪色样张可比对，但 #88 的缩放系数未标定",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/people22.gif",
+  "tier": "C",
+  "purpose": "地图他人标记：视野外·多人 [文件名推断]",
+  "source": "img/people11.gif（本清单内产物）",
+  "bbox": null,
+  "method": "同 people12 + people21 两步脚本",
+  "issues": "该文件名仅由 11/12/21 的编码规律推断 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/player1.gif",
+  "tier": "B",
+  "purpose": "地图上的自己（男）：白蓝长袍、背剑、发髻，约 22×47，图 64×120",
+  "source": "reference/images/17173-live/20100721110246898/z0721xz01.jpg (#106)",
+  "bbox": [
+   245,
+   240,
+   22,
+   47
+  ],
+  "method": "裁切 + 抠掉脚下地块，放到 64×120 画布底部居中（与地块同一贴底规则）",
+  "issues": "JPEG；与选中框/地块边线重叠处需修补；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/player2.gif",
+  "tier": "B",
+  "purpose": "地图上的自己（女）：蓝裙、棕发、腰间红剑 [文件名推断]",
+  "source": "reference/images/17173-live/20100531153113196/xazz0.jpg (#88)",
+  "bbox": [
+   241,
+   261,
+   19,
+   39
+  ],
+  "method": "同 player1；按男版 22×47 的比例校正尺寸后抠底",
+  "issues": "#88 未列入 04 §9.1 的原生表，缩放系数未标定，可能需上采样；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/maptarget.gif",
+  "tier": "C",
+  "purpose": "地图悬停罩：黄绿色双线菱形 64×35，四顶点各一个小圆环",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 画 64×35 菱形双线 + 4 个小圆环，黄绿色",
+  "issues": "颜色与造型取自 #88 [415,179,56,32]（半个）与 #130/#147 右缘",
+  "confidence": "high"
+ },
+ {
+  "path": "img/maptarget2.gif",
+  "tier": "C",
+  "purpose": "地图选中罩：蓝灰色双线菱形 64×35",
+  "source": null,
+  "bbox": null,
+  "method": "同 maptarget.gif 一个脚本换色（蓝灰）",
+  "issues": "造型实测自 #106 [232,272,53,23]、#131 [358,318,54,28]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/indexback.jpg",
+  "tier": "D",
+  "purpose": "昆冈登录页（单机版的「开始页」）登录页整图背景 1000×552",
+  "source": "reference/images/17173-live/20090826131655269/xdx6001.jpg (#22) 仅作占位装饰参考，非原件",
+  "bbox": null,
+  "method": "占位：纯色/CSS 渐变块；indexback 可平铺 #22 的淡青水墨芦苇条",
+  "issues": "登录页零截图；PLAN §5 已把开始页列为可选且不计入「界面完全还原」验收",
+  "confidence": "low"
+ },
+ {
+  "path": "img/indexloginbg.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页（单机版的「开始页」）登录框底 300×200",
+  "source": null,
+  "bbox": null,
+  "method": "占位：纯色/CSS 渐变块；indexback 可平铺 #22 的淡青水墨芦苇条",
+  "issues": "登录页零截图；PLAN §5 已把开始页列为可选且不计入「界面完全还原」验收",
+  "confidence": "low"
+ },
+ {
+  "path": "img/indexregisterbg.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页（单机版的「开始页」）注册框底 300×200",
+  "source": null,
+  "bbox": null,
+  "method": "占位：纯色/CSS 渐变块；indexback 可平铺 #22 的淡青水墨芦苇条",
+  "issues": "登录页零截图；PLAN §5 已把开始页列为可选且不计入「界面完全还原」验收",
+  "confidence": "low"
+ },
+ {
+  "path": "img/indexnewsbg.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页（单机版的「开始页」）新闻阅读层底 400×500",
+  "source": null,
+  "bbox": null,
+  "method": "占位：纯色/CSS 渐变块；indexback 可平铺 #22 的淡青水墨芦苇条",
+  "issues": "登录页零截图；PLAN §5 已把开始页列为可选且不计入「界面完全还原」验收",
+  "confidence": "low"
+ },
+ {
+  "path": "img/top/back2.jpg",
+  "tier": "B",
+  "purpose": "顶栏水墨山水横幅 1000×98（全站每页最显眼的一张图）",
+  "source": "reference/images/17173-live/20100811104141572/z0811xz01.jpg (#114) 左半 + reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg (#2) 右半",
+  "bbox": [
+   5,
+   0,
+   1000,
+   98
+  ],
+  "method": "#114 [0,0,755,98] 作左半（无水印；#114.x = #2.x − 9，需平移对齐）＋ #2 [760,0,245,98] 作右半拼接；再擦除烧在图上的 #littlemenu 7 钮、#resource 数值、#bigmenu 7 标签、五行互化钮、版本号，用横向邻域纹理克隆补洞（横幅是平滑水墨渐层，可脚本化修补）",
+  "issues": "#2 左上 web.17173.com 粉色水印压住 logo 左半 [18,28,164,24]；拼缝在 x≈755；JPEG 块噪；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/top/logo.gif",
+  "tier": "B",
+  "purpose": "顶栏「修真」毛笔行书 logo [文件名推断]",
+  "source": "reference/images/17173-live/20100811104141572/z0811xz01.jpg (#114)",
+  "bbox": [
+   62,
+   12,
+   173,
+   73
+  ],
+  "method": "从无水印的 #114 裁出，白底转透明，去 JPEG 毛边",
+  "issues": "原版 #logo 可能只是定位 div、字直接烧在 back2.jpg 里；若如此本条作废、不落盘",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titleplayer.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「人 物」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/1-经脉.jpg (#116)",
+  "bbox": [
+   15,
+   0,
+   150,
+   30
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titleproduce.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「炼 器」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/3-炼器.jpg (#118)",
+  "bbox": [
+   12,
+   3,
+   150,
+   30
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "high"
+ },
+ {
+  "path": "img/title/titleitem.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「法 宝」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/6-法宝.jpg (#121)",
+  "bbox": [
+   20,
+   4,
+   148,
+   29
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titletrade.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「市 场」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/9-交易.jpg (#123)",
+  "bbox": [
+   26,
+   6,
+   148,
+   29
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；PLAN §0 裁决：横幅用「市 场」不用「交 易」；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titleally.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「门 派」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/8-帮派.jpg (#122)",
+  "bbox": [
+   14,
+   2,
+   148,
+   28
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titlesword.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「剑 术」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/5-剑侠.jpg (#120)",
+  "bbox": [
+   9,
+   3,
+   148,
+   29
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titlemath.gif",
+  "tier": "B",
+  "purpose": "页标题淡墨横幅「术 数」150×30",
+  "source": "reference/images/17173-zone-systems-20081030/4-术数.jpg (#119)",
+  "bbox": [
+   15,
+   3,
+   148,
+   29
+  ],
+  "method": "整块裁切（图片字，两字本就是图的一部分，无需抠字）；去 JPEG 块噪，水墨保留灰度不做阈值化",
+  "issues": "文件名 [推断]（命名规律 img/title/title<页面英文>.gif）；bbox ±4px（各图内容原点由子标签右缘反推）；JPEG 下飞白边缘发糊",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/title/titlerank.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「排 行 榜」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "只有 #158（≈0.89 缩放）一张样张，放大不如合成；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titlecreatechr.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「创建人物」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "建号页截图未拍到页标题图；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titlebattle.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「战斗事件」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "B 窗零截图；原版 DOM 里该 img 的 title 属性误写成「个人资料」，属原版复制粘贴 bug，照抄；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titlemap.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「地 图」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "地图页截图上缘从地形插画开始，标题被裁掉；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titlemsg.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「消 息」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "消息在 R 窗，标题是 span.title3 文字；本图是否存在 [未知]；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titlebook.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「秘 笈」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "秘笈 tab 零截图；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/title/titleskill.gif",
+  "tier": "C",
+  "purpose": "页标题淡墨横幅「法 术」150×30",
+  "source": "img/title/titleplayer.gif（本清单 B 档产物，取其空白段作底）",
+  "bbox": null,
+  "method": "合成：取 B 档已裁横幅（#116/#121）的空白右段做 148×29 淡墨横刷底，再用楷体渲染两字（字间一个全角空、深紫褐 #603858、约 15px、位于左 1/3）",
+  "issues": "skill.jsp 各 tab 各有标题图，「法术」整页是否另有一张 [未知]；无 1:1 裁片；行楷书法字体缺失，只能用系统楷体近似，字形与原版不同 → 截图对齐时对该图打掩膜；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/btn/index.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「首页」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/help.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「游戏指南」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/rank.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「排行榜」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/playerdir.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「个人资料」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/vip.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「付费功能」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮；字下加黄色高亮底 #e0e080",
+  "issues": "字下有常亮的黄色高亮底 #e0e080（非 hover），是 7 个里唯一带高亮的；规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/bbs.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「论坛」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/about.gif",
+  "tier": "C",
+  "purpose": "#littlemenu 右上小按钮「关于」60×17",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮",
+  "issues": "#2 顶栏只有 6 个按钮，第 7 个 about 零截图；文案与是否高亮 [未知]，外观自创（PLAN §0 裁决）；规格实测自 #2 [609,2,380,17]（6 个，pitch 64）；12px 字在 JPEG 下已糊，按规格重画比裁切准",
+  "confidence": "low"
+ },
+ {
+  "path": "img/btn/player_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「人 物」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/skill_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「法 术」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/item_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「法 宝」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/map_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「地 图」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）；07 §7.2 未实见 map_1.gif，按 _1/_2 规律推断",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/ally_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「门 派」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/trade_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「交 易」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/msg_1.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「消 息」未选中态 60×20",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 60×20：自上而下银灰渐变 #8d8d8d→#b1b1b1→#d7d7d7、1px 近黑外框 #202020（上/左/右，底边与 y=98 黑线重合）、左右上角回纹小折角、14px 宋体黑字两字间空一格",
+  "issues": "规格实测自 #2 [308,79,444,20]（pitch 64，原生 1:1）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/player_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「人 物」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/skill_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「法 术」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/item_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「法 宝」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/map_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「地 图」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/btn/ally_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「门 派」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/trade_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「交 易」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/msg_2.gif",
+  "tier": "C",
+  "purpose": "#bigmenu 主标签「消 息」选中态（当前页）60×20",
+  "source": null,
+  "bbox": null,
+  "method": "同 _1 脚本换配色：顶部金色回纹 #cdba82/#a78c31/#d9ba5d → 底部渐白 #ffffff、外框深褐 #352400、字深红褐粗体 #5a0a18；尺寸不变不上浮",
+  "issues": "只实见 map_2.gif 的文件名与「人物」选中态的画面（#2/#114）；其余 6 个的画面按同式样推断 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/turn_1.gif",
+  "tier": "C",
+  "purpose": "#avgres「五行互化」图片按钮 100×30",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成：一笔蓝色水彩横刷 #7090c0→#90a0c0 + 上压黄色粗体「五行互化」#f0ee70 带 1px 深色描边；透明底",
+  "issues": "规格实测自 #2 [901,66,100,30]；按钮压在顶栏横幅上、背景山影透底，必须做成透明 gif 而不是裁切",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/turn_2.gif",
+  "tier": "C",
+  "purpose": "「五行互化」hover/按下态 [文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "同 turn_1 脚本加深/提亮一档",
+  "issues": "仅由 `_1` 后缀推断存在，画面 [未知]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/btn/btnok.gif",
+  "tier": "C",
+  "purpose": "M/M2 对话框与建号页「确 定」按钮 ≈75×20",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮，字「确 定」",
+  "issues": "#151 [186,395,76,19] 是 0.95 缩放样张，只作尺寸参考",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/btn/btncancel.gif",
+  "tier": "C",
+  "purpose": "M2 确认框「取 消」按钮 ≈75×20",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮，字「取 消」",
+  "issues": "零截图；按 btnok 同式样同尺寸生成",
+  "confidence": "low"
+ },
+ {
+  "path": "img/btn/mover1.gif",
+  "tier": "C",
+  "purpose": "地图格右键菜单「点击之后向此地移动」按钮",
+  "source": null,
+  "bbox": null,
+  "method": "按钮通式：米灰底（内部 #f0f0e0、边缘 #c0c0c0）+ 1px 深灰褐边 #76716d + 四角约 5px 回纹折角 + 12px 宋体黑字居中，PIL/SVG 脚本一次生成全部按钮，字按原版 title 文案",
+  "issues": "地图小菜单无清晰截图，尺寸 [未知]；同目录应还有攻击/推算等菜单钮，文件名未见",
+  "confidence": "low"
+ },
+ {
+  "path": "img/button/login.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页按钮「登录」",
+  "source": null,
+  "bbox": null,
+  "method": "占位：通用米灰按钮（开始页可选、不计入验收）",
+  "issues": "登录页零截图；登录页用的是另一套皮肤 css/bien.css，按钮式样与游戏内未必相同",
+  "confidence": "low"
+ },
+ {
+  "path": "img/button/register.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页按钮「注册」",
+  "source": null,
+  "bbox": null,
+  "method": "占位：通用米灰按钮（开始页可选、不计入验收）",
+  "issues": "登录页零截图；登录页用的是另一套皮肤 css/bien.css，按钮式样与游戏内未必相同",
+  "confidence": "low"
+ },
+ {
+  "path": "img/button/back.gif",
+  "tier": "D",
+  "purpose": "昆冈登录页按钮「返回」",
+  "source": null,
+  "bbox": null,
+  "method": "占位：通用米灰按钮（开始页可选、不计入验收）",
+  "issues": "登录页零截图；登录页用的是另一套皮肤 css/bien.css，按钮式样与游戏内未必相同",
+  "confidence": "low"
+ },
+ {
+  "path": "img/button/del.gif",
+  "tier": "C",
+  "purpose": "事件行右侧「取消」小红叉（移动事件 cancelmove / 战斗事件召回）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 14×14 红叉 #cc0000",
+  "issues": "尺寸实测自 #114 [727,235,14,14]；JPEG 下只能看出是红叉",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/gold.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「金」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：橙底 + 黑「金」字（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/wood.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「木」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：绿底 + 树形（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/water.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「水」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：蓝底 + 水纹（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/fire.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「火」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：红底 + 火焰（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/earth.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「土」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：褐黄底 + 山形/土堆（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/res/coin.gif",
+  "tier": "C",
+  "purpose": "资源条 / 消耗表 / 真气增长行通用 16×16 圆形图标「仙石」",
+  "source": null,
+  "bbox": null,
+  "method": "脚本生成 16×16 圆形图标：灰底 + 黑「石」字（列序恒为 金木水火土，仙石单列）",
+  "issues": "#2 有原生样张（金306/木427/水547/火667/土787/石907，y=41）与白底样张（[273,329]+22k），但 16px JPEG 细节已糊，按规格重画比裁切准（04 §9.3 结论）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/event/mark.gif",
+  "tier": "C",
+  "purpose": "万用项目符号 4×7 黑色小三角（事件行前缀两个拼成 ▸▸，出现 84 次）",
+  "source": null,
+  "bbox": null,
+  "method": "PIL 画 4×7 实心右三角",
+  "issues": "#121 [396,101,4,7] 有样张，尺寸已确认；重画比裁 JPEG 准",
+  "confidence": "high"
+ },
+ {
+  "path": "img/event/attack.gif",
+  "tier": "C",
+  "purpose": "战斗事件行图标：出击/斩杀中（小飞剑 16×16）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 画 16×16 斜置小飞剑剪影",
+  "issues": "#2 [530,128,18,18] 太小太糊，只能作剪影轮廓参考",
+  "confidence": "low"
+ },
+ {
+  "path": "img/event/back.gif",
+  "tier": "C",
+  "purpose": "战斗事件行图标：返回中（小飞剑，方向相反）",
+  "source": null,
+  "bbox": null,
+  "method": "同 attack.gif 脚本镜像/换向",
+  "issues": "同 attack.gif",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/random.gif",
+  "tier": "B",
+  "purpose": "「?」占位头像 100×120：建号页「随机」、系统消息、未知 NPC；也是本清单全部 D 档头像的占位来源",
+  "source": "reference/images/17173-live/20100527155609658/rrr0hj.jpg (#86)",
+  "bbox": [
+   28,
+   146,
+   85,
+   102
+  ],
+  "method": "裁切后按 1/0.85 上采样到 100×120，去 JPEG 块噪；回纹底与米黄细边保留",
+  "issues": "#86 是 0.85 缩放图，上采样后偏糊；bbox ±4px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/avatar/kunlunm.gif",
+  "tier": "B",
+  "purpose": "玩家头像：昆仑·男 100×120（彩色工笔，浅蓝回纹底 + 米黄细边）",
+  "source": "reference/images/sina-live/2010-03-29-1338386516/U4513P115T9D386516F168DT20100329133839_c.jpg (#151)",
+  "bbox": [
+   31,
+   161,
+   96,
+   115
+  ],
+  "method": "裁切后按 1/0.95 上采样到 100×120，去 JPEG 块噪",
+  "issues": "#151 是 0.95 缩放图；全部截图里唯一见过的门派头像；bbox ±4px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/avatar/shushanm.gif",
+  "tier": "D",
+  "purpose": "玩家头像：蜀山·男 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：直接复用 random.gif（原版自带的「?」头像）；台账标「占位」",
+  "issues": "从未见过原图；6 张门派头像只找到昆仑男一张",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/shushanf.gif",
+  "tier": "D",
+  "purpose": "玩家头像：蜀山·女 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：直接复用 random.gif（原版自带的「?」头像）；台账标「占位」",
+  "issues": "从未见过原图；6 张门派头像只找到昆仑男一张",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/kunlunf.gif",
+  "tier": "D",
+  "purpose": "玩家头像：昆仑·女 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：直接复用 random.gif（原版自带的「?」头像）；台账标「占位」",
+  "issues": "从未见过原图；6 张门派头像只找到昆仑男一张",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/tongtianm.gif",
+  "tier": "D",
+  "purpose": "玩家头像：通天·男 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：直接复用 random.gif（原版自带的「?」头像）；台账标「占位」",
+  "issues": "从未见过原图；6 张门派头像只找到昆仑男一张",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/tongtianf.gif",
+  "tier": "D",
+  "purpose": "玩家头像：通天·女 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：直接复用 random.gif（原版自带的「?」头像）；台账标「占位」",
+  "issues": "从未见过原图；6 张门派头像只找到昆仑男一张",
+  "confidence": "low"
+ },
+ {
+  "path": "img/avatar/escort.gif",
+  "tier": "D",
+  "purpose": "镖局老板 NPC 头像 100×120",
+  "source": "占位来源 img/avatar/random.gif",
+  "bbox": "",
+  "method": "占位：复用 random.gif；台账标「占位」",
+  "issues": "从未见过原图；镖局对话文本有存档但没有头像截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/scene/plain01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「平原」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20090923133942281/cxde222000.jpg (#36)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/river01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「江河（小桥渔舟）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20090923133942281/cxde222001.jpg (#37)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/river02.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「江河（山涧急流）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20090923133942281/cxde222001.jpg (#37)",
+  "bbox": [
+   150,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/forest01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「森林（松林红叶）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20090923133942281/cxde222002.jpg (#38)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/forest02.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「森林（白干大树）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20090923133942281/cxde222002.jpg (#38)",
+  "bbox": [
+   150,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/mountain01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「青山（孤峰云海）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20100805104905646/z0805xz02.jpg (#113)",
+  "bbox": [
+   0,
+   150,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]；#113 右侧两格被「游艺世界 YYGE.COM」水印压住，下排左三格无水印",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/mountain02.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「青山（金顶楼阁山）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20100805104905646/z0805xz02.jpg (#113)",
+  "bbox": [
+   150,
+   150,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]；#113 右侧两格被「游艺世界 YYGE.COM」水印压住，故森林/平原改用 #38/#36；本图取的下排左三格无水印",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/mountain03.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「青山（群峰飞瀑）」150×150（mapData[i].img 指向）",
+  "source": "reference/images/17173-live/20100805104905646/z0805xz02.jpg (#113)",
+  "bbox": [
+   300,
+   150,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，只做轻度 JPEG 去块噪（水墨保留灰度，不做阈值化）",
+  "issues": "17173 通稿是原始 150×150 素材的无缩放拼图（白底、羽化边、书法名已嵌在图里）；原件是 GIF、色阶更少，JPEG 版有轻微噪点；01/02/03 编号与画面的对应按通稿排列顺序 [推断]；#113 右侧两格被「游艺世界 YYGE.COM」水印压住，故森林/平原改用 #38/#36；本图取的下排左三格无水印",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/town01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「小镇」150×150 [文件名推断]",
+  "source": "reference/images/17173-live/20090923133942281/cxde222004.jpg (#40)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，轻度去块噪",
+  "issues": "文件名 [推断]（该地形未在任何 DOM 片段出现）；画面本身是原件级",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/village01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「村庄」150×150 [文件名推断]",
+  "source": "reference/images/17173-live/20090923133942281/cxde222004.jpg (#40)",
+  "bbox": [
+   150,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，轻度去块噪",
+  "issues": "文件名 [推断]（该地形未在任何 DOM 片段出现）；画面本身是原件级",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/city01.gif",
+  "tier": "A",
+  "purpose": "#sceneimg 顶部地形插画「城池」150×150 [文件名推断]",
+  "source": "reference/images/17173-live/20090923133942281/cxde222005.jpg (#41)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整格直接取用，轻度去块噪",
+  "issues": "文件名 [推断]（该地形未在任何 DOM 片段出现）；画面本身是原件级",
+  "confidence": "high"
+ },
+ {
+  "path": "img/scene/dongtian01.gif",
+  "tier": "B",
+  "purpose": "#sceneimg 洞天插画 150×150（彩色工笔亭台水榭，书法「洞天」在底部）[文件名推断]",
+  "source": "reference/images/sina-live/2010-02-04-1108372823/U2964P115T9D372823F168DT20100204110837_c.jpg (#131)",
+  "bbox": [
+   15,
+   5,
+   145,
+   145
+  ],
+  "method": "裁切后补上缘约 5px 与右缘约 5px（边缘延展/镜像），去 JPEG 块噪",
+  "issues": "上缘被截图裁掉需补边；是唯一一张彩色工笔的场景插画；#52 可作第二样本；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/scene/fudi01.gif",
+  "tier": "D",
+  "purpose": "#sceneimg 顶部地形插画「福地」150×150 [文件名推断]",
+  "source": "占位来源 img/scene/plain01.gif",
+  "bbox": "",
+  "method": "占位：复用 plain01.gif（平原）；台账标「占位」",
+  "issues": "零截图、零文件名；官方场景清单确认这三种地形存在（01-GAME-FACTS / map.html.txt）",
+  "confidence": "low"
+ },
+ {
+  "path": "img/scene/jiuzhou01.gif",
+  "tier": "D",
+  "purpose": "#sceneimg 顶部地形插画「九州」150×150 [文件名推断]",
+  "source": "占位来源 img/scene/plain01.gif",
+  "bbox": "",
+  "method": "占位：复用 plain01.gif（平原）；台账标「占位」",
+  "issues": "零截图、零文件名；官方场景清单确认这三种地形存在（01-GAME-FACTS / map.html.txt）",
+  "confidence": "low"
+ },
+ {
+  "path": "img/scene/wuyue01.gif",
+  "tier": "D",
+  "purpose": "#sceneimg 顶部地形插画「五岳」150×150 [文件名推断]",
+  "source": "占位来源 img/scene/plain01.gif",
+  "bbox": "",
+  "method": "占位：复用 plain01.gif（平原）；台账标「占位」",
+  "issues": "零截图、零文件名；官方场景清单确认这三种地形存在（01-GAME-FACTS / map.html.txt）",
+  "confidence": "low"
+ },
+ {
+  "path": "img/scene/forge01.gif",
+  "tier": "A",
+  "purpose": "150×150 羽化边小插画「铸剑（屋舍间悬一柄剑）」，疑为任务/NPC 场景插画 [文件名推断]",
+  "source": "reference/images/17173-live/20090604153531214/xzd6001.jpg (#10)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整图直接取用，轻度去块噪",
+  "issues": "文件名与确切用途 [推断]；画面是原件级（通稿里就是 150×150 原图）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/scene/suoyaota01.gif",
+  "tier": "A",
+  "purpose": "150×150 羽化边小插画「锁妖塔（红云、铁链缠塔）」，疑为任务/NPC 场景插画 [文件名推断]",
+  "source": "reference/images/17173-live/20090604153531214/xzd6002.jpg (#11)",
+  "bbox": [
+   0,
+   0,
+   150,
+   150
+  ],
+  "method": "原尺寸整图直接取用，轻度去块噪",
+  "issues": "文件名与确切用途 [推断]；画面是原件级（通稿里就是 150×150 原图）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·空地（只有晕染地面）」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain1.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain2.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain3.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/forest0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠约 46×28」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/forest1.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·单峰圆丘」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain1.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·横向条纹山脊」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain2.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·双峰」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/river0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/river1.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——视野外态（无后缀＝范围外，地面近白、地物褪色/去色）",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；本档为「基础块」，blue/green 两套由调色脚本从它派生",
+  "issues": "截图里每块都被相邻地块/人物/选中框遮挡且是 JPEG，无法逐块裁切（06 §6.3）；地面并非纯色，是带晕染、边缘虚化的菱形；2009-06(#12) 范围外是去色灰度、2010 年各图是淡彩褪色，基准期取去色",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain0blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·空地（只有晕染地面）」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/plain0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain0green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·空地（只有晕染地面）」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/plain0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain1blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/plain1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain1green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/plain1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain2blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/plain2.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain2green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/plain2.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/plain3blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/plain3.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/plain3green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「平原·3~4 棵极小树草」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/plain3.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/forest0blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠约 46×28」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/forest0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/forest0green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠约 46×28」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/forest0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/forest1blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/forest1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/forest1green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「森林·方形翠绿树冠」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/forest1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain0blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·单峰圆丘」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/mountain0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/mountain0green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·单峰圆丘」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/mountain0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain1blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·横向条纹山脊」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/mountain1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/mountain1green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·横向条纹山脊」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/mountain1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/mountain2blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·双峰」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/mountain2.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/mountain2green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「青山·双峰」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/mountain2.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/river0blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/river0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/river0green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/river0.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/river1blue.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——视野范围内（地面淡蓝白、地物与头像正常彩色）",
+  "source": "img/map/river1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "high"
+ },
+ {
+  "path": "img/map/river1green.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「江河·浅蓝椭圆水面带白晕边」——可移动范围内（地面偏灰、地物颜色最深）",
+  "source": "img/map/river1.gif（本清单基础块）",
+  "bbox": null,
+  "method": "由同名基础块经一个调色脚本生成（三套色不许裁三遍）：blue=地面淡蓝白+地物保饱和；green=地面偏灰+地物压暗",
+  "issues": "07 §7.2 未实见该文件名，按 11 基础块 × {原色,blue,green} 的规律补全 [推断]；着色语义由 map.jsp 整页 mapData 与曼哈顿距离统计反推（06 §1.4）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/map/village0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「村庄·4–5 间棕顶小茅屋散落」[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；blue/green 变体由同一调色脚本生成（落盘为 village0blue.gif / village0green.gif，不单列）",
+  "issues": "文件名 [推断]；可参考样张都在视野外（褪色）：村庄 #88 [169,214,36,27]、小镇/城池 #88 [357,177,43,28] 与 #131 右上；开服一周后才出现村庄",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/town0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「小镇·一簇白墙建筑带拱门围墙」[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；blue/green 变体由同一调色脚本生成（落盘为 town0blue.gif / town0green.gif，不单列）",
+  "issues": "文件名 [推断]；可参考样张都在视野外（褪色）：村庄 #88 [169,214,36,27]、小镇/城池 #88 [357,177,43,28] 与 #131 右上；开服一周后才出现村庄",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/city0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「城池·一簇白墙建筑带拱门围墙（规模更大）」[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；blue/green 变体由同一调色脚本生成（落盘为 city0blue.gif / city0green.gif，不单列）",
+  "issues": "文件名 [推断]；可参考样张都在视野外（褪色）：村庄 #88 [169,214,36,27]、小镇/城池 #88 [357,177,43,28] 与 #131 右上；开服一周后才出现村庄",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/dongtian0.gif",
+  "tier": "C",
+  "purpose": "地块 64×120「洞天·淡色立石/山门」[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "脚本绘制 64×120 画布（菱形占底部 64×35）：水墨晕染菱形地面 + 地物，以 #106 的 4 倍放大图为描摹底；像素风、低饱和、无渐变，可程序化；blue/green 变体由同一调色脚本生成（落盘为 dongtian0blue.gif / dongtian0green.gif，不单列）",
+  "issues": "文件名 [推断]；可参考样张都在视野外（褪色）：村庄 #88 [169,214,36,27]、小镇/城池 #88 [357,177,43,28] 与 #131 右上；开服一周后才出现村庄",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/fudi0.gif",
+  "tier": "D",
+  "purpose": "地块 64×120「福地」[文件名推断]",
+  "source": "占位来源 img/map/plain0.gif",
+  "bbox": "",
+  "method": "占位：复用 plain0.gif（平原空地）+ 一个程序化标记；台账标「占位」",
+  "issues": "零截图、零文件名；五岳有已知坐标但没有任何画面",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/jiuzhou0.gif",
+  "tier": "D",
+  "purpose": "地块 64×120「九州」[文件名推断]",
+  "source": "占位来源 img/map/plain0.gif",
+  "bbox": "",
+  "method": "占位：复用 plain0.gif（平原空地）+ 一个程序化标记；台账标「占位」",
+  "issues": "零截图、零文件名；五岳有已知坐标但没有任何画面",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/wuyue0.gif",
+  "tier": "D",
+  "purpose": "地块 64×120「五岳」[文件名推断]",
+  "source": "占位来源 img/map/plain0.gif",
+  "bbox": "",
+  "method": "占位：复用 plain0.gif（平原空地）+ 一个程序化标记；台账标「占位」",
+  "issues": "零截图、零文件名；五岳有已知坐标但没有任何画面",
+  "confidence": "low"
+ },
+ {
+  "path": "img/map/mapbg.gif",
+  "tier": "B",
+  "purpose": "#mapbg 手绘地图墨框 ≈458×253（内框 448×245 即 mapdiv 视口）[文件名推断]",
+  "source": "reference/images/17173-live/20100721110246898/z0721xz01.jpg (#106)",
+  "bbox": [
+   30,
+   155,
+   457,
+   252
+  ],
+  "method": "整张裁切或抠成九宫格；墨线约 4px、边缘毛糙，保留灰度不做阈值化；内区 [34,159,448,245] 抠成透明",
+  "issues": "框内压着地块/人物/滚屏箭头，内区必须抠透明；bbox ±2px；文件名 [推断]（DOM 只给了 #mapbg 这个 id）",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/lt.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左上」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/mt.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「上」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/rt.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右上」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/lm.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/rm.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/lb.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左下」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/mb.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「下」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/rb.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右下」常态（约 12–14px 深灰实心三角）",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 生成 8 个方向的实心三角（四角的朝对角方向），压在墨框外沿",
+  "issues": "坐标实测自 #106（四角 [22,148]/[487,148]/[22,408]/[487,408]，四边中点 [250,148]/[250,415]/[22,280]/[487,280]）；JPEG 下只能看出轮廓",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pos/lto.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左上」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/mto.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「上」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/rto.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右上」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/lmo.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/rmo.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/lbo.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「左下」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/mbo.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「下」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pos/rbo.gif",
+  "tier": "C",
+  "purpose": "地图 8 向滚屏箭头「右下」hover 态",
+  "source": null,
+  "bbox": null,
+  "method": "同一脚本换色生成",
+  "issues": "原版 hover 颜色 [未知]，暂用加深一档；零截图",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/101.gif",
+  "tier": "D",
+  "purpose": "法术图标 64×64「灵宝真经」（炼器 tab，id 由 DOM 确证）",
+  "source": "占位来源 img/skill/unknown.gif",
+  "bbox": "",
+  "method": "占位：用原版未解锁「?」图标；台账标「占位」",
+  "issues": "id 确证但画面无法确定：#118 只有「丹」「铸」两个已学会图标露面，无法与这三个 id 对上号",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/106.gif",
+  "tier": "D",
+  "purpose": "法术图标 64×64「御宝秘录」（炼器 tab，id 由 DOM 确证）",
+  "source": "占位来源 img/skill/unknown.gif",
+  "bbox": "",
+  "method": "占位：用原版未解锁「?」图标；台账标「占位」",
+  "issues": "id 确证但画面无法确定：#118 只有「丹」「铸」两个已学会图标露面，无法与这三个 id 对上号",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/107.gif",
+  "tier": "D",
+  "purpose": "法术图标 64×64「炼器总纲」（炼器 tab，id 由 DOM 确证）",
+  "source": "占位来源 img/skill/unknown.gif",
+  "bbox": "",
+  "method": "占位：用原版未解锁「?」图标；台账标「占位」",
+  "issues": "id 确证但画面无法确定：#118 只有「丹」「铸」两个已学会图标露面，无法与这三个 id 对上号",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/unknown.gif",
+  "tier": "B",
+  "purpose": "法术树未学会/未解锁「?」图标 64×64——全部 D 档法术图标的占位来源 [文件名推断]",
+  "source": "reference/images/17173-zone-systems-20081030/3-炼器.jpg (#118)",
+  "bbox": [
+   205,
+   173,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（原生 1:1、全图里最干净的一张）+ 去 JPEG 块噪；外框 1px #c6c8c7 + 1px #080500，内部 60×60 米黄 #fefebe，居中粗黑「?」，左上右下各一个 ≈11×11 回纹角饰",
+  "issues": "文件名 [推断]（原版应有固定文件名）；画面规格已完全实测",
+  "confidence": "high"
+ },
+ {
+  "path": "img/skill/liandan.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「炼丹之术（葫芦+丹丸，写「丹」）」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/3-炼器.jpg (#118)",
+  "bbox": [
+   65,
+   53,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/zhujian.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「铸剑（布囊，写「铸」）」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/3-炼器.jpg (#118)",
+  "bbox": [
+   205,
+   53,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/yijing.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「易经（线装书）」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/4-术数.jpg (#119)",
+  "bbox": [
+   68,
+   51,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/jiugong.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「九宫飞星（蓝色九宫格阵图）」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/4-术数.jpg (#119)",
+  "bbox": [
+   348,
+   51,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/yujian.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「御剑术（卷轴+剑）」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/5-剑侠.jpg (#120)",
+  "bbox": [
+   202,
+   52,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/liantai.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「莲台法器」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/5-剑侠.jpg (#120)",
+  "bbox": [
+   62,
+   172,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/kuanren.gif",
+  "tier": "B",
+  "purpose": "法术图标 64×64「宽刃剑」（已学会态）[文件名待定]",
+  "source": "reference/images/17173-zone-systems-20081030/5-剑侠.jpg (#120)",
+  "bbox": [
+   342,
+   172,
+   64,
+   64
+  ],
+  "method": "裁切 64×64（三张源图均原生 1:1）+ 去 JPEG 块噪；落盘时按 src/data 最终确定的 skill id 重命名为 img/skill/<id>.gif",
+  "issues": "原版路径是 img/skill/<3 位 id>.gif，这 7 个图标的 id [未知]；工笔小图在 JPEG 下细节糊；bbox ±2px",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/bgproducek.gif",
+  "tier": "C",
+  "purpose": "skill.jsp 炼器树背景 460×425（整棵树的箭头 + Lv.N 标注，图标是另外绝对定位叠上去的）",
+  "source": null,
+  "bbox": null,
+  "method": "按 04 §7.2/§7.3 用 SVG 画：3 列×4 行网格（列左缘 x=58/198/338，行上缘 y=0/120/240/360），3px 粗黑折线（直角拐弯无圆角）+ ≈13×12 实心三角箭头，线中断口放 14px 手写斜体「Lv.N」",
+  "issues": "#118/#8 里图标烧在背景上，直接裁不可用；`k` [推断]=kunlun，门派变体见下两条",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/bgproduces.gif",
+  "tier": "C",
+  "purpose": "skill.jsp 炼器树背景 460×425（蜀山 版）[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "同 bgproducek.gif 的脚本，按该派节点布局重排",
+  "issues": "三派树的差异 [未知]，暂与昆仑同布局；文件名仅由 `k`=kunlun 的规律推断",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/bgproducet.gif",
+  "tier": "C",
+  "purpose": "skill.jsp 炼器树背景 460×425（通天 版）[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "同 bgproducek.gif 的脚本，按该派节点布局重排",
+  "issues": "三派树的差异 [未知]，暂与昆仑同布局；文件名仅由 `k`=kunlun 的规律推断",
+  "confidence": "low"
+ },
+ {
+  "path": "img/skill/bgsword.gif",
+  "tier": "C",
+  "purpose": "skill.jsp 剑术树背景 460×425 [文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "同 bgproducek.gif 的脚本，箭头与 Lv 标注按 04 §7.3 的剑术表",
+  "issues": "文件名 [推断]；秘笈 tab 零截图，其背景是否存在 [未知]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/skill/bgmath.gif",
+  "tier": "C",
+  "purpose": "skill.jsp 术数树背景 460×425 [文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "同 bgproducek.gif 的脚本，箭头与 Lv 标注按 04 §7.3 的术数表",
+  "issues": "文件名 [推断]；秘笈 tab 零截图，其背景是否存在 [未知]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/chrbgs.gif",
+  "tier": "B",
+  "purpose": "player.jsp #playerinfo 右下角门派水印（s=蜀山：竹），淡灰 #c8c8c8~#e8e8e8",
+  "source": "reference/images/17173-zone-systems-20081030/1-经脉.jpg (#116)",
+  "bbox": [
+   375,
+   340,
+   105,
+   110
+  ],
+  "method": "裁切后白底转透明、去 JPEG 块噪；水墨保留灰度不做阈值化",
+  "issues": "淡灰水印在 JPEG 下对比极低；bbox ±4px；`s`=shushan 由 bgproducek 的 `k`=kunlun 命名规律推断",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/chrbgt.gif",
+  "tier": "B",
+  "purpose": "player.jsp 右下角门派水印（t=通天：梅）[文件名推断]",
+  "source": "reference/images/17173-live/20081225104603605_all/xiuzhen804.jpg (#5)",
+  "bbox": [
+   350,
+   310,
+   125,
+   115
+  ],
+  "method": "同 chrbgs.gif",
+  "issues": "#2 另有一份更小的 [395,455,100,100]；bbox ±4px；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/chrbgk.gif",
+  "tier": "D",
+  "purpose": "player.jsp 右下角门派水印（k=昆仑：荷）[文件名推断]",
+  "source": "占位来源 img/pipe/chrbgs.gif",
+  "bbox": "",
+  "method": "占位：暂用 chrbgs.gif（蜀山竹）或留空；台账标「占位」",
+  "issues": "只有 #146（0.90 缩放）与 #65（0.80 缩放），水墨细纹放大后不可用（PLAN §3 判 D）",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pipe/bodym.gif",
+  "tier": "B",
+  "purpose": "男·人体线稿（经脉/本体/金丹三视图共用的底图，约 165×400）[文件名推断]",
+  "source": "reference/images/17173-live/20100811104141572/z0811xz01.jpg (#114)",
+  "bbox": [
+   16,
+   150,
+   460,
+   410
+  ],
+  "method": "裁出线稿后抠掉 8 个节点圆盘、引线与篆书标签，白底转透明；#114 无水印、原生 1:1、遮挡最少",
+  "issues": "节点/引线覆盖处需按左右对称补线；JPEG 毛边；#117 为同图更早版本可交叉参考；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyf.gif",
+  "tier": "B",
+  "purpose": "女·人体线稿（同上）[文件名推断]",
+  "source": "reference/images/17173-live/20081225104603605_all/xiuzhen805.jpg (#6)",
+  "bbox": [
+   140,
+   45,
+   190,
+   400
+  ],
+  "method": "同 bodym.gif",
+  "issues": "#6 左上有 17173 水印（不压人体）；#31（0.82 缩放）可作补充；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodymgold.gif",
+  "tier": "C",
+  "purpose": "男·经脉视图人体剪影（金 属性填充）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），金 用 #f0f070→#f0f010",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodymwood.gif",
+  "tier": "C",
+  "purpose": "男·经脉视图人体剪影（木 属性填充）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），木 用 #d0e8b8→#c0e0a0",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodymwater.gif",
+  "tier": "C",
+  "purpose": "男·经脉视图人体剪影（水 属性填充）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），水 用 #c0e0f0→#60a0d0→#1070c0",
+  "issues": "该性别×五行组合无截图可比对（渐变色按五行取、与性别无关 [推断]）；渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pipe/bodymfire.gif",
+  "tier": "C",
+  "purpose": "男·经脉视图人体剪影（火 属性填充）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），火 用 #f09090→#f00000",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodymearth.gif",
+  "tier": "C",
+  "purpose": "男·经脉视图人体剪影（土 属性填充）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），土 用 #b0b0a0→#808070",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyfgold.gif",
+  "tier": "C",
+  "purpose": "女·经脉视图人体剪影（金 属性填充）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），金 用 #f0f070→#f0f010",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyfwood.gif",
+  "tier": "C",
+  "purpose": "女·经脉视图人体剪影（木 属性填充）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），木 用 #d0e8b8→#c0e0a0",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyfwater.gif",
+  "tier": "C",
+  "purpose": "女·经脉视图人体剪影（水 属性填充）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），水 用 #c0e0f0→#60a0d0→#1070c0",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyffire.gif",
+  "tier": "C",
+  "purpose": "女·经脉视图人体剪影（火 属性填充）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），火 用 #f09090→#f00000",
+  "issues": "渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyfearth.gif",
+  "tier": "C",
+  "purpose": "女·经脉视图人体剪影（土 属性填充）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "调色脚本：对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和），土 用 #b0b0a0→#808070",
+  "issues": "该性别×五行组合无截图可比对（渐变色按五行取、与性别无关 [推断]）；渐变色取样自 JPEG，±10；文件名 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pipe/bodymjindan.gif",
+  "tier": "C",
+  "purpose": "男·金丹视图剪影（纯黑实心 + 2–3px 白/浅灰外描边）[文件名推断]",
+  "source": "img/pipe/bodym.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "脚本对线稿做 100% 黑填充 + 2–3px #e6e4e5 外描边；丹田光球与光环不入图，用 CSS radial-gradient 叠加（核心圆 r≈12 #f0ff02→#dbff00；外环外半径≈50、环宽≈6、#e0f000→#606000）",
+  "issues": "规格实测自 #100 [43,53,149,387]（原生 1:1，男）；女性金丹剪影 [未知]；光球颜色是否随金丹属性变化 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/pipe/bodyfjindan.gif",
+  "tier": "C",
+  "purpose": "女·金丹视图剪影（纯黑实心 + 2–3px 白/浅灰外描边）[文件名推断]",
+  "source": "img/pipe/bodyf.gif（本清单 B 档线稿）",
+  "bbox": null,
+  "method": "脚本对线稿做 100% 黑填充 + 2–3px #e6e4e5 外描边；丹田光球与光环不入图，用 CSS radial-gradient 叠加（核心圆 r≈12 #f0ff02→#dbff00；外环外半径≈50、环宽≈6、#e0f000→#606000）",
+  "issues": "规格实测自 #100 [43,53,149,387]（原生 1:1，男）；女性金丹剪影 [未知]；光球颜色是否随金丹属性变化 [推断]",
+  "confidence": "low"
+ },
+ {
+  "path": "img/pipe/bodylabel.gif",
+  "tier": "B",
+  "purpose": "本体视图的 8 个篆书部位名标签 + 引线（一张叠加层）[文件名推断]",
+  "source": "reference/images/17173-live/20100811104141572/z0811xz01.jpg (#114)",
+  "bbox": [
+   16,
+   150,
+   460,
+   410
+  ],
+  "method": "从同一裁片只保留篆书标签与引线、抠掉人体与节点，白底转透明",
+  "issues": "AI 代理不手绘篆书，只能原样保留裁片像素（这是本清单里唯一必须靠像素保真的字形素材）；JPEG 毛边，小字号下可接受；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/titlebg.gif",
+  "tier": "C",
+  "purpose": "表头 class=titlebg 的灰渐变底（22px 高）[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "CSS linear-gradient(#fefefe → #dddddd，末像素行 #cacaca)，不必落盘图片文件",
+  "issues": "取样自 #2 人物信息表与右栏任务表；文件名 [推断]",
+  "confidence": "high"
+ },
+ {
+  "path": "img/titlebg2.gif",
+  "tier": "B",
+  "purpose": "区块标题墨迹条 458×20（class=titlebg2 的背景图，全站复用一张）[文件名推断]",
+  "source": "reference/images/17173-live/20100331114901844/cxxxf1.jpg (#71) 主 + reference/images/17173-zone-systems-20081030/6-法宝.jpg (#121) 补",
+  "bbox": [
+   7,
+   7,
+   458,
+   20
+  ],
+  "method": "裁 #71 [7,7,458,20]；中段被标题字遮住处用 #121 [21,52,454,20] 的对应段拼补；两端飞白保留；去块噪不做阈值化",
+  "issues": "所有样张中段都压着标题字，必须两图拼；bbox ±2px；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/gmidbg.jpg",
+  "tier": "B",
+  "purpose": "中栏 #gmid 暖灰宣纸底纹 252×445（取样 #eeebe6~#f0e8e5）[文件名推断]",
+  "source": "reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg (#2)",
+  "bbox": [
+   514,
+   99,
+   252,
+   445
+  ],
+  "method": "裁一条无文字的竖向干净段（如 y=430–480）做纵向平铺；底部 y≈480–545 渐隐到白的收尾单独裁一段",
+  "issues": "事件文字与图标烧满全图，只能取空白段平铺；PLAN §0 裁决用 2008 暖灰宣纸且无角饰，不用 2010 的中性灰 #eaeaea+回纹角饰；文件名 [推断]",
+  "confidence": "medium"
+ },
+ {
+  "path": "img/corner.gif",
+  "tier": "C",
+  "purpose": "浮窗四角 8×8 回纹角花（R/L/B/H/M/M2 通用）[文件名推断]",
+  "source": null,
+  "bbox": null,
+  "method": "SVG 画 8×8 回纹；窗体边框用 CSS：外线 1px #a5a09d、隔 1px 白、内线 1px #c9c2bc",
+  "issues": "规格实测自 #3（原生 1:1，R 窗 252×452）；M/M2/B/H 窗零截图，沿用 R 窗式样 [推断]；文件名 [推断]",
+  "confidence": "medium"
+ }
+]

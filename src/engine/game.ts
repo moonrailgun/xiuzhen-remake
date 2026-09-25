@@ -15,6 +15,7 @@ import { resolveCraft } from './craft.ts'
 import { generateNpcs, type NpcWorld } from './npc.ts'
 import { emptyQuestLog } from './quest.ts'
 import { emptyMarket, refillNpcOrders, resolveMarketEvent, ctxOf, applyCtx } from './market.ts'
+import { scheduleRaid, resolveRaid } from './raid.ts'
 import { seedRng } from './rng.ts'
 import { save, load, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { ZERO_QI, type GameState, type Player, type FiveQi } from './state.ts'
@@ -174,11 +175,13 @@ export function tick(
     if (ev.kind === 'battle') return resolveBattleEvent(st, ev)
     if (ev.kind === 'craft') return { state: resolveCraft(st, ev) }
     if (ev.kind === 'market') return { state: applyCtx(resolveMarketEvent(ctxOf(st), ev)) }
+    if (ev.kind === 'raid') return { state: resolveRaid(st, ev) }
     return { state: st }
   })
 
-  // 结算完再补市场，这样刚被买走的单不会当场复活
-  const settled = refillNpcOrders({ ...out.state, timeline: out.timeline })
+  // 结算完再补市场，这样刚被买走的单不会当场复活；
+  // 再看看这一小时有没有人来打你（出保之后才会有）
+  const settled = scheduleRaid(refillNpcOrders({ ...out.state, timeline: out.timeline }))
   return { state: settled, resolved: out.resolved }
 }
 

@@ -425,6 +425,32 @@ if (await questLink.count() > 0) {
   check('任务详情窗显示任务标题与概要', false, '右栏没有任务链接')
 }
 
+// —— 17b. 来袭：出保之后会有人打过来，用原版逐字标题句 ——
+await page.evaluate(() => {
+  const env = JSON.parse(localStorage.getItem('xiuzhen.save'))
+  const st = env.state
+  st.timeline.events = [{
+    id: 'raid', kind: 'raid', finishAt: st.clock.gameT + 7200,
+    payload: { attacker: '小哥来了', attackerId: 3, fromX: st.player.x + 4, fromY: st.player.y,
+               swordPower: 60, swords: 2, element: '火' },
+  }]
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+})
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(350)
+const raidMid = (await page.locator('#gmid').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('来袭出现在战斗事件栏', /1 来袭/.test(raidMid), raidMid.slice(0, 40))
+
+await page.click('#gmid a[onclick*="battleevent.jsp"]')
+await page.waitForTimeout(400)
+const raidB = (await page.locator('#bwindowcontent').textContent())?.replace(/\s+/g, ' ') ?? ''
+check('★来袭用原版逐字句「来自…到达并攻击你」',
+  /来自小哥来了的.*到达并攻击你/.test(raidB), raidB.slice(0, 70))
+check('来袭事件的操作是「还击 / 战斗地图」，没有求援',
+  raidB.includes('还击') && raidB.includes('战斗地图') && !raidB.includes('求援'))
+check('来犯者的剑看不穿（整行 ???）', raidB.includes('???'))
+await page.evaluate(() => window.closeBWindow())
+
 // 18. 产业页与排行榜浮窗能打开（原版 L 窗路由）
 await page.evaluate(() => window.openLWindow('', 'rank.jsp'))
 await page.waitForTimeout(300)

@@ -70,7 +70,7 @@ import { importSave, clear as clearSave, SAVE_KEYS } from '../engine/save.ts'
 import { dayOfServer } from '../engine/clock.ts'
 import { startCultivate, planUpgrade, speedUp, spendCoin, levelOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration } from '../engine/clock.ts'
-import { sorted } from '../engine/timeline.ts'
+import { sorted, type GameEvent } from '../engine/timeline.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
@@ -197,11 +197,14 @@ function midVm(s: GameState) {
    */
   const battleRows = () => {
     const all = events.filter((e) => e.kind === 'battle')
+    const raids = events.filter((e) => e.kind === 'raid')
     const groups: { label: string; tab: number; icon: string; of: typeof all }[] = [
       { label: '斩杀', tab: 2, icon: 'event/attack.gif',
         of: all.filter((e) => e.payload['phase'] !== 'returning') },
       { label: '返回', tab: 3, icon: 'event/back.gif',
         of: all.filter((e) => e.payload['phase'] === 'returning') },
+      // 来袭：原版 tab 号未留存（实见的只有 2=斩杀 3=返回），取 1 是 [推断]
+      { label: '来袭', tab: 1, icon: 'event/attack.gif', of: raids },
     ]
     return groups
       .filter((g) => g.of.length > 0)
@@ -1238,12 +1241,39 @@ function fightWindow(s: GameState, targetName: string): string {
   })
 }
 
-/** 战斗事件总览（B 窗）。四种态里本地版会出现三种：出击在途 / 缠斗 / 返回。 */
+/** 来袭事件 → B 窗的一条。标题句用原版的「来自{玩家}的…到达并攻击你」。 */
+function raidEventItem(s: GameState, e: GameEvent) {
+  const who = String(e.payload['attacker'] ?? '某人')
+  const fx = Number(e.payload['fromX'] ?? s.player.x)
+  const fy = Number(e.payload['fromY'] ?? s.player.y)
+  const seconds = Math.max(0, Math.round(e.finishAt - s.clock.gameT))
+  return {
+    eventId: e.id,
+    kind: 'incoming' as const,
+    who,
+    at: [s.player.x, s.player.y] as [number, number],
+    seconds,
+    when: formatGameDate(e.finishAt),
+    // 来袭方的剑看不穿（原版整行 ???），另带「从{玩家} ({x},{y})而来」
+    left: [{
+      owner: who,
+      ownerId: Number(e.payload['attackerId'] ?? 0),
+      seconds,
+      arriveAt: formatGameDate(e.finishAt),
+      from: { name: who, x: fx, y: fy },
+    }],
+    right: [],
+  }
+}
+
+/** 战斗事件总览（B 窗）。本地版会出现四种态里的三种：出击 / 缠斗 / 来袭。 */
 function battleEventVm(s: GameState, tab: number) {
-  const events = sorted(s.timeline).filter((e) => e.kind === 'battle')
+  const all = sorted(s.timeline)
+  const raids = all.filter((e) => e.kind === 'raid').map((e) => raidEventItem(s, e))
+  const events = all.filter((e) => e.kind === 'battle')
   return {
     tab,
-    events: events.map((e) => {
+    events: [...raids, ...events.map((e) => {
       const t = e.payload['target'] as BattleTarget
       const phase = e.payload['phase'] as string
       const swords = (e.payload['swords'] ?? []) as readonly LaunchSword[]
@@ -1279,7 +1309,7 @@ function battleEventVm(s: GameState, tab: number) {
         left,
         right: phase === 'fighting' ? right : [],
       }
-    }),
+    })],
   }
 }
 

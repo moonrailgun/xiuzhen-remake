@@ -20,6 +20,7 @@ export type EventKind =
   | 'move' // 移动事件：多段路径，逐段计时
   | 'cultivate' // 修炼事件：经脉 / 本体 / 法术升级（普通 1 个队列，VIP +1）
   | 'market' // 市场：出售真气的上架延迟、购买真气的注入耗时
+  | 'raid' // 来袭：NPC 打过来（原版是真人，单机下模拟，见 raid.ts）
 
 export type GameEvent = {
   readonly id: string

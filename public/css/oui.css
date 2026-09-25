@@ -170,6 +170,11 @@ a.help, .help {
   border-bottom: 1px dotted var(--help-dash);
 }
 
+/* 但中栏那六个区块标题**不画虚线** —— 它们在 DOM 里同样是 `A.help`（09 §2.6），
+   可 2008 的 #2 与 2010 的 #114 两张 1:1 截图里，「战斗事件」「炼器事件」「移动事件」
+   底下都是干干净净的，没有下划线。所以虚线只属于正文里的术语链接。 */
+#gmid a.help { border-bottom: none; }
+
 /* 事件栏里的链接强制黑字（反直觉但原版如此） */
 #gmid a:not(.skillup) { color: var(--text); }
 

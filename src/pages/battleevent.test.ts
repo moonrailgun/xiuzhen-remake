@@ -86,7 +86,7 @@ test('返航标题转义目标名', () => {
 })
 
 test('标题句里的倒计时用原版 <SPAN start=秒> 协议', () => {
-  assert.match(titleLine(event()), /<SPAN class=countdown start="13788">/)
+  assert.match(titleLine(event()), /<SPAN class=countdown[^>]*start="13788">/)
 })
 
 // —— 操作链接 ——

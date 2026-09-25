@@ -86,7 +86,7 @@ test('同种物品堆叠显示 ×N，带省略号的状态后面跟倒计时', (
   assert.ok(h.includes('×15'), '太乙金光剑 ×15')
   assert.ok(h.includes('×7'), '一炼碧罗丹 ×7')
   // DOM 原文的绞杀倒计时显示为 31:23:08
-  assert.ok(h.includes('<SPAN class=smallgray>绞杀中...<SPAN class=countdown start="112988">31:23:08</SPAN></SPAN>'))
+  assert.ok(h.includes('<SPAN class=smallgray>绞杀中...<SPAN class=countdown title=剩余时间 start="112988">31:23:08</SPAN></SPAN>'))
   assert.ok(h.includes('<SPAN class=smallgray>空闲</SPAN>'), '空闲没有倒计时')
 })
 

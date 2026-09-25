@@ -181,7 +181,9 @@ export function pageHeader(
 export const countdown = (seconds: number | null): string =>
   seconds === null
     ? '<SPAN class=countdown>???</SPAN>'
-    : `<SPAN class=countdown start="${num(seconds)}">${fmtDuration(seconds)}</SPAN>`
+    // 原文：`<SPAN title=剩余时间 start="{秒}">H:MM:SS</SPAN>`（09 §2.6 倒计时协议）。
+    // class=countdown 是我们加的，原版靠 timer.js 扫 [start] 属性，不看 class。
+    : `<SPAN class=countdown title=剩余时间 start="${num(seconds)}">${fmtDuration(seconds)}</SPAN>`
 
 function fmtDuration(total: number): string {
   const t = Math.max(0, Math.floor(total))

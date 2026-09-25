@@ -219,11 +219,12 @@ function midVm(s: GameState) {
       }))
   }
 
-  // 移动事件照原版显示「当前段坐标 + 下个目标」，并带取消的红 ×
+  // 移动事件照原版显示「当前段坐标 + 下个目标」，并带取消的红 ×。
+  // 不给 icon：原版 `img/event/` 只有 mark / attack / back 三个文件（07 §7.2），
+  // 没有 move.gif；截图 #114 里移动块用的就是那两个 mark.gif 墨点。
   const md = moveDisplay(s)
   const move = md
     ? [{
-        icon: 'event/move.gif',
         text: `(${md.current.x}, ${md.current.y})`,
         seconds: md.current.seconds,
         cancelId: 'move',

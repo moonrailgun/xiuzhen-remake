@@ -23,8 +23,9 @@ npm run dev     # 打开 http://localhost:5273
 ## 开发
 
 ```bash
-npm run check      # 类型检查 + 651 个单元测试
+npm run check      # 类型检查 + 单元测试
 npm run playtest   # 端到端试玩 58 步（需先 npm run dev）
+npm run regression # 正式入口的任务、存档、经济、战斗回归（需先 npm run dev）
 npm run smoke      # 全页面冒烟（需先 npm run dev）
 npm run parity     # 截图对齐检查（需先 npm run dev）
 ```

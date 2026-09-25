@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 // 城镇坐标直接问引擎，跟游戏里用的是同一套地形函数
 import { terrainAt, WORLD_SIZE } from '../../src/data/world.ts'
+import { hourlyIncomeOf } from '../../src/engine/town.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const OUT = join(ROOT, 'tools', 'parity', 'shots')
@@ -75,6 +76,8 @@ await page.evaluate(() => {
   const env = JSON.parse(raw)
   env.state.player.qi = [9999, 9999, 9999, 9999, 9999]
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
 })
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(300)
@@ -141,6 +144,7 @@ await page.click('a[onclick="mapMenuMove()"]')
 await page.waitForTimeout(300)
 const dialog = await page.locator('#mwindowcontent').textContent()
 check('超范围移动被拒绝并提示', (dialog ?? '').includes('移动'), (dialog ?? '').trim().slice(0, 40))
+await page.evaluate(() => window.closeMWindow())
 
 // 10. 领新手任务
 await page.click('#bigmenu a[href="player.jsp"]')
@@ -232,6 +236,8 @@ await page.evaluate(() => {
   st.player.y = sheep.homeY
   st.timeline.events = st.timeline.events.filter((e) => e.kind !== 'move')
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
 })
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(300)
@@ -305,6 +311,8 @@ await page.evaluate((t) => {
   st.player.silver = 50000
   st.timeline.events = []
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
 }, townAt)
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(300)
@@ -337,16 +345,25 @@ await page.waitForTimeout(300)
 check('投资窗显示商业等级与份额',
   ((await page.locator('#lwindowcontent').textContent()) ?? '').includes('商业 Lv.'))
 
+const beforeInvest = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
+  return { silver: st.player.silver, gameT: st.clock.gameT }
+})
 await page.fill('#investsilver', '5000')
 await page.click('#lwindowcontent a[onclick="doInvest()"]')
 await page.waitForTimeout(400)
 const invested = await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
   const towns = Object.values(st.towns)
-  return { silver: st.player.silver, towns: towns.length, put: towns[0]?.investments?.[0]?.silver ?? 0 }
+  return { silver: st.player.silver, towns: towns.length, put: towns[0]?.investments?.[0]?.silver ?? 0,
+    town: towns[0], owner: st.player.name, gameT: st.clock.gameT }
 })
-check('投资后银两扣除、城镇入档', invested.towns === 1 && invested.put === 5000 && invested.silver === 45000,
-  JSON.stringify(invested))
+// 实时收入可能在点击后跨过整数结算点；上界仅允许这段实测游戏时间内的产业收入。
+const incomeBound = Math.ceil(hourlyIncomeOf(invested.town, invested.owner) * (invested.gameT - beforeInvest.gameT) / 3600)
+const expectedSilver = beforeInvest.silver - 5000
+check('投资后银两扣除、城镇入档', invested.towns === 1 && invested.put === 5000
+  && invested.silver >= expectedSilver && invested.silver <= expectedSilver + incomeBound,
+  JSON.stringify({ silver: invested.silver, expected: [expectedSilver, expectedSilver + incomeBound], towns: invested.towns, put: invested.put }))
 
 // —— 15. 游戏指南（H 窗）——
 await page.click('#littlemenu a[onclick*="游戏指南"]')
@@ -371,6 +388,8 @@ await page.evaluate(() => {
   ]
   env.state.player.skills = { ...env.state.player.skills, 百炼之法: 20 }
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
 })
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(300)
@@ -399,6 +418,8 @@ const beforeTurn = await page.evaluate(() => {
   // 丹田气海 0 级只能存 1000，所以数额要在上限内（否则 tick 会先截断）
   env.state.player.qi = [1000, 0, 0, 0, 0]
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
   return env.state.player.bonusCoin
 })
 await page.reload({ waitUntil: 'networkidle' })
@@ -444,6 +465,8 @@ await page.evaluate(() => {
                swordPower: 60, swords: 2, element: '火' },
   }]
   localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  // 同页写存档不会自动发 storage；先同步运行中的游戏，避免 pagehide 保存旧状态。
+  window.dispatchEvent(new Event('storage'))
 })
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(350)

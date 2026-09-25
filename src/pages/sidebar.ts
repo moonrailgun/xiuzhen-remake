@@ -6,7 +6,7 @@
  * 战斗事件 / 炼器事件 / 移动事件 / 修炼事件。
  */
 
-import { esc, each, when } from './html.ts'
+import { esc, escJs, each, when } from './html.ts'
 import { countdown } from './shell.ts'
 
 export type EventRow = {
@@ -62,38 +62,117 @@ export type RightVm = {
   readonly guardCap: number
 }
 
-/** 事件区块：bigbold 标题 + 若干行；空区块原版仍然显示标题。 */
-function eventBlock(title: string, rows: readonly EventRow[], emptyText?: string): string {
-  return `<TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
-<TR><TD class=bigbold colSpan=3>${esc(title)}</TD></TR>
-${
-    rows.length === 0
-      ? `<TR><TD class=smallgray colSpan=3>${esc(emptyText ?? '目前没有任何事件')}</TD></TR>`
-      : each(rows, (r) => {
-          const speed = r.speedup
-            // 「半」= 减半剩余时间（2 仙石），「完」= 直接完成（10 仙石）
-            ? `<TD class=smallbold align=right noWrap><A class=skillup href="#" onclick="paycoin(10)">半</A> <A class=skillup href="#" onclick="paycoin(11)">完</A></TD>`
-            : ''
-          const cancel = r.cancelId
-            ? `<TD width=16><A href="#" onclick="cancelmove('${esc(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`
-            : ''
-          const icon = `<IMG src="img/${esc(r.icon ?? 'event/mark.gif')}">`
-          // 原版战斗事件行：图标与文字一起被包进一个黑色链接里，倒计时在链接外
-          const main = r.openUrl
-            ? `<TR class=middle><TD width=16><A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${icon}</A></TD>` +
-              `<TD><A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${esc(r.text)}</A></TD>` +
-              `<TD align=right noWrap>${countdown(r.seconds)}</TD>${cancel}</TR>`
-            : `<TR class=middle><TD width=16>${icon}</TD>` +
-              `<TD>${esc(r.text)}</TD><TD align=right noWrap>${countdown(r.seconds)}</TD>${cancel}</TR>`
-          const next = r.nextLeg
-            ? `<TR class=middle><TD></TD><TD>${esc(r.nextLeg.text)}</TD><TD align=right noWrap>${countdown(r.nextLeg.seconds)}</TD></TR>`
-            : ''
-          return speed
-            ? `<TR><TD colSpan=2></TD>${speed}</TR>${main}${next}`
-            : `${main}${next}`
-        })
-  }
+/**
+ * 六个区块共用的外壳。**照原版 DOM**（`09 §2.6` 逐字）：
+ *
+ *   外表 cellSpacing=0 **cellPadding=0** width=240
+ *    ├ 第一行：左格套一张 width={80|200} 的小表（`TD width=8>&nbsp;` 顶一格 +
+ *    │          `TD.bigbold > A.help onclick="hlp('主题')"`），右格放「半/完」等操作
+ *    ├ 第二行：空态表 cellSpacing=0 **cellPadding=8** —— 空态那一格是
+ *    │          `TD.smallgray align=left`，文案**前面有一个全角空格**
+ *    ├ 第三行：事件行表 cellPadding=3
+ *    └ 第四行：`TD colSpan=2 height=5` 的垫高行
+ *
+ * 注意**帮助主题名与显示标题不同**：显示「当前场景中的NPC」，hlp 主题是「场景中的NPC」。
+ */
+function blockShell(opts: {
+  readonly title: string
+  readonly helpTopic: string
+  /** 标题小表的宽度：事件块 80，场景块 200（原文） */
+  readonly titleWidth: 80 | 200
+  /** 右上角操作区，默认一个 &nbsp; */
+  readonly corner?: string
+  readonly body: string
+}): string {
+  return `<TABLE cellSpacing=0 cellPadding=0 width=240 border=0><TBODY>
+<TR>
+<TD><TABLE cellSpacing=0 cellPadding=0 width=${opts.titleWidth} border=0><TBODY><TR>
+<TD width=8>&nbsp;</TD>
+<TD class=bigbold><A class=help href="#" onclick="hlp('${escJs(opts.helpTopic)}')">${esc(opts.title)}</A></TD>
+</TR></TBODY></TABLE></TD>
+<TD align=right>${opts.corner ?? '&nbsp;'}</TD>
+</TR>
+${opts.body}
+<TR><TD colSpan=2 height=5></TD></TR>
 </TBODY></TABLE>`
+}
+
+/** 空态行：自己一张 cellPadding=8 的表，文案前有一个全角空格（原文）。 */
+const emptyRow = (text: string): string =>
+  `<TR><TD colSpan=2><TABLE cellSpacing=0 cellPadding=8 width=240 border=0><TBODY>
+<TR><TD class=smallgray align=left>　${esc(text)}</TD></TR>
+</TBODY></TABLE></TD></TR>`
+
+/** 事件区块：标题 + 若干行；空区块原版仍然显示标题。 */
+function eventBlock(
+  title: string,
+  rows: readonly EventRow[],
+  emptyText?: string,
+  helpTopic = title,
+): string {
+  // 「半 完」在原版是整块的右上角操作，不是某一行的（`09 §2.6` 的模板里它在第一行右格）
+  const speedup = rows.some((r) => r.speedup)
+    // 原文：半 = 减半所有修炼事件剩余时间(2 仙石, pay=10)；完 = 直接完成(10 仙石, pay=11)
+    ? `<TABLE class=skillup cellSpacing=0 cellPadding=0 width=50 align=right border=0><TBODY><TR>
+<TD><A class=skillup href="#" onclick="MDialogOkCancel('', '减半所有修炼事件剩余时间，需要花费2个仙石', 'ajaxPost(\\'paycoin\\', \\'pay=10\\', refleshAll);')">半</A></TD>
+<TD><A class=skillup href="#" onclick="MDialogOkCancel('', '直接完成所有修炼事件，需要花费10个仙石', 'ajaxPost(\\'paycoin\\', \\'pay=11\\', refleshAll);')">完</A></TD>
+</TR></TBODY></TABLE>`
+    : undefined
+
+  const body = rows.length === 0
+    ? emptyRow(emptyText ?? '目前没有任何事件')
+    : `<TR><TD colSpan=2><TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
+${eventRows(rows)}
+</TBODY></TABLE></TD></TR>`
+
+  return blockShell({
+    title,
+    helpTopic,
+    titleWidth: 80,
+    ...(speedup ? { corner: speedup } : {}),
+    body,
+  })
+}
+
+/**
+ * 事件行。两种排法，都对着原版实物做：
+ *
+ * **单行事件**（炼器/战斗/修炼）—— 照 `09 §2.6` 的 DOM 原文：
+ *   `<TD class=small width=140>　<IMG mark.gif><IMG mark.gif> 炼制丹药 × 1</TD>`
+ *   `<TD class=small width=60><SPAN title=剩余时间 start=…></TD><TD>&nbsp;</TD>`
+ *   两个墨点**在文字格内**，不单独占一格。
+ *
+ * **移动事件**（两行）—— 照截图 #114（2010-08，`z0811xz01.jpg` 中栏 y195–285）：
+ *   墨点与红 × 各占一格且**都是 `rowSpan=2`**，竖直居中跨在两行中间；
+ *   第一行是当前段坐标 + 总剩余，第二行是「下个目标(x,y)」+ 下一格剩余。
+ *   （研究笔记 §2.6 的「右侧 rowSpan=2 的取消钮」说的就是这个。）
+ */
+function eventRows(rows: readonly EventRow[]): string {
+  return each(rows, (r) => {
+    // 战斗/返回行把墨点换成 attack.gif / back.gif（`09 §资源表`）
+    const dots = r.icon && r.icon !== 'event/mark.gif'
+      ? `<IMG src="img/${esc(r.icon)}">`
+      : '<IMG src="img/event/mark.gif"><IMG src="img/event/mark.gif">'
+    const time = (s: number | null) =>
+      `<TD class=small width=60 align=right noWrap>${countdown(s)}</TD>`
+
+    if (r.nextLeg) {
+      const cancel = r.cancelId
+        ? `<TD width=16 rowSpan=2 align=center><A href="#" onclick="cancelmove('${esc(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A></TD>`
+        : '<TD width=16 rowSpan=2>&nbsp;</TD>'
+      return `<TR class=middle><TD width=20 rowSpan=2 align=center>${dots}</TD>` +
+        `<TD class=small width=124>${esc(r.text)}</TD>${time(r.seconds)}${cancel}</TR>` +
+        `<TR class=middle><TD class=small width=124>${esc(r.nextLeg.text)}</TD>` +
+        `${time(r.nextLeg.seconds)}</TR>`
+    }
+
+    const label = `　${dots} ${esc(r.text)}`
+    const cell = r.openUrl
+      ? `<A style="COLOR:black" href="#" onclick="openBWindow('', '${esc(r.openUrl)}')">${label}</A>`
+      : label
+    return `<TR class=middle><TD class=small width=140>${cell}</TD>` +
+      `${time(r.seconds)}<TD>&nbsp;</TD></TR>`
+  })
 }
 
 export function renderMid(vm: MidVm): string {
@@ -104,21 +183,30 @@ export function renderMid(vm: MidVm): string {
     when(vm.move.length > 0, () => eventBlock('移动事件', vm.move)),
     eventBlock('修炼事件', vm.cultivate, '目前没有任何事件'),
 
-    `<TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
-<TR><TD class=bigbold>当前场景中的NPC</TD></TR>
-${
-      vm.npcs.length === 0
-        ? '<TR><TD class=smallgray>当前场景中没有NPC</TD></TR>'
-        : each(vm.npcs, (n) => `<TR class=middle><TD><A class=skillup href="#" onclick="openLWindow('','npc.jsp?name=${encodeURIComponent(n)}')">${esc(n)}</A></TD></TR>`)
-    }
-</TBODY></TABLE>`,
+    // 场景两块的标题表宽是 200（事件块是 80），
+    // 且 hlp 主题名比显示标题短：「场景中的NPC」「场景中的玩家」（原文）
+    blockShell({
+      title: '当前场景中的NPC',
+      helpTopic: '场景中的NPC',
+      titleWidth: 200,
+      body: vm.npcs.length === 0
+        ? emptyRow('当前场景中没有NPC')
+        : `<TR><TD colSpan=2><TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
+${each(vm.npcs, (n) => `<TR class=middle><TD class=small>　<A class=skillup href="#" onclick="openLWindow('','npc.jsp?name=${encodeURIComponent(n)}')">${esc(n)}</A></TD></TR>`)}
+</TBODY></TABLE></TD></TR>`,
+    }),
 
-    `<TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
-<TR><TD class=bigbold colSpan=2>当前场景中的玩家</TD></TR>
-${
+    blockShell({
+      title: '当前场景中的玩家',
+      helpTopic: '场景中的玩家',
+      titleWidth: 200,
+      body: `<TR><TD colSpan=2>${
       vm.players.length === 0
-        ? '<TR><TD class=smallgray colSpan=2>当前场景中只有你一个人</TD></TR>'
-        : each(vm.players, (p) => {
+        ? `<TABLE cellSpacing=0 cellPadding=8 width=240 border=0><TBODY>
+<TR><TD class=smallgray align=left>　当前场景中只有你一个人</TD></TR>
+</TBODY></TABLE>`
+        : `<TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
+${each(vm.players, (p) => {
             const name = esc(p.name)
             return `<TR class=middle><TD width=28><IMG src="img/avatar/${esc(p.avatar)}.gif" width=24 height=24></TD>` +
               `<TD noWrap><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${encodeURIComponent(p.name)}')">${name}</A>` +
@@ -129,10 +217,12 @@ ${
               ` <A href="#" onclick="openLWindow('写消息','writemsg.jsp?receiver=${encodeURIComponent(p.name)}')"><IMG src="img/talk.gif" title="发送消息"></A>` +
               ` <A href="#" onclick="addpal('${esc(p.name)}')"><IMG src="img/friend.gif" title="加为护法"></A>` +
               `</TD></TR>`
-          })
-    }
-<TR><TD colSpan=2 align=center><A class=skillup href="#" onclick="openLWindow('','playerlist.jsp')">点击此处查看更多玩家</A></TD></TR>
-</TBODY></TABLE>`,
+          })}
+</TBODY></TABLE>`
+    }<TABLE cellSpacing=0 cellPadding=3 width=240 border=0><TBODY>
+<TR><TD align=center><A class=skillup href="#" onclick="openLWindow('','playerlist.jsp')">点击此处查看更多玩家</A></TD></TR>
+</TBODY></TABLE></TD></TR>`,
+    }),
   ].join('\n')
 }
 

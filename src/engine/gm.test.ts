@@ -179,6 +179,18 @@ test('★空补丁是恒等：什么都不填就什么都不改（真气是浮�
   const frac: GameState = { ...s, player: { ...s.player, daoxing: 78840.75 } }
   assert.equal(unwrap(applyGm(frac, {})).player.daoxing, 78840.75)
   assert.equal(unwrap(applyGm(frac, { daoxing: 100 })).player.daoxing, 100, '给了就按给的来')
+
+  // 法术表里没有的法术、以及背包，空补丁时连「顺手清理」都不该做
+  const legacy: GameState = {
+    ...s,
+    player: { ...s.player, skills: { 御剑术: 5, 某个老法术: 3 } },
+  }
+  assert.deepEqual(unwrap(applyGm(legacy, {})).player.skills, { 御剑术: 5, 某个老法术: 3 })
+  assert.deepEqual(
+    unwrap(applyGm(legacy, { skills: { 御剑术: 5, 某个老法术: 3 } })).player.skills,
+    { 御剑术: 5 },
+    '显式给了才清理',
+  )
 })
 
 test('清空事件只清时间线，不动别的', () => {

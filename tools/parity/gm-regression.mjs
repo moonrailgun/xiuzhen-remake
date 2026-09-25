@@ -125,6 +125,35 @@ try {
   s = await saved()
   check('清空事件后时间线是空的', s.timeline.events.length === 0)
 
+  console.log('\n面板开着期间别处的改动不会被回滚')
+  // 面板是浮窗，开着的时候左栏照常能玩，每秒还有一次 pulse 在推进时间。
+  // 以前不管动没动都把整张表当成补丁发出去，于是「开着面板在别处升了级、回来点应用」
+  // 会按面板打开那一刻的快照把等级打回去，还只提示一句「已应用」。
+  await page.locator('#lwindow a[onclick="gmFillQi()"]').click()   // 前面清零过，先把真气补回来
+  await page.waitForTimeout(250)
+  await page.evaluate(() => closeLWindow())
+  await page.evaluate(() => setRate(600))
+  await page.evaluate(() => doUpgrade('body', 1))
+  await page.waitForTimeout(200)
+  await page.evaluate(() => openGm())
+  await page.waitForTimeout(250)
+  check('前提：面板里这一项还是旧值', await page.inputValue('#gmform [name="gm-body1"]') === '0')
+  await page.waitForTimeout(4000)
+  const grown = (await saved()).player.body[1]
+  check('前提：面板开着期间它在别处涨上去了', grown >= 1)
+  await fill('gm-coin', '77')
+  await apply()
+  s = await saved()
+  check('只改了仙石，别处涨的等级不该被打回去', s.player.body[1] === grown && s.player.coin === 77)
+
+  const before2 = (await saved()).player.qi.map(Math.floor)
+  await page.waitForTimeout(2000)
+  await apply()
+  s = await saved()
+  check('什么都不改地再点一次应用，真气不倒退',
+    s.player.qi.every((v, i) => v >= before2[i]))
+  await page.evaluate(() => setRate(1))
+
   console.log('\n存档始终合法')
   check('改完还能正常读回来', await page.evaluate(() => {
     const raw = localStorage.getItem('xiuzhen.save')

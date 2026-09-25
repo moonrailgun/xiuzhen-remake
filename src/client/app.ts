@@ -80,7 +80,7 @@ import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
 import { openWindow, closeWindow, setPageResolver, startCountdowns, setCountdownClock } from './windows.ts'
-import { esc, escJs } from '../pages/html.ts'
+import { esc, escJs, js } from '../pages/html.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
   try {
@@ -732,7 +732,7 @@ export function installGameActions(): void {
     }
     const kinds = Object.keys(DIVINATIONS) as DivinationKind[]
     const menu = kinds.map((k) =>
-      `<DIV style="padding:3px 0"><A class=skillup href="#" onclick="doDivine('${k}','${escJs(name)}')">${k}</A>` +
+      `<DIV style="padding:3px 0"><A class=skillup href="#" onclick="doDivine('${k}','${js(name)}')">${k}</A>` +
       `<SPAN class=smallgray>　${DIVINATIONS[k].effect}</SPAN></DIV>`).join('')
     openWindow('lwindow', '掐指一算', `<DIV class=middle style="padding:10px">${menu}</DIV>`)
   }
@@ -1104,7 +1104,7 @@ export function installGameActions(): void {
     const body = list.length === 0
       ? '<DIV class=smallgray>目前没有可以领取的任务。</DIV>'
       : list.map((q) =>
-          `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="acceptQuest('${q.id}')">${questTitle(q)}</A></DIV>`,
+          `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="acceptQuest('${js(q.id)}')">${questTitle(q)}</A></DIV>`,
         ).join('')
     openWindow('lwindow', '可领取任务', `<DIV class=middle style="padding:10px">${body}</DIV>`)
   }
@@ -1312,53 +1312,107 @@ export function installGameActions(): void {
     document.querySelector<HTMLInputElement>(`#gmform [name="${CSS.escape(name)}"]`)?.checked === true
 
   /**
-   * 把整张表读成一份补丁。
+   * 这一格被人动过没有。
    *
-   * 每个动作（应用 / 加法宝 / 删法宝 / 填满真气）都先读一遍完整表单再动手，
-   * 这样「改了一堆数字还没应用，顺手删了一件法宝」不会把那堆数字丢掉。
+   * 用浏览器自己的 `defaultValue` / `defaultChecked` —— 它记的正是渲染那一刻写进
+   * `value=` 属性里的值，不用自己再存一份快照。
+   *
+   * 为什么非做不可：面板是浮窗，开着的时候左栏照常能玩，每秒还有一次 pulse 在推进时间。
+   * 以前不管动没动都把整张表当成补丁发出去，于是「开着面板买了把剑，回来点应用」
+   * 会按面板打开那一刻的快照把剑删掉、真气银两一起回滚，还只提示一句「已应用」。
+   */
+  const dirty = (name: string): boolean => {
+    const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(
+      `#gmform [name="${CSS.escape(name)}"]`)
+    if (el === null) return false
+    if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')) {
+      return el.checked !== el.defaultChecked
+    }
+    if (el instanceof HTMLSelectElement) {
+      return [...el.options].some((o) => o.selected !== o.defaultSelected)
+    }
+    return el.value !== (el as HTMLInputElement).defaultValue
+  }
+  /** 一组里只要有一格动过，整组都要发（等级、真气这些是数组，不能只发一半）。 */
+  const anyDirty = (names: readonly string[]): boolean => names.some(dirty)
+
+  /**
+   * 把表单里**动过的那些格子**读成一份补丁。
+   *
+   * 没动过的字段一律不放进补丁 —— `applyGm` 对 `undefined` 的字段原样不动，
+   * 这样面板开着期间在别处发生的变化不会被回滚。
+   * 每个动作（应用 / 加法宝 / 删法宝 / 填满真气）都先读一遍表单再动手，
+   * 这样「改了一堆数字还没应用，顺手删了一件法宝」也不会把那堆数字丢掉。
    */
   function readGmForm(s: GameState): GmPatch {
     const p = s.player
-    const items: Artifact[] = []
-    for (let i = 0; ; i++) {
-      const id = field(`gm-item-id:${i}`)
-      if (id === undefined) break
-      const original = p.artifacts.find((a) => a.id === id)
-      if (!original) continue
-      items.push({
-        ...original,
-        quality: (field(`gm-item-quality:${i}`) ?? original.quality) as Artifact['quality'],
-        refine: fieldNum(`gm-item-refine:${i}`, original.refine),
-        status: field(`gm-item-status:${i}`) ?? original.status,
-        count: fieldNum(`gm-item-count:${i}`, original.count),
-      })
+    const patch: Record<string, unknown> = {}
+    const put = (key: string, name: string, read: () => unknown) => {
+      if (dirty(name)) patch[key] = read()
     }
-    const skills: Record<string, number> = {}
-    for (const name of skillCaps().keys()) {
-      const v = fieldNum(`gm-skill:${name}`, p.skills[name] ?? 0)
-      if (v > 0) skills[name] = v
+
+    put('name', 'gm-name', () => field('gm-name'))
+    put('gender', 'gm-gender', () => (field('gm-gender') === '女' ? 'f' : 'm'))
+    put('element', 'gm-element', () => field('gm-element'))
+    put('school', 'gm-school', () => field('gm-school'))
+    put('realm', 'gm-realm', () => field('gm-realm'))
+    put('x', 'gm-x', () => fieldNum('gm-x', p.x))
+    put('y', 'gm-y', () => fieldNum('gm-y', p.y))
+    put('silver', 'gm-silver', () => fieldNum('gm-silver', p.silver))
+    put('coin', 'gm-coin', () => fieldNum('gm-coin', p.coin))
+    put('bonusCoin', 'gm-bonusCoin', () => fieldNum('gm-bonusCoin', p.bonusCoin))
+    put('daoxing', 'gm-daoxing', () => fieldNum('gm-daoxing', p.daoxing))
+    put('experience', 'gm-experience', () => fieldNum('gm-experience', p.experience))
+    put('vip', 'gm-vip', () => checked('gm-vip'))
+    if (checked('gm-clearEvents')) patch['clearEvents'] = true
+
+    const qiNames = ELEMENTS.map((_, i) => `gm-qi${i}`)
+    if (anyDirty(qiNames)) patch['qi'] = qiNames.map((n, i) => fieldNum(n, p.qi[i] ?? 0))
+    const merNames = MERIDIANS.map((_, i) => `gm-meridian${i}`)
+    if (anyDirty(merNames)) patch['meridians'] = merNames.map((n, i) => fieldNum(n, p.meridians[i] ?? 0))
+    const bodyNames = BODY_PARTS.map((_, i) => `gm-body${i}`)
+    if (anyDirty(bodyNames)) patch['body'] = bodyNames.map((n, i) => fieldNum(n, p.body[i] ?? 0))
+
+    const skillNames = [...skillCaps().keys()]
+    if (anyDirty(skillNames.map((n) => `gm-skill:${n}`))) {
+      const skills: Record<string, number> = {}
+      for (const name of skillNames) {
+        const v = fieldNum(`gm-skill:${name}`, p.skills[name] ?? 0)
+        if (v > 0) skills[name] = v
+      }
+      patch['skills'] = skills
     }
-    return {
-      name: field('gm-name') ?? p.name,
-      gender: field('gm-gender') === '女' ? 'f' : 'm',
-      element: (field('gm-element') ?? p.element) as Element,
-      school: (field('gm-school') ?? p.school) as GameState['player']['school'],
-      realm: (field('gm-realm') ?? p.realm) as GameState['player']['realm'],
-      x: fieldNum('gm-x', p.x),
-      y: fieldNum('gm-y', p.y),
-      qi: ELEMENTS.map((_, i) => fieldNum(`gm-qi${i}`, p.qi[i] ?? 0)),
-      silver: fieldNum('gm-silver', p.silver),
-      coin: fieldNum('gm-coin', p.coin),
-      bonusCoin: fieldNum('gm-bonusCoin', p.bonusCoin),
-      daoxing: fieldNum('gm-daoxing', p.daoxing),
-      experience: fieldNum('gm-experience', p.experience),
-      meridians: MERIDIANS.map((_, i) => fieldNum(`gm-meridian${i}`, p.meridians[i] ?? 0)),
-      body: BODY_PARTS.map((_, i) => fieldNum(`gm-body${i}`, p.body[i] ?? 0)),
-      skills,
-      vip: checked('gm-vip'),
-      artifacts: items,
-      clearEvents: checked('gm-clearEvents'),
+
+    // 法宝行：只要有一格动过就整张表发。`gm-item-id` 是隐藏域、永远不 dirty，
+    // 所以专门看品质/淬炼/数量/状态那四列。
+    const itemNames: string[] = []
+    for (let i = 0; field(`gm-item-id:${i}`) !== undefined; i++) {
+      itemNames.push(`gm-item-quality:${i}`, `gm-item-refine:${i}`, `gm-item-count:${i}`, `gm-item-status:${i}`)
     }
+    if (anyDirty(itemNames)) {
+      const items: Artifact[] = []
+      for (let i = 0; ; i++) {
+        const id = field(`gm-item-id:${i}`)
+        if (id === undefined) break
+        const original = p.artifacts.find((a) => a.id === id)
+        if (!original) continue
+        items.push({
+          ...original,
+          quality: (field(`gm-item-quality:${i}`) ?? original.quality) as Artifact['quality'],
+          refine: fieldNum(`gm-item-refine:${i}`, original.refine),
+          status: field(`gm-item-status:${i}`) ?? original.status,
+          count: fieldNum(`gm-item-count:${i}`, original.count),
+        })
+      }
+      patch['artifacts'] = items
+    }
+    return patch as GmPatch
+  }
+
+  /** 当前背包（按面板上那些行读出来的，供加/删法宝在它上面改）。 */
+  function gmCurrentArtifacts(s: GameState): readonly Artifact[] {
+    const fromForm = readGmForm(s).artifacts
+    return fromForm ?? s.player.artifacts
   }
 
   /** 落一份补丁，记下收拢说明，重开面板。 */
@@ -1412,7 +1466,7 @@ export function installGameActions(): void {
   g['gmDropItem'] = (id: string) => {
     if (!state) return
     const patch = readGmForm(state)
-    commitGm({ ...patch, artifacts: (patch.artifacts ?? []).filter((a) => a.id !== id) })
+    commitGm({ ...patch, artifacts: gmCurrentArtifacts(state).filter((a) => a.id !== id) })
   }
 
   g['gmAddItem'] = () => {
@@ -1432,7 +1486,7 @@ export function installGameActions(): void {
       status: '空闲',
       count: 1,
     }
-    commitGm({ ...patch, artifacts: [...(patch.artifacts ?? []), item] })
+    commitGm({ ...patch, artifacts: [...gmCurrentArtifacts(state), item] })
   }
 
   g['exportSave'] = () => {
@@ -1891,7 +1945,7 @@ function playerListWindow(s: GameState): string {
 <TR class="titlebg middlebold" align=middle><TD width="30%">玩家</TD><TD width="20%">境界</TD><TD width="25%">道行</TD><TD width="25%">位置</TD></TR>
 ${list.map((n) =>
     `<TR class="trbg middle" align=middle>` +
-    `<TD><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${encodeURIComponent(n.base.name)}')">${esc(n.base.name)}</A></TD>` +
+    `<TD><A class=skillup href="#" onclick="openLWindow('','playerinfo.jsp?name=${js(encodeURIComponent(n.base.name))}')">${esc(n.base.name)}</A></TD>` +
     `<TD>${esc(n.realm)}</TD><TD>${esc(n.daoxingText)}</TD>` +
     `<TD class=small>(${n.x},${n.y})</TD></TR>`).join('\n')}
 </TBODY></TABLE>`
@@ -1923,8 +1977,11 @@ function npcWindow(s: GameState, name: string): string {
 function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
   const level = commerceLevel(town)
   const box = (inner: string) => `<DIV class=middle style="padding:10px">${inner}</DIV>`
+  // handler 整条过一遍 `esc`：调用方里的 `escJs(名字)` 是内层，这里是外层，
+  // 合起来就是 `html.ts` 的 `js()` 那两层（`quest.ts` 的 `button()` 同构）。
+  // 定界用的那对单引号会变成 `&#39;`，HTML 解码回来正好还是引号。
   const act = (label: string, fn: string) =>
-    `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="${fn}">${esc(label)}</A></DIV>`
+    `<DIV style="padding:4px 0"><A class=skillup href="#" onclick="${esc(fn)}">${esc(label)}</A></DIV>`
   const pre = (text: string) =>
     `<DIV class=middle style="padding:10px;white-space:pre-wrap">${esc(text)}</DIV>`
 

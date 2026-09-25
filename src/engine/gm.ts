@@ -145,15 +145,21 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
     return { ok: false, reason: `本体必须是 ${BODY_PARTS.length} 项` }
   }
 
-  const caps = skillCaps()
-  const skills: Record<string, number> = {}
-  for (const [key, raw] of Object.entries(patch.skills ?? p.skills)) {
-    const cap = caps.get(key)
-    // 未知法术直接丢掉：`skillUpgradeBlockReason` 会因为找不到节点而永远拒绝升级，
-    // 留在存档里只是一条永远动不了的死数据。
-    if (cap === undefined) { notes.push(`丢弃了不存在的法术「${key}」`); continue }
-    const level = clamp(int(raw, 0), 0, cap, `法术「${key}」`, notes)
-    if (level > 0) skills[key] = level
+  // 补丁没给法术就原样留着 —— 连「丢掉表里没有的法术」这种好意也不做。
+  // 空补丁必须是恒等，否则「打开面板什么都不改直接点应用」会悄悄改掉存档。
+  let skills = p.skills
+  if (patch.skills !== undefined) {
+    const caps = skillCaps()
+    const next: Record<string, number> = {}
+    for (const [key, raw] of Object.entries(patch.skills)) {
+      const cap = caps.get(key)
+      // 未知法术直接丢掉：`skillUpgradeBlockReason` 会因为找不到节点而永远拒绝升级，
+      // 留在存档里只是一条永远动不了的死数据。
+      if (cap === undefined) { notes.push(`丢弃了不存在的法术「${key}」`); continue }
+      const level = clamp(int(raw, 0), 0, cap, `法术「${key}」`, notes)
+      if (level > 0) next[key] = level
+    }
+    skills = next
   }
 
   const vip = patch.vip ?? p.vip
@@ -169,16 +175,20 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
   const experience = clamp(patched(patch.experience, p.experience), 0, MAX_MONEY, '阅历', notes)
 
   // —— 4. 法宝 ——
-  const rawArtifacts = patch.artifacts ?? p.artifacts
-  const seen = new Set<string>()
-  const artifacts: Artifact[] = []
-  for (const a of rawArtifacts) {
-    if (seen.has(a.id)) { notes.push(`丢弃了重复的法宝 id「${a.id}」`); continue }
-    if (!(ITEM_STATUSES as readonly string[]).includes(a.status)) {
-      return { ok: false, reason: `法宝「${a.name}」的状态「${a.status}」不是九种状态之一` }
+  // 同上：补丁没给就原样留着，不去重、不取整。
+  let artifacts: readonly Artifact[] = p.artifacts
+  if (patch.artifacts !== undefined) {
+    const seen = new Set<string>()
+    const next: Artifact[] = []
+    for (const a of patch.artifacts) {
+      if (seen.has(a.id)) { notes.push(`丢弃了重复的法宝 id「${a.id}」`); continue }
+      if (!(ITEM_STATUSES as readonly string[]).includes(a.status)) {
+        return { ok: false, reason: `法宝「${a.name}」的状态「${a.status}」不是九种状态之一` }
+      }
+      seen.add(a.id)
+      next.push({ ...a, refine: Math.max(0, int(a.refine, 0)), count: Math.max(1, int(a.count, 1)) })
     }
-    seen.add(a.id)
-    artifacts.push({ ...a, refine: Math.max(0, int(a.refine, 0)), count: Math.max(1, int(a.count, 1)) })
+    artifacts = next
   }
 
   // —— 5. 按**新的**上限夹资源 ——
@@ -220,7 +230,7 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
   //     法宝永久销毁，而占用依然超标 —— 此后炼制/购买/换银票全被 `canAcquireArtifacts` 拒；
   //  2. 明明没做到，却还返回 `ok`。
   const slots = artifactCapacity(draft)
-  const used = artifactSpaceUsed({ ...draft, player: { ...draft.player, artifacts } })
+  const used = artifactSpaceUsed(draft)
   if (used > slots) {
     const queued = used - artifacts.reduce((n, a) => n + a.count, 0)
     return {

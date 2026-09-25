@@ -203,3 +203,47 @@ a.help, .help {
 
 /* —— 倒计时 —— */
 .countdown { }
+
+/* —— 人物页 —— */
+/* 左栏是「人体图 + 绝对定位的节点」与「右侧信息表」并排。
+   #2 实测：人体图区 x=25–260，信息表 x=270–489（宽 220）。 */
+.playerbody { position: relative; width: 460px; min-height: 440px; }
+/* 人体图区 x=0–240（原图 25–260），信息表 x=250–469（原图 270–489，宽 220） */
+.figure { position: absolute; left: 0; top: 0; width: 250px; height: 430px; }
+/* 剪影裁自 #153（裁切框 25,50），其头节点在图内 (85,28)；HEAD_ORIGIN 是 (125,78)，
+   故整体偏移 (40,50)，这样程序叠加的 12 个节点正好落回剪影上原本的位置。 */
+.figure .body { position: absolute; left: 40px; top: 50px; }
+.playerinfo { position: absolute; left: 250px; top: 0; width: 220px; }
+
+/* 经脉节点：白色圆盘 19px，内含手写斜体数字；外圈 44px 径向发光。
+   两位数时圆盘不变大（见 #35 的 15/16/17）。 */
+.mnode {
+  position: absolute;
+  width: 19px; height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid;
+  color: #000;
+  font: italic 12px 'Comic Sans MS', 'Chalkboard SE', cursive;
+  line-height: 19px;
+  text-align: center;
+  z-index: 3;
+  overflow: hidden;
+}
+.mglow { position: absolute; z-index: 1; pointer-events: none; }
+.mline { position: absolute; height: 1px; transform-origin: 0 50%; opacity: .75; z-index: 2; }
+
+/* 本体节点：同款圆盘但发光是灰色 */
+.bodynode { border-color: #9a9a9a; }
+.figure .bodylabel { position: absolute; left: 0; top: 0; z-index: 2; }
+
+/* 右下角门派水印（通天=梅、蜀山=竹、昆仑=荷） */
+.schoolmark { position: absolute; right: -10px; bottom: 0; opacity: .55; z-index: 0; }
+
+/* 金丹：丹田处发光 */
+.goldencore {
+  position: absolute; left: 118px; top: 200px; width: 26px; height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe680 0%, #d4a017 60%, #d4a01700 100%);
+  z-index: 3;
+}

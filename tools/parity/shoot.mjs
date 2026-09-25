@@ -67,8 +67,9 @@ if (probe) {
   console.log('\n元素计数:', counts)
 }
 
-await page.screenshot({ path: join(OUT, 'shell.png') })
-console.log(`\n已截图 → tools/parity/shots/shell.png`)
+const name = process.env.SHOT ?? 'shell'
+await page.screenshot({ path: join(OUT, name + '.png'), fullPage: true })
+console.log(`\n已截图 → tools/parity/shots/${name}.png`)
 
 if (errors.length) {
   console.error('\n页面报错:')

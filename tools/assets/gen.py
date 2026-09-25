@@ -194,13 +194,299 @@ def gen_misc() -> int:
     return n
 
 
+
+
+# ============================================================
+# 人体剪影着色：从 B 档裁出的线稿派生 12 个五行着色态
+# manifest 说法：「对线稿做自上而下由浅到深的渐变填充（头/肩很淡、小腿最饱和）」
+# 做法：先洪水填充出「人体外部」，剩下的非线条区域即内部，按竖向渐变上色。
+# ============================================================
+
+BODY_GRADIENTS = {
+    "gold": [(240, 240, 112), (240, 240, 16)],
+    "wood": [(208, 232, 184), (192, 224, 160)],
+    "water": [(192, 224, 240), (96, 160, 208), (16, 112, 192)],
+    "fire": [(240, 144, 144), (240, 0, 0)],
+    "earth": [(176, 176, 160), (128, 128, 112)],
+}
+
+
+def _lerp_stops(stops, t):
+    if len(stops) == 1:
+        return stops[0]
+    seg = t * (len(stops) - 1)
+    i = min(int(seg), len(stops) - 2)
+    k = seg - i
+    a, b = stops[i], stops[i + 1]
+    return tuple(round(a[j] + (b[j] - a[j]) * k) for j in range(3))
+
+
+def tint_body(src: Path, stops) -> Image.Image:
+    """把线稿内部染成竖向渐变，线条保持深色，外部透明。"""
+    im = Image.open(src).convert("RGBA")
+    w, h = im.size
+    gray = im.convert("L")
+    px = gray.load()
+
+    # 线条 = 暗像素
+    ink = Image.new("L", (w, h), 0)
+    ink_px = ink.load()
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] < 150:
+                ink_px[x, y] = 255
+
+    # 洪水填充找外部：从四角灌水，只在「非线条」区域扩散
+    outside = Image.new("L", (w, h), 0)
+    out_px = outside.load()
+    stack = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+    while stack:
+        x, y = stack.pop()
+        if not (0 <= x < w and 0 <= y < h):
+            continue
+        if out_px[x, y] or ink_px[x, y]:
+            continue
+        out_px[x, y] = 255
+        stack.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+
+    result = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    res_px = result.load()
+    for y in range(h):
+        color = _lerp_stops(stops, y / max(1, h - 1))
+        for x in range(w):
+            if ink_px[x, y]:
+                # 线条：保留原始深浅，避免把毛笔线压成死黑
+                v = px[x, y]
+                res_px[x, y] = (v // 3, v // 3, v // 3, 255)
+            elif not out_px[x, y]:
+                res_px[x, y] = color + (255,)
+    return result
+
+
+def gen_body_tints() -> int:
+    n = 0
+    for g in ("m", "f"):
+        line = OUT / "pipe" / f"body{g}.gif"
+        if not line.exists():
+            continue
+        for key, stops in BODY_GRADIENTS.items():
+            save(tint_body(line, stops), f"pipe/body{g}{key}.gif")
+            n += 1
+        # 金丹视图：线稿整体黑填充 + 浅色外描边
+        im = Image.open(line).convert("RGBA")
+        gray = im.convert("L")
+        w, h = im.size
+        out = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        gp, op = gray.load(), out.load()
+        for y in range(h):
+            for x in range(w):
+                if gp[x, y] < 200:
+                    op[x, y] = (0, 0, 0, 255)
+        save(out, f"pipe/body{g}jindan.gif")
+        n += 1
+    return n
+
+
+# —— 事件栏与操作小图标 ——
+
+
+def gen_event_icons() -> int:
+    icons = {
+        "mark.gif": "tri",      # 4×7 实心右三角（原版列表前缀）
+        "sword.gif": "sword",
+        "attack.gif": "sword",
+        "spy.gif": "circle",
+        "quest.gif": "quest",
+        "cancel.gif": "cross",
+        "move.gif": "tri",
+        "back.gif": "tri",
+    }
+    for name, kind in icons.items():
+        if kind == "tri":
+            im = Image.new("RGBA", (8, 9), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.polygon([(1, 1), (7, 4), (1, 8)], fill=(80, 80, 80, 255))
+        elif kind == "sword":
+            im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.line((3, 13, 12, 3), fill=(120, 120, 130, 255), width=2)
+            d.line((2, 12, 5, 15), fill=(150, 110, 60, 255), width=2)
+        elif kind == "circle":
+            im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.ellipse((1, 1, 14, 14), outline=(90, 90, 90, 255))
+            d.ellipse((6, 6, 9, 9), fill=(90, 90, 90, 255))
+        elif kind == "quest":
+            im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            centered(d, (0, 0, 16, 16), "?", font(13), (60, 90, 160, 255))
+        else:  # cross
+            im = Image.new("RGBA", (12, 12), (0, 0, 0, 0))
+            d = ImageDraw.Draw(im)
+            d.line((2, 2, 9, 9), fill=(190, 40, 40, 255), width=2)
+            d.line((9, 2, 2, 9), fill=(190, 40, 40, 255), width=2)
+        save(im, f"event/{name}")
+    return len(icons)
+
+
+def gen_placeholders() -> int:
+    """D 档：复用原版自带的占位件。"""
+    n = 0
+    rnd = OUT / "avatar" / "random.gif"
+    if rnd.exists():
+        base = Image.open(rnd).convert("RGBA")
+        for name in ("shushanm", "shushanf", "kunlunf", "tongtianm", "tongtianf", "escort"):
+            save(base, f"avatar/{name}.gif")
+            n += 1
+    # 昆仑水印只有缩放图，暂用蜀山（竹）占位
+    s = OUT / "pipe" / "chrbgs.gif"
+    if s.exists():
+        save(Image.open(s).convert("RGBA"), "pipe/chrbgk.gif")
+        n += 1
+    # 页标题图：墨迹条 148×28 + 字间留空的页名
+    titles = {
+        "titleplayer.gif": "人 物", "titleskill.gif": "法 术", "titleitem.gif": "法 宝",
+        "titlemap.gif": "地 图", "titleally.gif": "门 派", "titletrade.gif": "市 场",
+        "titlerank.gif": "排 行 榜", "titlecreatechr.gif": "创 建 人 物",
+    }
+    f = font(14)
+    for name, label in titles.items():
+        im = Image.new("RGBA", (150, 30), (0, 0, 0, 0))
+        d = ImageDraw.Draw(im)
+        # 一道淡墨横向笔触
+        for y in range(4, 26):
+            a = int(38 * (1 - abs(y - 15) / 12))
+            d.line([(6, y), (143, y)], fill=(120, 120, 120, max(0, a)))
+        d.text((12, 6), label, font=f, fill=(70, 70, 70, 255))
+        save(im, name)
+        n += 1
+    # titlebg2 墨迹标题条 458×20
+    im = Image.new("RGBA", (458, 20), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for y in range(20):
+        a = int(30 * (1 - abs(y - 10) / 11))
+        d.line([(0, y), (457, y)], fill=(130, 130, 130, max(0, a)))
+    save(im, "titlebg2.gif")
+    n += 1
+    return n
+
+
+
+
+# ============================================================
+# 经脉视图的人体剪影：用 #153（新浪版 449×450，原生 1:1）。
+#
+# 为什么不用 manifest 原定的「裁线稿 → 程序化填充」：那份线稿取自本体视图，
+# 上面烧着 8 个节点、引线与篆书标签，毛笔勾线并不闭合，洪水填充会漏色。
+# 也不用 #5：它带 17173 的粉色水印，压在人体上半身，擦不干净。
+# #153 是同内容的新浪版，**无水印**、新号（12 节点全 0 级）、还自带蜀山竹水印。
+#
+# 头节点实测在 (110,78)（白盘中心 RGB≈245,244,250，外环蓝色发光）；
+# 其余 11 个由 04 §4.2 的相对偏移推出。
+# ============================================================
+
+BODY_SRC = "reference/images/sina-live/2010-03-31-1641387364/U4514P115T9D387364F168DT20100331164134_c.jpg"
+BODY_HEAD = (110, 78)
+BODY_CROP = (25, 50, 205, 440)     # 人体范围，避开右下角的门派水印
+NODE_OFFSETS_ABS = [
+    (0, 0), (-54, 81), (-64, 175),
+    (16, 50), (59, 91), (57, 153),
+    (3, 110), (-23, 222), (-25, 311),
+    (4, 165), (33, 246), (32, 337),
+]
+
+
+def _inpaint_disc(im: Image.Image, cx: int, cy: int, r: int) -> None:
+    """用环外一圈的中值色填掉一个圆盘（去掉烧在剪影上的节点与其发光核心）。"""
+    import math
+    px = im.load()
+    w, h = im.size
+    ring = []
+    for a in range(0, 360, 6):
+        x = int(cx + (r + 6) * math.cos(math.radians(a)))
+        y = int(cy + (r + 6) * math.sin(math.radians(a)))
+        if 0 <= x < w and 0 <= y < h:
+            p = px[x, y]
+            if p[3] > 40:
+                ring.append(p)
+    if not ring:
+        return
+    ring.sort(key=lambda c: c[0] + c[1] + c[2])
+    med = ring[len(ring) // 2]
+    for y in range(max(0, cy - r), min(h, cy + r + 1)):
+        for x in range(max(0, cx - r), min(w, cx + r + 1)):
+            if (x - cx) ** 2 + (y - cy) ** 2 <= r * r:
+                px[x, y] = med
+
+
+def _recolor(im: Image.Image, target: tuple[int, int, int]) -> Image.Image:
+    """换色系：保留明度层次（剪影是自上而下由浅入深的渐变），替换色相。"""
+    out = im.copy()
+    px = out.load()
+    w, h = out.size
+    tr, tg, tb = target
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 20:
+                continue
+            lum = (r * 299 + g * 587 + b * 114) / 1000 / 255
+            k = 1 - lum
+            px[x, y] = (
+                round(255 - (255 - tr) * k),
+                round(255 - (255 - tg) * k),
+                round(255 - (255 - tb) * k),
+                a,
+            )
+    return out
+
+
+BODY_TARGET = {
+    "wood": (120, 200, 90),
+    "gold": (226, 200, 40),
+    "water": (40, 120, 200),
+    "fire": (220, 60, 50),
+    "earth": (140, 110, 60),
+}
+
+
+def gen_body_from_meridian_view() -> int:
+    src = ROOT / BODY_SRC
+    if not src.exists():
+        return 0
+    im = Image.open(src).convert("RGBA").crop(BODY_CROP)
+    px = im.load()
+    w, h = im.size
+    # 纸白转透明
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if r > 236 and g > 236 and b > 236:
+                px[x, y] = (r, g, b, 0)
+    # 抹掉烧在剪影上的 12 个节点
+    ox, oy = BODY_CROP[0], BODY_CROP[1]
+    for (dx, dy) in NODE_OFFSETS_ABS:
+        _inpaint_disc(im, BODY_HEAD[0] + dx - ox, BODY_HEAD[1] + dy - oy, 14)
+
+    n = 0
+    for key, target in BODY_TARGET.items():
+        tinted = im if key == "wood" else _recolor(im, target)
+        for g in ("m", "f"):
+            save(tinted, f"pipe/body{g}{key}.gif")
+            n += 1
+    return n
+
+
 def main() -> int:
     total = 0
     total += gen_element_icons()
     total += gen_main_tabs()
     total += gen_little_buttons()
     total += gen_misc()
-    print(f"生成 C 档素材 {total} 个 → public/img/")
+    total += gen_body_from_meridian_view()
+    total += gen_event_icons()
+    total += gen_placeholders()
+    print(f"生成 C/D 档素材 {total} 个 → public/img/")
     return 0
 
 

@@ -1,39 +1,52 @@
 /**
  * 客户端入口。
  *
- * 阶段 1 的目标是把**界面**做出来并能和当年的截图叠图比对，所以这里先用
- * 「夹具 vm」——逐字抄截图上的数字。真正的 `vm(state,…)` 选择器在阶段 2 接上。
- * 这么分的原因见 `docs/spec/DECISIONS.md` §3.4：截图里的产量、消耗都是原版引擎
- * 用原版数值表算出来的，我们重建的表算不出同样的数；先对齐界面，再接引擎。
+ * 阶段 1 的目标是把**界面**做出来并能和当年的截图叠图比对，所以这里用「夹具 vm」——
+ * 逐字抄截图上的数字（见 `fixtures.ts` 顶部的说明）。真正的 `vm(state,…)` 选择器在阶段 2 接上。
+ *
+ * 开发期可以用 `?fixture=2010` 切到 2010-08 那张截图的场景（本体视图 + 多段移动事件）。
  */
 
-import { renderShell, type ShellVm } from '../pages/shell.ts'
+import { renderShell } from '../pages/shell.ts'
+import { renderPlayer } from '../pages/player.ts'
+import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { installGlobals, setPageResolver, startCountdowns } from './windows.ts'
+import {
+  SHELL_2008,
+  PLAYER_2008,
+  MID_2008,
+  RIGHT_2008,
+  PLAYER_BODY_2010,
+  MID_2010,
+} from './fixtures.ts'
 
-/** 截图 #2（xiuzhen801.jpg，2008-12，1051×588）上的角色「173小鱼」。 */
-const FIXTURE_MAIN: ShellVm = {
-  tab: 'player',
-  resources: {
-    current: [1132, 1364, 2164, 2071, 1401],
-    capacity: 2900,
-    perHour: [0, 59, 59, 59, 59], // 木属性 → 金为 0（五行一缺）
-    coin: 0,
-    bonusCoin: 73,
-  },
-  serverTime: '16:47:58',
-  version: '版本号:1.2.1-yyge',
-  left: '',
-  mid: '',
-  right: '',
+function pick() {
+  const which = new URLSearchParams(location.search).get('fixture')
+  if (which === '2010') {
+    return {
+      shell: { ...SHELL_2008, resources: { ...SHELL_2008.resources, capacity: 10000, current: [1469, 713, 271, 532, 0] as const, perHour: [0, 394, 96, 96, 0] as const } },
+      player: PLAYER_BODY_2010,
+      mid: MID_2010,
+      right: { ...RIGHT_2008, quests: [] },
+    }
+  }
+  return { shell: SHELL_2008, player: PLAYER_2008, mid: MID_2008, right: RIGHT_2008 }
 }
 
 function boot(): void {
   installGlobals()
-  setPageResolver((url) => `<div class="middle">（${url} 尚未接入）</div>`)
+  setPageResolver((url) => `<DIV class=middle style="padding:12px">（${url} 尚未接入）</DIV>`)
 
   const app = document.getElementById('app')
   if (!app) return
-  app.innerHTML = renderShell(FIXTURE_MAIN)
+
+  const f = pick()
+  app.innerHTML = renderShell({
+    ...f.shell,
+    left: renderPlayer(f.player),
+    mid: renderMid(f.mid),
+    right: renderRight(f.right),
+  })
   startCountdowns(app)
 }
 

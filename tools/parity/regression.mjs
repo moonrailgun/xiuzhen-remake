@@ -19,9 +19,11 @@ const importText = async raw => {
   await page.evaluate(() => importSavePrompt())
   await (await chooser).setFiles({ name: 'regression.json', mimeType: 'application/json', buffer: Buffer.from(raw) })
   await page.waitForTimeout(100)
-  // 导入会当场盖掉进度，所以有一道二次确认（#mwindow2）。不点它的话导入根本没发生，
-  // 后面所有基于「导入后的存档」的断言都会在旧状态上静默通过。
+  // 导入会当场盖掉进度，先过二次确认（#mwindow2）。**必须等它出现再点**：
+  // `isVisible()` 是当下一瞬的快照，文件读取是异步的，固定 sleep 100ms 赌不赢慢机器 ——
+  // 赌输了就是「导入压根没发生，后面所有断言在旧状态上静默通过」。
   const ok = page.locator('a[onclick="OnMDialog2OK()"]')
+  await ok.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {})
   if (await ok.isVisible()) {
     await ok.click()
     await page.waitForTimeout(100)

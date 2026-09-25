@@ -1,5 +1,21 @@
+# Dependencies and build output
 node_modules/
 dist/
-.DS_Store
+coverage/
+
+# Local research archives (never publish)
+/reference/
+/docs/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Generated files and local caches
 __pycache__/
+*.py[cod]
+*.log
+.DS_Store
 tools/parity/shots/

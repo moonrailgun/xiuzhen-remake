@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   renderCreatePlayer,
   validateName,
@@ -19,23 +19,33 @@ const vm = (o: Partial<CreatePlayerVm> = {}): CreatePlayerVm => ({
   ...o,
 })
 
-/** 原版建号页 HTML（GBK），用来逐项核对我们的取值与文案。 */
-const original = (() => {
-  const buf = readFileSync(
-    new URL('../../reference/raw/game-server/s1-createplayer.jsp-BQGMCWI5.html', import.meta.url),
-  )
-  return new TextDecoder('gbk').decode(buf)
-})()
+/** 原版 HTML 仅保存在本地归档，公开源码不包含这份文件。 */
+const originalPath = new URL('../../reference/raw/game-server/s1-createplayer.jsp-BQGMCWI5.html', import.meta.url)
+
+test('本地参考归档：建号页取值与文案逐项核对', {
+  skip: !existsSync(originalPath) && '本地参考归档未提供',
+}, () => {
+  const original = new TextDecoder('gbk').decode(readFileSync(originalPath))
+  for (const value of ['<option value="0">金</option>', '<option value="2">土</option>', '<option value="3">水</option>']) {
+    assert.ok(original.includes(value))
+  }
+  for (const p of POSITION_ROWS.flat()) {
+    assert.ok(original.includes(`value="${p.value}" />${p.label}`), p.label)
+  }
+  for (const text of [
+    '蜀山以剑仙著称，拥有最为刚猛的攻击；昆仑以炼器著称，在炼制法宝上有所专长；而通天则信奉弱肉强食的自由思想，最具掠夺性。',
+    '为你在游戏里的人物起一个名字，可以使用中英文字符和数字，最多7个汉字(14个英文字母)长度。',
+  ]) assert.ok(original.includes(text))
+  for (const title of ['人物资料', '五行属性', '道源宗法', '出生方位']) {
+    assert.ok(original.includes(`<td>${title}</td>`), `原版缺 ${title}`)
+  }
+})
 
 test('五行取值照原版：0金 1木 2土 3水 4火，5=随机（2 是土不是水）', () => {
   assert.deepEqual(
     ATTR_OPTIONS.map((o) => [o.value, o.label]),
     [[5, '随机'], [0, '金'], [1, '木'], [3, '水'], [4, '火'], [2, '土']],
   )
-  // 与原版 HTML 对照
-  assert.ok(original.includes('<option value="0">金</option>'))
-  assert.ok(original.includes('<option value="2">土</option>'))
-  assert.ok(original.includes('<option value="3">水</option>'))
 })
 
 test('门派取值照原版：1蜀山 2昆仑 3通天，0=随机', () => {
@@ -56,27 +66,21 @@ test('九州取值与排布照原版', () => {
       [4, '西南益州'], [7, '南方荆州'], [8, '东南扬州'],
     ],
   )
-  for (const p of flat) {
-    assert.ok(original.includes(`value="${p.value}" />${p.label}`) || original.includes(`value="${p.value}" />${p.label}`), p.label)
-  }
 })
 
 test('三派描述文案与原版逐字一致', () => {
   const text = '蜀山以剑仙著称，拥有最为刚猛的攻击；昆仑以炼器著称，在炼制法宝上有所专长；而通天则信奉弱肉强食的自由思想，最具掠夺性。'
-  assert.ok(original.includes(text), '原版里应有这句')
   assert.ok(renderCreatePlayer(vm()).includes(text))
 })
 
 test('姓名说明文案与原版逐字一致', () => {
   const text = '为你在游戏里的人物起一个名字，可以使用中英文字符和数字，最多7个汉字(14个英文字母)长度。'
-  assert.ok(original.includes(text))
   assert.ok(renderCreatePlayer(vm()).includes(text))
 })
 
 test('四个分节标题与原版一致', () => {
   const h = renderCreatePlayer(vm())
   for (const t of ['人物资料', '五行属性', '道源宗法', '出生方位']) {
-    assert.ok(original.includes(`<td>${t}</td>`), `原版缺 ${t}`)
     assert.ok(h.includes(t), `我们缺 ${t}`)
   }
 })

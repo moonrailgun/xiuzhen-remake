@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    // Node 24 原生跑 TS 只做类型擦除，下面四项保证 `node --test` 与 Vite 都能用同一份源码：
+    // - erasableSyntaxOnly: 禁用 enum / namespace / 构造函数参数属性（Node 会直接报错）
+    // - verbatimModuleSyntax: 强制类型导入写 `import type`
+    // - allowImportingTsExtensions: 相对导入一律写 .ts（Node 要求）
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "tools/**/*.ts"]
+}

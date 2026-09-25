@@ -1,0 +1,18 @@
+{
+  "name": "xiuzhen-remake",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "2008 年网页游戏《修真》的本地单机怀旧版复刻",
+  "scripts": {
+    "dev": "vite --port 5273 --strictPort",
+    "build": "vite build",
+    "play": "vite preview --port 5273 --strictPort",
+    "test": "node --test 'src/**/*.test.ts'",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

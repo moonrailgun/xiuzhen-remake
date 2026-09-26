@@ -6,6 +6,8 @@
  * 不必逐个改写成事件委托（`docs/spec/DECISIONS.md` §3.9）。
  */
 
+import { morph } from './dom.ts'
+
 export type WindowKey = 'lwindow' | 'rwindow' | 'bwindow' | 'hwindow' | 'mwindow' | 'mwindow2'
 
 /** 取内容区。页面壳保证这些节点存在。 */
@@ -23,7 +25,9 @@ export function openWindow(key: WindowKey, title: string, html: string): void {
   const box = boxOf(key)
   const content = contentOf(key)
   if (!box || !content) return
-  content.innerHTML = html
+  // 同一个窗重开（翻页、答题后刷新）时就地更新，图片不重取；滚动位置照原版换页那样回顶
+  morph(content, html)
+  content.scrollTop = 0
   setTitle(key, title)
   box.style.display = ''
   startCountdowns(content)
@@ -81,7 +85,8 @@ const fmt = (total: number): string => {
 
 let timerId: number | null = null
 let countdownClock = () => Date.now() / 1000
-const deadlines = new WeakMap<HTMLElement, number>()
+/** 每个倒计时元素的截止时刻，连同算它时用的 start 值。 */
+const deadlines = new WeakMap<HTMLElement, { start: number; at: number }>()
 export const setCountdownClock = (clock: () => number): void => { countdownClock = clock }
 
 /** 扫描容器里的倒计时并启动全局定时器。 */
@@ -90,8 +95,12 @@ export function startCountdowns(root: ParentNode = document): void {
   for (const n of nodes) {
     const start = Number(n.getAttribute('start'))
     if (Number.isFinite(start)) {
-      if (!deadlines.has(n)) deadlines.set(n, countdownClock() + start)
-      n.textContent = fmt(Math.max(0, deadlines.get(n)! - countdownClock()))
+      // 元素会被 morph 复用：只有重渲染改了 start（新数据）才重设截止；
+      // 没动的（比如开着的浮窗里的）不能按旧 start 重算，否则倒计时回跳。
+      const d = deadlines.get(n)
+      const at = d && d.start === start ? d.at : countdownClock() + start
+      if (at !== d?.at) deadlines.set(n, { start, at })
+      n.textContent = fmt(Math.max(0, at - countdownClock()))
     }
   }
   if (timerId === null && typeof window !== 'undefined') {
@@ -103,7 +112,7 @@ function tickCountdowns(): void {
   const nodes = document.querySelectorAll<HTMLElement>('[start]')
   if (nodes.length === 0) return
   for (const n of nodes) {
-    const left = (deadlines.get(n) ?? countdownClock()) - countdownClock()
+    const left = (deadlines.get(n)?.at ?? countdownClock()) - countdownClock()
     n.textContent = fmt(left)
     if (left <= 0) {
       n.removeAttribute('start')

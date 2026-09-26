@@ -80,6 +80,7 @@ import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
 import { openWindow, closeWindow, setPageResolver, startCountdowns, setCountdownClock } from './windows.ts'
+import { morph } from './dom.ts'
 import { esc, escJs, js } from '../pages/html.ts'
 
 const STORAGE_KEY_AVAILABLE = (() => {
@@ -401,6 +402,9 @@ const noStorageBanner = (): string =>
 <SPAN class=small>：浏览器禁用了本地存储（常见于无痕/隐私模式），这局的进度关掉页面就没了。
 想留住进度请换普通窗口，或随时用「关于 → 导出存档」手动备份。</SPAN></DIV>`
 
+/** 倒计时 span 的 start 值每秒递减、正文由 timer 改写；比较栏位是否变化时把它们抹平。 */
+const stripCountdowns = (html: string): string => html.replace(/ start="[^"]*">[^<]*/g, '>')
+
 function render(live = false): void {
   const app = root()
   if (!app) return
@@ -416,10 +420,11 @@ function render(live = false): void {
   }
 
   const s = state
+  const serverTime = formatServerTime(s.clock)
   const html = renderShell({
     tab,
     resources: resourceBarOf(s),
-    serverTime: formatServerTime(s.clock),
+    serverTime,
     version: '版本号:1.2.1-yyge',
     left: leftPane(s),
     mid: renderMid(midVm(s)),
@@ -430,23 +435,18 @@ function render(live = false): void {
   else {
     const template = document.createElement('template')
     template.innerHTML = html
+    // 服务器时间每秒都变，单独就地改，别为它重建整个顶栏。
+    const clockEl = document.getElementById('servertime')
+    if (clockEl) clockEl.textContent = serverTime
     // 浮窗独立于三栏更新；定时刷新时保留正在填写的表单。
     for (const id of ['top', 'gleft', 'gmid', 'gright']) {
       const current = document.getElementById(id)
       const next = template.content.querySelector<HTMLElement>(`#${id}`)
       if (!current || !next) continue
-      const controls = live ? [...current.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')] : []
-      const drafts = controls.map(el => ({ id: el.id, name: el.name, value: el.value, checked: el instanceof HTMLInputElement && el.checked, focused: el === document.activeElement,
-        start: el instanceof HTMLInputElement && el.type === 'text' ? el.selectionStart : null }))
-      current.innerHTML = next.innerHTML
-      if (live) [...current.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')].forEach((el, i) => {
-        const d = drafts[i]
-        if (!d || d.id !== el.id || d.name !== el.name) return
-        if (el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox')) {
-          if (el.value === d.value) el.checked = d.checked
-        } else el.value = d.value
-        if (d.focused) { el.focus(); if (d.start !== null && el instanceof HTMLInputElement) el.setSelectionRange(d.start, d.start) }
-      })
+      // 每秒的 pulse 也走这里：内容没变就不碰 DOM。
+      if (stripCountdowns(current.innerHTML) === stripCountdowns(next.innerHTML)) continue
+      // 变了也只改差异节点：没动的 <img>、输入框焦点和滚动位置都原样保留（见 dom.ts）。
+      morph(current, next, { keepDrafts: live })
     }
   }
   startCountdowns(app)

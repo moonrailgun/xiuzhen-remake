@@ -47,6 +47,45 @@ await page.click('a[onclick="sendCreatePlayer()"]')
 await page.waitForTimeout(400)
 
 check('建号后进入主界面', await page.locator('#gpage').count() > 0)
+
+// 2b. 空闲时每秒的 pulse 只改服务器时间，不整栏重建（重建会让图片闪、选区和滚动丢失）
+await page.evaluate(() => {
+  window.__paneRebuilds = 0
+  for (const id of ['top', 'gleft', 'gmid', 'gright']) {
+    new MutationObserver((recs) => { window.__paneRebuilds += recs.filter((r) => r.target.id === id).length })
+      .observe(document.getElementById(id), { childList: true })
+  }
+})
+const clock0 = await page.locator('#servertime').textContent()
+await page.waitForTimeout(2500)
+const clock1 = await page.locator('#servertime').textContent()
+const rebuilds = await page.evaluate(() => window.__paneRebuilds)
+check('空闲时服务器时间照走', clock0 !== clock1, `${clock0} → ${clock1}`)
+check('空闲时四栏不整体重建', rebuilds === 0, `重建 ${rebuilds} 次`)
+
+// 2c. 切标签只改差异节点：顶栏 21 张图仍是原来的元素，浏览器不会重新取图；焦点也不丢
+await page.evaluate(() => { window.__topImgs = [...document.querySelectorAll('#top img')] })
+await page.click(`a[onclick="return gotoTab('skill'),false"]`)
+await page.waitForTimeout(200)
+await page.click(`a[onclick="return gotoTab('player'),false"]`)
+await page.waitForTimeout(200)
+const kept = await page.evaluate(() => {
+  const now = [...document.querySelectorAll('#top img')]
+  return {
+    imgs: now.length === window.__topImgs.length && now.every((el, i) => el === window.__topImgs[i]),
+    active: !!document.querySelector('#bigmenu img[src="img/btn/player_2.gif"]') && !document.querySelector('#bigmenu img[src="img/btn/skill_2.gif"]'),
+    title: !!document.querySelector('#gleft img[src="img/title/titleplayer.gif"]'),
+  }
+})
+check('切标签后顶栏图片元素原样保留', kept.imgs)
+check('切标签后高亮与正文正确更新', kept.active && kept.title)
+// 焦点：点击本身会把焦点移到链接上，所以这里不经鼠标、直接触发重渲染
+const focusKept = await page.evaluate(() => {
+  document.querySelector('#top img[title=首页]').closest('a').focus()
+  gotoTab('skill'); gotoTab('player')
+  return document.activeElement?.querySelector('img')?.title === '首页'
+})
+check('重渲染后焦点不丢', focusKept)
 const name = await page.locator('td.titlebg').first().textContent()
 check('角色名显示正确', name?.includes('173小鱼') ?? false, name ?? '')
 await page.screenshot({ path: join(OUT, 'play-2-main.png') })

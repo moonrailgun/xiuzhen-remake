@@ -56,7 +56,20 @@ const goldInc = await page.locator('#goldinc').textContent()
 const woodInc = await page.locator('#woodinc').textContent()
 check('木属性角色金产量为 0（五行一缺）', goldInc === '0', `金 ${goldInc} / 木 ${woodInc}`)
 
-// 4. 新号真气为 0，无法升级 → 应提示真气不足
+// 4. 新号自带初始真气：资源条读作 1000/2000，克我（木属性 → 金）减半为 500
+const bar = await page.evaluate(() => ['gold', 'wood'].map((id) => document.getElementById(id)?.textContent))
+const cap = await page.locator('#top .storage').first().textContent()
+check('新号资源条读作 1000/2000，克我减半', bar[0] === '500' && bar[1] === '1000' && cap === '2000', `金 ${bar[0]} / 木 ${bar[1]} / 上限 ${cap}`)
+
+// 4b. 把真气清零 → 升级应提示真气不足
+await page.evaluate(() => {
+  const raw = localStorage.getItem('xiuzhen.save')
+  if (!raw) return
+  const env = JSON.parse(raw)
+  env.state.player.qi = [0, 0, 0, 0, 0]
+  localStorage.setItem('xiuzhen.save', JSON.stringify(env))
+  window.dispatchEvent(new Event('storage'))
+})
 await page.locator('.mnode').first().click()
 await page.waitForTimeout(200)
 check('点经脉节点打开升级说明窗', await page.locator('#rwindow').isVisible())

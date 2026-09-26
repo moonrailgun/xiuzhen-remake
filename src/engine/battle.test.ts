@@ -24,7 +24,8 @@ const state = (over: Partial<GameState['player']> = {}): GameState => {
     { name: '173小鱼', gender: 'f', element: '木', school: '通天', x: 100, y: 100, seed: 1 },
     0,
   )
-  return { ...s, player: { ...s.player, ...over } }
+  // 战利品测试从 0 真气起算，入账后的真气就是战利品本身
+  return { ...s, player: { ...s.player, qi: s.player.qi.map(() => 0) as unknown as typeof s.player.qi, ...over } }
 }
 
 /** 极品青龙伏魔剑（原版数值：攻 16~160、耐 8~80、速 7、敏 3）。 */

@@ -142,6 +142,9 @@ export function upgradeSeconds(
 // 2009-09「丹田开放到 36 级」时官方改过表，Lv9=10000 属改表后的版本，基准期不用。
 
 const DANTIAN_ANCHORS: readonly Anchor[] = [
+  // 新号资源条读作「1000/2000」；2010 年玩家问出窍后「丹田是又从2000开始还是累积」
+  // （reference/text/forum162/article-128255-p1.txt L129），两个年代口径一致。
+  { level: 0, value: 2000, source: 'reference/text/guides/9947-p1.txt L30（「刚出生是1000/2000的真气」）' },
   { level: 2, value: 2900, source: 'reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg（#2 资源条 /2900）' },
   { level: 3, value: 3500, source: 'docs/spec/DECISIONS-rules.md §5（2008-11 序列）' },
   { level: 10, value: 8600, source: '同上' },
@@ -160,4 +163,4 @@ const dantianCurve = makeCurve(
 
 /** 丹田气海第 N 级的单种真气容量。 */
 export const dantianCapacity = (level: number): number =>
-  level <= 0 ? 1000 : dantianCurve(Math.min(level, 36))
+  dantianCurve(Math.max(0, Math.min(level, 36)))

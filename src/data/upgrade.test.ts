@@ -129,11 +129,12 @@ test('累计锚点：三转周天时，经脉部分的道行应小于总数 12 �
 })
 
 test('丹田容量过实测锚点，且单调递增', () => {
+  assert.equal(dantianCapacity(0), 2000, '9947：新号资源条读作 1000/2000')
   assert.equal(dantianCapacity(2), 2900, '截图 #2 资源条 /2900')
   assert.equal(dantianCapacity(35), 1200000, '截图 #33')
   assert.equal(dantianCapacity(36), 1400000)
   let prev = 0
-  for (let lv = 1; lv <= 36; lv++) {
+  for (let lv = 0; lv <= 36; lv++) {
     const v = dantianCapacity(lv)
     assert.ok(v >= prev, `Lv.${lv} 容量回落`)
     prev = v

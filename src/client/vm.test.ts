@@ -143,7 +143,7 @@ test('炼制数量 = 当前真气能撑几件；级别不够是 null', () => {
   const rich = swordCraftRows(withQi(base(), 1000)).find((r) => r.name === '玉虚桃木剑')!
   // 玉虚桃木剑水属性消耗 金95 木95 水140 火120 土48 → 1000/140 = 7
   assert.equal(rich.craftable, 7)
-  const poor = swordCraftRows(base()).find((r) => r.name === '玉虚桃木剑')!
+  const poor = swordCraftRows(withQi(base(), 0)).find((r) => r.name === '玉虚桃木剑')!
   assert.equal(poor.craftable, 0, '真气为 0 时是 0，不是 null（等级够就不写未满足）')
 })
 

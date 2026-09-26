@@ -19,7 +19,7 @@ import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, se
 import { scheduleRaid, resolveRaid } from './raid.ts'
 import { seedRng } from './rng.ts'
 import { save, load, importSave, SaveError, SAVE_VERSION, type Storage, type Migration } from './save.ts'
-import { ZERO_QI, floorQi, type GameState, type Player, type FiveQi } from './state.ts'
+import { floorQi, type GameState, type Player, type FiveQi } from './state.ts'
 import {
   hourlyQi,
   groupElement,
@@ -29,6 +29,7 @@ import {
   type MeridianGroup,
 } from '../data/meridian.ts'
 import { dantianCapacity } from '../data/upgrade.ts'
+import { qiRewardFor, type QiReward } from '../data/quests.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
@@ -101,6 +102,16 @@ export type NewGameOptions = {
   readonly startGameT?: number
 }
 
+/**
+ * 新号初始真气。原版新号资源条读作「1000/2000」
+ * （`reference/text/guides/9947-p1.txt` L30「刚出生是1000/2000的真气」，2009-03）。
+ * 克我一行按新手任务奖励同样的「克我减半」规律取 500 [推断]：2010-03 新号截图
+ * （`reference/images/sina-live/2010-03-31-1641387364/`：木属性、经脉全 0、金产量 0/小时）
+ * 已炼出 1 把桃木剑（金 140），飞剑页可炼数显示 玉虚(2)/乌光(1)/青石(0)，
+ * 恰好是金 500 − 140 = 360 的读数；若金也是 1000 会显示 (6)/(2)/(1)。
+ */
+export const INITIAL_QI: QiReward = { base: 1000, overcomeBy: 500 }
+
 export function newGame(opts: NewGameOptions, nowWall: number): GameState {
   const startT = opts.startGameT ?? 0
   return refillNpcOrders({
@@ -124,7 +135,7 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
       realm: '筑基期',
       x: opts.x,
       y: opts.y,
-      qi: ZERO_QI,
+      qi: qiRewardFor(INITIAL_QI, opts.element),
       meridians: Array(12).fill(0),
       body: Array(8).fill(0),
       skills: {},

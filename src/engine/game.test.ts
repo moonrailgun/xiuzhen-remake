@@ -24,11 +24,28 @@ import { serialize, SAVE_KEYS, SAVE_VERSION, type Storage } from './save.ts'
 
 const qi = (...v: number[]): FiveQi => v as unknown as FiveQi
 
-const fresh = (over: Partial<Parameters<typeof newGame>[0]> = {}) =>
+/** 真正的新号（带初始真气）。 */
+const born = (over: Partial<Parameters<typeof newGame>[0]> = {}) =>
   newGame(
     { name: '173小鱼', gender: 'f', element: '木', school: '通天', x: 100, y: 100, seed: 42, ...over },
     0,
   )
+
+/** 结算类测试从 0 真气起算，期望值就是这段时间的产出本身。 */
+const fresh = (over: Partial<Parameters<typeof newGame>[0]> = {}) => {
+  const s = born(over)
+  return { ...s, player: { ...s.player, qi: qi(0, 0, 0, 0, 0) } }
+}
+
+test('新号自带初始真气：四行 1000、克我 500，丹田 Lv0 容量 2000（资源条读作 1000/2000）', () => {
+  const s = born() // 木属性 → 克我 = 金
+  assert.deepEqual(s.player.qi, qi(500, 1000, 1000, 1000, 1000))
+  assert.equal(capacityOf(s), 2000)
+  // 金属性 → 克我 = 火
+  assert.deepEqual(born({ element: '金' }).player.qi, qi(1000, 1000, 1000, 500, 1000))
+  // 有了初始真气，新手任务第 1 步「打通经脉」建号后立刻能做
+  assert.ok(startCultivate(s, { system: 'meridian', index: 0 }, { hasVip: false }).ok)
+})
 
 function memStorage(): Storage & { size(): number } {
   const m = new Map<string, string>()
@@ -41,12 +58,12 @@ function memStorage(): Storage & { size(): number } {
 }
 
 test('新号：全 0 级、送 100 附加仙石、筑基期', () => {
-  const s = fresh()
+  const s = born()
   assert.equal(s.player.realm, '筑基期')
   assert.equal(s.player.bonusCoin, 100, '进游戏送 100 附加仙石（官方指南）')
   assert.equal(s.player.coin, 0)
   assert.deepEqual([...s.player.meridians], Array(12).fill(0))
-  assert.deepEqual([...s.player.qi], [0, 0, 0, 0, 0])
+  assert.deepEqual([...s.player.qi], [500, 1000, 1000, 1000, 1000], '初始真气 1000，克我（木 → 金）减半')
 })
 
 test('产量：木属性角色金为 0（五行一缺）', () => {

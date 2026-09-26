@@ -419,17 +419,17 @@ test('发奖：真气按本命属性展开，克我那一项减半（新手第 1
 })
 
 test('发奖：真气按丹田上限截断', () => {
-  const state = makeState({ meridians: [1, ...Array<number>(11).fill(0)] }) // 丹田 0 级 = 1000
+  const state = makeState({ meridians: [1, ...Array<number>(11).fill(0)] }) // 丹田 0 级 = 2000
   const log = unwrap(accept(emptyQuestLog(), state, N1))
   const out = unwrap(claim(log, state, N1))
-  assert.equal(questCapacity(state, out.log), 1000)
+  assert.equal(questCapacity(state, out.log), 2000)
   assert.deepEqual([...out.state.player.qi], [150, 150, 150, 75, 150])
 
-  // 三转周天奖励 3000，丹田只有 1000 → 截断
+  // 三转周天奖励 3000（克我 1500），丹田只有 2000 → 截断
   const big = { ...state, player: { ...state.player, meridians: Array<number>(12).fill(3) } }
   const l2: QuestLog = { ...emptyQuestLog(), entries: [{ id: 'newbie:tail:1', acceptedAt: 0, done: false }] }
   const out2 = unwrap(claim(l2, big, 'newbie:tail:1'))
-  assert.deepEqual([...out2.state.player.qi], [1000, 1000, 1000, 1000, 1000])
+  assert.deepEqual([...out2.state.player.qi], [2000, 2000, 2000, 1500, 2000])
 })
 
 test('发奖：新手末环给「新手玄武玉匣」', () => {

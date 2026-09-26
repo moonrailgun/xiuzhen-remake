@@ -3,7 +3,7 @@ node_modules/
 dist/
 coverage/
 
-# Local research archives (never publish)
+# Extracted research records (compressed snapshots are versioned in archives/)
 /reference/
 /docs/
 

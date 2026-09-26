@@ -277,9 +277,12 @@ a.help, .help {
 .mglow { position: absolute; z-index: 1; pointer-events: none; }
 .mline { position: absolute; height: 1px; transform-origin: 0 50%; opacity: .75; z-index: 2; }
 
-/* 本体节点：同款圆盘但发光是灰色 */
+/* 本体视图：占满左栏 460px、不显示信息表（04 §5.1）。底图 460×410 是整张原版裁片
+   （线稿 + 引线 + 篆书 + 灰光晕），相对 .playerbody 下移 21px 后，8 个烧在图里的 21px 白盘
+   正好被同尺寸的 CSS 圆盘（.mnode 19px + 1px 边框）原位盖住；光晕用图里的，不叠 .mglow。 */
+.figure.bodyfigure { width: 460px; height: 431px; }
+.bodyfigure .body { left: 0; top: 21px; }
 .bodynode { border-color: #9a9a9a; }
-.figure .bodylabel { position: absolute; left: 0; top: 0; z-index: 2; }
 
 /* 右下角门派水印（通天=梅、蜀山=竹、昆仑=荷） */
 .schoolmark { position: absolute; right: -10px; bottom: 0; opacity: .55; z-index: 0; }

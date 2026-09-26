@@ -126,27 +126,35 @@ const elementKey = (e: Element): string =>
 const schoolKey = (s: PlayerVm['school']): string =>
   ({ 蜀山: 's', 昆仑: 'k', 通天: 't' })[s]
 
-/** 8 项本体。位置见 04 §5；名称用篆书图，等级是同款白色圆盘。 */
+/**
+ * 8 项本体。底图 `img/pipe/body{m,f}.gif` 是整张 460×410 的原版裁片（线稿 + 引线 + 篆书 +
+ * 节点灰光晕，04 §5.1 判定原版就是一张底图）。坐标是 04 §5.2 的节点圆心换算到图内
+ * （「穷千里目」= (228,46)），男女相同 ±1px。8 个白盘烧在底图里，这里用同尺寸（21px）
+ * 的圆盘原位盖住，数字换成当前存档的等级；光晕沿用图里的像素，不再叠 .mglow。
+ */
 const BODY_PARTS: readonly { readonly key: string; readonly name: string; readonly at: readonly [number, number] }[] = [
-  { key: 'eye', name: '穷千里目', at: [125, 78] },
-  { key: 'steel', name: '炼体成钢', at: [63, 128] },
-  { key: 'calm', name: '心静通灵', at: [163, 128] },
-  { key: 'sleeve', name: '袖里乾坤', at: [55, 205] },
-  { key: 'root', name: '固本培元', at: [128, 200] },
-  { key: 'dantian', name: '丹田气海', at: [96, 262] },
-  { key: 'hand', name: '手熟无他', at: [160, 262] },
-  { key: 'walk', name: '行万里路', at: [128, 360] },
+  { key: 'eye', name: '穷千里目', at: [228, 46] },
+  { key: 'steel', name: '炼体成钢', at: [193, 91] },
+  { key: 'calm', name: '心静通灵', at: [245, 101] },
+  { key: 'sleeve', name: '袖里乾坤', at: [175, 157] },
+  { key: 'root', name: '固本培元', at: [229, 148] },
+  { key: 'dantian', name: '丹田气海', at: [230, 198] },
+  { key: 'hand', name: '手熟无他', at: [282, 198] },
+  { key: 'walk', name: '行万里路', at: [255, 287] },
 ]
+/** 底图相对 .figure 的偏移：#117/#114/#6 换算到页面都是 (0, 20–22)，取 21（与 oui.css 的 .bodyfigure .body 一致）。 */
+const BODY_ORIGIN = { x: 0, y: 21 } as const
 
 function bodyFigure(vm: PlayerVm): string {
-  return `<DIV class=figure>
-<IMG class=body src="img/pipe/body${vm.gender}.gif" width=250 height=430 alt="">
-<IMG class=bodylabel src="img/pipe/bodylabel.gif" alt="">
+  return `<DIV class="figure bodyfigure">
+<IMG class=body src="img/pipe/body${vm.gender}.gif" width=460 height=410 alt="">
 ${each(BODY_PARTS, (p, i) => {
     const lv = vm.bodyLevels[i] ?? 0
+    const x = BODY_ORIGIN.x + p.at[0] - 10
+    const y = BODY_ORIGIN.y + p.at[1] - 10
     return `<A class="mnode bodynode" href="#" title="${esc(p.name)}" ` +
       `onclick="openRWindow('','skillmid.jsp?type=body&idx=${i}')" ` +
-      `style="left:${p.at[0] - 10}px;top:${p.at[1] - 10}px">${lv}</A>`
+      `style="left:${x}px;top:${y}px">${lv}</A>`
   })}
 </DIV>`
 }
@@ -198,10 +206,10 @@ export function renderPlayer(vm: PlayerVm): string {
   return `${pageHeader('titleplayer.gif', tabs)}
 <DIV class=playerbody>
 ${figure}
-<DIV class=playerinfo>
+${when(vm.view !== 'body', () => `<DIV class=playerinfo>
 ${infoTable(vm)}
 ${qiGrowth(vm)}
-</DIV>
+</DIV>`)}
 </DIV>`
 }
 

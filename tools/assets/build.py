@@ -3,7 +3,8 @@
 
 四档做法（见 docs/PLAN.md §3「美术四档」）：
   A 原件级  —— 从原生 1:1 截图按 bbox 整格裁出，不做处理
-  B 裁切修补 —— 裁出后去 JPEG 块噪；需要抠底的另见 --matte
+  B 裁切修补 —— 裁出后去 JPEG 块噪（`"denoise": false` 可关，线稿/篆书必须关）；清单项可加 `"matte": "white"`（白底转透明）
+              和 `"erase": [[x,y,w,h], …]`（裁片内整块擦成透明，用来去水印）
   C 程序化  —— 由 gen.py 画出来（按钮、图标、渐变、地块调色等）
   D 占位    —— 没有任何原图，用原版自带的占位件或简单生成
 
@@ -46,6 +47,21 @@ def denoise(img: Image.Image) -> Image.Image:
     return img.filter(ImageFilter.MedianFilter(size=3))
 
 
+def white_to_alpha(img: Image.Image) -> Image.Image:
+    """白底转透明：纸白（≥236）全透，200–236 按明度渐变，保住毛笔线的灰边和灰光晕的软边。"""
+    px = img.load()
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            lum = min(r, g, b)
+            if lum >= 236:
+                px[x, y] = (r, g, b, 0)
+            elif lum >= 200:
+                px[x, y] = (r, g, b, round((236 - lum) * 255 / 36))
+    return img
+
+
 def main() -> int:
     items = load_manifest()
     only_list = "--list" in sys.argv
@@ -79,8 +95,13 @@ def main() -> int:
                 if x >= im.width or y >= im.height or x2 <= x or y2 <= y:
                     raise ValueError(f"bbox {item['bbox']} 超出原图 {im.size}")
                 crop = im.crop((x, y, x2, y2))
-                if item["tier"] == "B":
+                # 3×3 中值会把 1px 的篆书笔画和毛笔线稿吃掉，线稿类清单项用 "denoise": false 关掉
+                if item["tier"] == "B" and item.get("denoise", True):
                     crop = denoise(crop)
+                if item.get("matte") == "white":
+                    crop = white_to_alpha(crop)
+                for ex, ey, ew, eh in item.get("erase", []):
+                    crop.paste((0, 0, 0, 0), (ex, ey, ex + ew, ey + eh))
                 out.parent.mkdir(parents=True, exist_ok=True)
                 # 统一存 PNG 字节流，但保留原版的 .gif/.jpg 文件名（浏览器按内容嗅探）
                 crop.save(out, format="PNG")

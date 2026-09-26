@@ -125,17 +125,29 @@ function findChain(log: QuestLog, id: string): { chain: readonly Quest[]; index:
   return null
 }
 
+/** 这一条是不是「三尸只在周六现身」那类**按日子**的门槛（GM 召唤可以绕过它）。 */
+export const isSpawnDayQuest = (q: Quest): boolean =>
+  q.series === '斩却三尸' && q.goal.kind === 'slay'
+
 /**
  * 领取门槛。返回 `null` 表示可以领。
  * 三尸的「只在周六」写在这里而不是数据表里 —— 它是规则不是数值。
+ *
+ * `ignoreSpawnDay` 只给 GM 的「召唤三尸」用：召唤的意思就是**让它现在就现身**，
+ * 所以只放行日子这一条，境界与前置照旧挡着 —— 否则会造出一份
+ * 「第 3 步领了、第 1 步还没做」的任务簿，`chainUnlocked` 的前提就不成立了。
  */
-export function acceptBlocker(q: Quest, state: GameState): string | null {
+export function acceptBlocker(
+  q: Quest,
+  state: GameState,
+  opts: { readonly ignoreSpawnDay?: boolean } = {},
+): string | null {
   const req = q.require
   if (req?.realm && !realmReached(state.player, req.realm)) return `境界不足，需要${req.realm}`
   if (req?.outOfProtection && !isOutOfProtection(state.player, state.clock.gameT, DAY)) {
     return '尚未离开新手保护期'
   }
-  if (q.series === '斩却三尸' && q.goal.kind === 'slay') {
+  if (isSpawnDayQuest(q) && !opts.ignoreSpawnDay) {
     if (weekdayOf(state.clock) !== SANSHI_SPAWN_WEEKDAY) return '三尸只在每周六现身'
   }
   return null
@@ -247,13 +259,18 @@ export function questLocation(state: GameState, q: Quest): readonly [number, num
 
 const clampToWorld = (v: number): number => Math.max(0, Math.min(WORLD_SIZE - 1, Math.round(v)))
 
-export function accept(log: QuestLog, state: GameState, id: string): QuestResult<QuestLog> {
+export function accept(
+  log: QuestLog,
+  state: GameState,
+  id: string,
+  opts: { readonly ignoreSpawnDay?: boolean } = {},
+): QuestResult<QuestLog> {
   if (entryOf(log, id)) return fail('该任务已经领取过了')
   const found = findChain(log, id)
   if (!found) return fail('没有这个任务')
   const q = found.chain[found.index]!
   if (!chainUnlocked(log, found.chain, found.index)) return fail('前置任务尚未完成')
-  const blocker = acceptBlocker(q, state)
+  const blocker = acceptBlocker(q, state, opts)
   if (blocker) return fail(blocker)
 
   const entry: QuestEntry = {

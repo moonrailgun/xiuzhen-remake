@@ -61,6 +61,16 @@ export type GmVm = {
   readonly realms: readonly string[]
   /** 待办事件条数（清空按钮旁边显示） */
   readonly events: number
+  /** 三尸现状（原版只在周六现身，GM 可以直接召唤） */
+  readonly sanshi: {
+    readonly name: string | null
+    readonly step: number
+    readonly total: number
+    readonly status: string | null
+    readonly at: readonly [number, number] | null
+    readonly isSpawnDay: boolean
+    readonly blocked: string | null
+  }
   /** 上一次应用的结果：收拢说明或错误 */
   readonly notice?: { readonly ok: boolean; readonly lines: readonly string[] }
 }
@@ -155,6 +165,28 @@ ${rows}
 </TBODY></TABLE></TD></TR>`
 }
 
+
+/** 三尸那一行。召唤是即时动作，不跟「应用修改」走。 */
+function sanshiCell(vm: GmVm): string {
+  const s = vm.sanshi
+  if (s.name === null) {
+    return '<SPAN class=smallgray>三尸已经斩完了。</SPAN>'
+  }
+  const where = s.at ? `目标地点 (${num(s.at[0])},${num(s.at[1])})` : ''
+  const state = s.status === 'done' ? '已交付'
+    : s.status === 'ready' ? '可交付'
+      : s.status === 'active' ? '进行中'
+        : s.blocked ? `<SPAN class=smallred>${esc(s.blocked)}</SPAN>`
+          : s.isSpawnDay ? '今天是周六，正常也能领' : '未领取'
+  const action = s.status === 'active' || s.status === 'ready' || s.status === 'done'
+    ? ''
+    : s.blocked
+      ? ''
+      : '　<A class=skillup href="#" onclick="gmSummonSanshi()"><B>召唤</B></A>'
+  return `${esc(s.name)}<SPAN class=smallgray>（${num(s.step)}/${num(s.total)}）</SPAN>${action}<BR>` +
+    `<SPAN class=smallgray>${state}${where ? `　${esc(where)}` : ''}</SPAN>`
+}
+
 export function renderGm(vm: GmVm): string {
   const notice = vm.notice
     ? `<DIV class="${vm.notice.ok ? 'smallgray' : 'smallred'}" style="padding:6px 2px">` +
@@ -216,6 +248,9 @@ ${artifactRows(vm)}
 ${select('gm-add-quality', vm.qualities, '极品', 60)}
 +<INPUT class=small type=number name="gm-add-refine" value="0" min=0 max=20 style="width:38px">
 　<A class=skillup href="#" onclick="gmAddItem()">加入背包</A></TD></TR>
+
+${sectionHead('斩却三尸', '原版只在每周六现身')}
+${row('当前目标', sanshiCell(vm))}
 
 ${sectionHead('时间线')}
 ${row('待办事件', `${num(vm.events)} 条　<INPUT type=checkbox name="gm-clearEvents">` +

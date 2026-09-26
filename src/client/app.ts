@@ -55,7 +55,7 @@ import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLo
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { renderGm, type GmVm } from '../pages/gm.ts'
-import { applyGm, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
+import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
 import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
@@ -1441,6 +1441,20 @@ export function installGameActions(): void {
     openWindow('lwindow', '', resolvePage('gm.jsp'))
   }
 
+  /** 召唤三尸：即时动作，不跟「应用修改」走，所以不读表单。 */
+  g['gmSummonSanshi'] = () => {
+    if (!state) return
+    const r = summonSanshi(state)
+    if (!r.ok) {
+      gmNotice = { ok: false, lines: [`召唤失败：${r.reason}`] }
+    } else {
+      state = r.state
+      gmNotice = { ok: true, lines: [r.message] }
+      step()
+    }
+    ;(globalThis as unknown as Record<string, () => void>)['openGm']!()
+  }
+
   g['gmApply'] = () => {
     if (!state) return
     commitGm(readGmForm(state))
@@ -1565,6 +1579,18 @@ function gmVm(s: GameState): GmVm {
     schools: [...SCHOOLS],
     realms: [...REALMS],
     events: s.timeline.events.length,
+    sanshi: (() => {
+      const v = sanshiView(s)
+      return {
+        name: v.quest?.name ?? null,
+        step: v.quest?.step ?? 0,
+        total: v.quest?.total ?? 0,
+        status: v.status,
+        at: v.at,
+        isSpawnDay: v.isSpawnDay,
+        blocked: v.blocked,
+      }
+    })(),
     notice: gmNotice,
   }
 }

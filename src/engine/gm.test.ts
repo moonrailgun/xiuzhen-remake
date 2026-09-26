@@ -9,7 +9,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 import { newGame, validateGameState } from './game.ts'
-import { applyGm, meridianCapFor, bodyCapFor, skillCaps } from './gm.ts'
+import { applyGm, sanshiView, summonSanshi, meridianCapFor, bodyCapFor, skillCaps } from './gm.ts'
+import { accept, entryOf } from './quest.ts'
+import { DAY, weekdayOf } from './clock.ts'
+import { SANSHI_SPAWN_WEEKDAY } from '../data/quests.ts'
 import { artifactCapacity, artifactSpaceUsed } from './craft.ts'
 import { capacityOf, BODY_DANTIAN, BODY_MAX_LEVEL, DANTIAN_MAX_LEVEL } from './cultivate.ts'
 import { MERIDIANS } from '../data/meridian.ts'
@@ -208,4 +211,88 @@ test('清空事件只清时间线，不动别的', () => {
 
 test('经脉数量与本体项数跟着数据表走，不写死', () => {
   assert.equal(fresh().player.meridians.length, MERIDIANS.length)
+})
+
+// ===========================================================================
+// 召唤三尸
+// ===========================================================================
+
+/** 开服日是周二（weekday=2），所以第 4 天才是周六。 */
+const atDay = (s: GameState, day: number): GameState =>
+  ({ ...s, clock: { ...s.clock, gameT: day * DAY } })
+
+const pigu = (day = 0): GameState => {
+  const s = fresh()
+  return atDay({ ...s, player: { ...s.player, realm: '辟谷期' } }, day)
+}
+
+test('★召唤三尸：平日也能现身，而正常领取仍然只在周六（保真规则没被动）', () => {
+  const wed = pigu(0)
+  assert.equal(weekdayOf(wed.clock) === SANSHI_SPAWN_WEEKDAY, false, '前提：今天不是周六')
+
+  // 正常路径照旧被挡 —— 「三尸只在每周六现身」是原文，规则本身不能改
+  const normal = accept(wed.quests, wed, 'realm:sanshi:1')
+  assert.equal(normal.ok, false)
+  assert.equal((normal as { reason: string }).reason, '三尸只在每周六现身')
+
+  // GM 召唤放行
+  const r = summonSanshi(wed)
+  assert.equal(r.ok, true, r.ok ? '' : r.reason)
+  const entry = entryOf((r as { state: GameState }).state.quests, 'realm:sanshi:1')
+  assert.ok(entry, '召唤完就该在任务簿里')
+  assert.ok(entry.at, '斩杀类任务领取时要把坐标冻结下来')
+  assert.match((r as { message: string }).message, /上尸彭踞/)
+})
+
+test('★召唤只放行「日子」一条，境界与前置照旧挡着', () => {
+  // 境界不够
+  const zhuji = fresh()
+  const r1 = summonSanshi(zhuji)
+  assert.equal(r1.ok, false)
+  assert.equal((r1 as { reason: string }).reason, '境界不足，需要辟谷期')
+
+  // 前置未交付：第 1 只还没斩完，不能直接召唤第 2 只
+  const s = pigu()
+  const first = summonSanshi(s)
+  assert.equal(first.ok, true)
+  const afterFirst = (first as { state: GameState }).state
+  assert.equal(entryOf(afterFirst.quests, 'realm:sanshi:2'), undefined, '第 2 只不该被一起领走')
+  // 再召唤只会重复指向第 1 只
+  const again = summonSanshi(afterFirst)
+  assert.equal(again.ok, true)
+  assert.match((again as { message: string }).message, /已经在 \(\d+,\d+\) 等着了/)
+  assert.equal(afterFirst.quests.entries.filter((e) => e.id.startsWith('realm:sanshi:')).length, 1)
+})
+
+test('★面板显示的拦截原因，和按下去的结果是同一件事', () => {
+  // 以前这里自己又推了一遍门槛，平日把「今天不是周六」误报成「前置任务尚未完成」
+  for (const s of [fresh(), pigu(0), pigu(4)]) {
+    const view = sanshiView(s)
+    const r = summonSanshi(s)
+    assert.equal(view.blocked, r.ok ? null : r.reason,
+      `面板说「${view.blocked}」，实际是「${r.ok ? '可以召唤' : r.reason}」`)
+  }
+})
+
+test('★三尸都斩完之后没有可召唤的', () => {
+  const s = pigu()
+  const done = {
+    ...s,
+    quests: {
+      ...s.quests,
+      entries: [1, 2, 3].map((n) => ({ id: `realm:sanshi:${n}`, acceptedAt: 0, done: true, cleared: true })),
+    },
+  }
+  assert.equal(sanshiView(done).quest, null)
+  const r = summonSanshi(done)
+  assert.equal(r.ok, false)
+  assert.match((r as { reason: string }).reason, /斩完/)
+})
+
+test('★召唤出来的坐标，和面板上预览的是同一个点', () => {
+  const s = pigu()
+  const preview = sanshiView(s).at
+  const r = summonSanshi(s)
+  assert.equal(r.ok, true)
+  assert.deepEqual(sanshiView((r as { state: GameState }).state).at, preview)
 })

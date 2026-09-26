@@ -34,8 +34,20 @@ import {
 } from './cultivate.ts'
 import { artifactCapacity, artifactSpaceUsed } from './craft.ts'
 import { validateGameState } from './game.ts'
+import {
+  accept,
+  acceptBlocker,
+  entryOf,
+  isSpawnDayQuest,
+  questLocation,
+  statusOf,
+  type QuestLog,
+  type QuestStatus,
+} from './quest.ts'
+import { weekdayOf } from './clock.ts'
 import { ELEMENTS, MERIDIANS, MAX_LEVEL as MERIDIAN_MAX_LEVEL, MAX_LEVEL_BEFORE_XINDONG, type Element } from '../data/meridian.ts'
 import { SKILL_TREES } from '../data/skills.ts'
+import { SANSHI_CHAIN, SANSHI_SPAWN_WEEKDAY } from '../data/quests.ts'
 import { WORLD_SIZE } from '../data/world.ts'
 import { ITEM_STATUSES } from '../pages/item.ts'
 
@@ -253,4 +265,80 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
     return { ok: false, reason: `改完的存档过不了校验：${e instanceof Error ? e.message : String(e)}` }
   }
   return { ok: true, state: next, notes }
+}
+
+// ===========================================================================
+// 召唤三尸
+// ===========================================================================
+
+export type SanshiView = {
+  /** 当前该打的那一只；四步都交付了就是 null */
+  readonly quest: { readonly id: string; readonly name: string; readonly step: number; readonly total: number } | null
+  readonly status: QuestStatus | null
+  /** 已领取的话是冻结下来的坐标；没领取则是「现在领会落在哪」 */
+  readonly at: readonly [number, number] | null
+  /** 今天是不是周六 */
+  readonly isSpawnDay: boolean
+  /** 召唤不动的原因（境界、前置）；null 表示召唤得动 */
+  readonly blocked: string | null
+}
+
+/** 链上第一个还没交付的三尸「斩杀」步骤。 */
+const nextSanshi = (log: QuestLog) =>
+  SANSHI_CHAIN.find((q) => isSpawnDayQuest(q) && !entryOf(log, q.id)?.done)
+
+/** 面板上那一块的现状。 */
+export function sanshiView(state: GameState): SanshiView {
+  const log = state.quests
+  const q = nextSanshi(log)
+  const isSpawnDay = weekdayOf(state.clock) === SANSHI_SPAWN_WEEKDAY
+  if (!q) return { quest: null, status: null, at: null, isSpawnDay, blocked: null }
+  const entry = entryOf(log, q.id)
+  // 领过的用冻结下来的坐标，没领的按「现在领会落在哪」预览 —— 与 `accept` 同一个算法
+  const at = entry?.at ?? questLocation(state, q)
+  return {
+    quest: { id: q.id, name: q.name, step: q.step, total: q.total },
+    status: statusOf(log, state, q.id),
+    at: at as readonly [number, number],
+    isSpawnDay,
+    // **直接拿「召唤会不会被拒」当答案**，而不是自己再推一遍门槛。
+    // 自己推会错：`statusOf` 走的是不带 ignoreSpawnDay 的 `acceptBlocker`，
+    // 平日里它一律返回 `locked`，于是面板把「今天不是周六」误报成「前置任务尚未完成」。
+    // 面板说的必须和按下去的行为是同一件事。
+    blocked: entry ? null : (() => {
+      const attempt = accept(log, state, q.id, { ignoreSpawnDay: true })
+      return attempt.ok ? null : attempt.reason
+    })(),
+  }
+}
+
+/**
+ * 召唤：让三尸**现在就现身**，不必等到周六。
+ *
+ * 「三尸只在每周六现身」是原文（`15374`，`DECISIONS.md` §5 #8），所以规则本身不动 ——
+ * 这里只是 GM 把那一条日子门槛按下去，境界与前置一概照旧：
+ * 绕过前置会造出「第 3 步领了、第 1 步还没做」的任务簿，`chainUnlocked` 的前提就塌了。
+ */
+export function summonSanshi(
+  state: GameState,
+): { readonly ok: true; readonly state: GameState; readonly message: string }
+  | { readonly ok: false; readonly reason: string } {
+  const q = nextSanshi(state.quests)
+  if (!q) return { ok: false, reason: '三尸已经斩完了，没有可召唤的。' }
+
+  const entry = entryOf(state.quests, q.id)
+  if (entry) {
+    const [x, y] = (entry.at ?? questLocation(state, q)) as readonly [number, number]
+    return { ok: true, state, message: `${q.name}已经在 (${x},${y}) 等着了，不用再召唤。` }
+  }
+
+  const accepted = accept(state.quests, state, q.id, { ignoreSpawnDay: true })
+  if (!accepted.ok) return { ok: false, reason: accepted.reason }
+  const next: GameState = { ...state, quests: accepted.value }
+  const [x, y] = (entryOf(accepted.value, q.id)?.at ?? questLocation(state, q)) as readonly [number, number]
+  return {
+    ok: true,
+    state: next,
+    message: `${q.name}（${q.step}/${q.total}）已现身，目标地点 (${x},${y})。`,
+  }
 }

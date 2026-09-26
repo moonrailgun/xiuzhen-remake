@@ -125,6 +125,27 @@ try {
   s = await saved()
   check('清空事件后时间线是空的', s.timeline.events.length === 0)
 
+  console.log('\n召唤三尸')
+  // 「三尸只在每周六现身」是原文，规则本身不动；GM 只是把那一条日子门槛按下去。
+  await pick('gm-realm', '辟谷期')
+  await apply()
+  check('境界不到辟谷期时没有召唤按钮（先升上去）', (await saved()).player.realm === '辟谷期')
+  const summon = page.locator('#lwindow a[onclick="gmSummonSanshi()"]')
+  check('辟谷期后出现召唤按钮', await summon.count() === 1)
+  await summon.click()
+  await page.waitForTimeout(250)
+  s = await saved()
+  const sanshi = s.quests.entries.find(e => e.id === 'realm:sanshi:1')
+  check('召唤后三尸进了任务簿', !!sanshi)
+  check('斩杀类任务领取时冻结了坐标', Array.isArray(sanshi?.at) && sanshi.at.length === 2)
+  check('右栏任务条看得到它', (await page.locator('#gright').textContent()).includes('三尸'))
+  check('面板给出了目标地点', (await page.locator('#lwindowcontent').textContent()).includes(`(${sanshi.at[0]},${sanshi.at[1]})`))
+  // 重复召唤不会再领一份
+  await page.evaluate(() => gmSummonSanshi())
+  await page.waitForTimeout(250)
+  s = await saved()
+  check('重复召唤不会领出第二份', s.quests.entries.filter(e => e.id.startsWith('realm:sanshi:')).length === 1)
+
   console.log('\n面板开着期间别处的改动不会被回滚')
   // 面板是浮窗，开着的时候左栏照常能玩，每秒还有一次 pulse 在推进时间。
   // 以前不管动没动都把整张表当成补丁发出去，于是「开着面板在别处升了级、回来点应用」

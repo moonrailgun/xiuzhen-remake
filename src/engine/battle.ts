@@ -127,6 +127,7 @@ export function launch(
 }
 
 export type LaunchedSwordStats = {
+  readonly instantAttackRatio?: number
   readonly attack: number
   readonly durability: number
   readonly agility: number
@@ -141,6 +142,8 @@ export function launchedSwordStats(sword: LaunchSword, skills: Readonly<Record<s
     durability: Math.floor(panelStat(sword.durability, sword.quality, sword.refine) * bonus('身剑诀')),
     agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
     speed: sword.speed * bonus('大周天剑法'),
+    // Lv1 2% 见 article-105340-p1；逐级线性增长为重建。
+    instantAttackRatio: Math.max(0, Math.min(20, skills['剑心通明'] ?? 0)) * 0.02,
   }
 }
 
@@ -167,8 +170,9 @@ function swordSelectionError(state: GameState, swords: readonly LaunchSword[]): 
 }
 
 /** 旧存档没有出击快照时沿用原面板值。 */
-function toCombat(s: LaunchSword): CombatSword {
-  return { id: s.id, name: s.name, element: s.element, ...statsOf(s) }
+function toCombat(s: LaunchSword, kind?: BattleTarget['kind']): CombatSword {
+  return { id: s.id, name: s.name, element: s.element, ...statsOf(s),
+    ...(kind === 'monster' ? { instantAttackRatio: 0 } : {}) }
 }
 
 function targetToCombat(t: BattleTarget): CombatSword {
@@ -231,12 +235,12 @@ export function resolveBattleEvent(
       // 缠斗阶段的**法宝状态**原版逐字是「绞杀中...」（03 §1.12 [原文]，09b §156 真实 DOM）。
       // 「缠斗」只出现在事件标题句「在(x,y)缠斗 剩余…结束」里，不是状态词。
       state: swordStatus(state, swords, '绞杀中'),
-      follow: [{ ...event, finishAt: event.finishAt + tangleDuration(swords.map(toCombat), [targetToCombat(target)]),
+      follow: [{ ...event, finishAt: event.finishAt + tangleDuration(swords.map(s => toCombat(s, target.kind)), [targetToCombat(target)]),
         payload: { ...event.payload, phase: 'fighting' satisfies BattlePhase } }],
     }
   }
 
-  const result = resolveBattle(swords.map(toCombat), [targetToCombat(target)])
+  const result = resolveBattle(swords.map(s => toCombat(s, target.kind)), [targetToCombat(target)])
   const lost = result.attacker.filter((outcome) => outcome.broken).map((outcome) => outcome.id)
   const won = result.defender.every((outcome) => outcome.broken)
   // 战利品是**飞剑驮回来的**：一把都没活着回来就没有返航事件，也就没有东西能入账。
@@ -401,7 +405,7 @@ export function reinforce(
 
   // 赶得上：并进原事件，并按新剑的敏捷延长缠斗
   const fighting = ev.payload['phase'] === 'fighting'
-  const fightEnd = ev.finishAt + (fighting ? 0 : tangleDuration((ev.payload['swords'] as LaunchSword[]).map(toCombat), [targetToCombat(target)]))
+  const fightEnd = ev.finishAt + (fighting ? 0 : tangleDuration((ev.payload['swords'] as LaunchSword[]).map(s => toCombat(s, target.kind)), [targetToCombat(target)]))
   if (arriveAt <= fightEnd) {
     const merged = [...(ev.payload['swords'] as LaunchSword[]), ...swords]
     const extraTangle = swords.reduce((sum, s) => sum + statsOf(s).agility, 0)

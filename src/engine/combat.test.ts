@@ -281,3 +281,19 @@ test('★相生加成带小数时，「受到伤害 == 耐久 ⇔ 惨被斩断�
   }
   assert.ok(checked > 8000, `扫得太少：${checked}`)
 })
+
+test('剑心通明/通灵先断剑，不反击、不缠斗；严格小于阈值且护身不受影响', () => {
+  const a = { id: 'a', name: '甲', element: null, attack: 1000, durability: 1000, agility: 5, instantAttackRatio: 0.02 }
+  const d = { id: 'd', name: '乙', element: null, attack: 5000, durability: 19, agility: 6 }
+  const cut = resolveBattle([a], [d])
+  assert.equal(cut.defender[0]!.broken, true)
+  assert.equal(cut.attacker[0]!.damageTaken, 0)
+  assert.equal(cut.tangleSeconds, 0)
+  assert.equal(tangleDuration([a], [{ ...d, durability: 20 }]), 11)
+  assert.equal(tangleDuration([a], [{ ...d, defensiveOnly: true }]), 11)
+  const shield = { ...d, attack: 0, durability: 100000, instantDefenseRatio: 0.02 }
+  const held = resolveBattle([a], [shield])
+  assert.equal(held.attacker[0]!.broken, true)
+  assert.equal(held.defender[0]!.damageTaken, 0)
+  assert.equal(held.tangleSeconds, 0)
+})

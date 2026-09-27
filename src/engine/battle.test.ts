@@ -451,3 +451,17 @@ test('★吸回来的真气受丹田上限约束（不能先溢出再被静默�
     assert.ok(v <= cap, `真气 ${v} 超过了丹田上限 ${cap}——会在下次 tick 被静默抹掉`)
   }
 })
+
+test('剑心通明保存在出击快照中，玩家瞬断但怪物仍正常缠斗', () => {
+  for (const kind of ['player', 'monster'] as const) {
+    const started = launch(state({ skills: { 剑心通明: 1 } }),
+      { ...skeleton(101, 100), kind, hp: 2, attack: 9999 }, [qinglong()])
+    assert.ok(started.ok)
+    const event = started.state.timeline.events[0]!
+    assert.equal((event.payload.swords as LaunchSword[])[0]!.launchedStats!.instantAttackRatio, 0.02)
+    const later = { ...started.state, player: { ...started.state.player, skills: {} } }
+    const at = advanceTo(later, later.timeline, event.finishAt, resolveBattleEvent)
+    assert.equal(at.timeline.events[0]!.payload.phase, kind === 'player' ? 'returning' : 'fighting')
+    if (kind === 'player') assert.equal((at.state.mail[0]!.body.rows as { damage: number }[])[0]!.damage, 0)
+  }
+})

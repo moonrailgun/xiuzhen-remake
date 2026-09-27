@@ -26,6 +26,8 @@ export type CombatSword = {
   readonly agility: number
   /** 护身不能出击，只能迎敌 */
   readonly defensiveOnly?: boolean
+  readonly instantAttackRatio?: number
+  readonly instantDefenseRatio?: number
 }
 
 export type SwordOutcome = {
@@ -106,9 +108,21 @@ export function defenseOrder(items: readonly CombatSword[]): readonly CombatSwor
   return [...items].sort((a, b) => Number(b.defensiveOnly ?? false) - Number(a.defensiveOnly ?? false))
 }
 
-/** 缠斗时长 = 双方敏捷之和（秒）。 */
-export const tangleDuration = (a: readonly CombatSword[], b: readonly CombatSword[]): number =>
-  [...a, ...b].reduce((sum, s) => sum + s.agility, 0)
+/** 剑心只作用于飞剑。按面板值同时判定、先于相生结算为重建，严格低于阈值为原文。 */
+function instantCuts(a: readonly CombatSword[], b: readonly CombatSword[]) {
+  return {
+    a: new Set(a.filter(s => !s.defensiveOnly && b.some(d => !d.defensiveOnly && s.attack < d.durability * (d.instantDefenseRatio ?? 0))).map(s => s.id)),
+    b: new Set(b.filter(s => !s.defensiveOnly && a.some(d => !d.defensiveOnly && s.durability < d.attack * (d.instantAttackRatio ?? 0))).map(s => s.id)),
+  }
+}
+
+/** 先剔除瞬断飞剑，再按双方敏捷算缠斗。 */
+export function tangleDuration(a: readonly CombatSword[], b: readonly CombatSword[]): number {
+  const cut = instantCuts(a, b)
+  const left = a.filter(s => !cut.a.has(s.id)), right = b.filter(s => !cut.b.has(s.id))
+  if ((cut.a.size || cut.b.size) && (!left.length || !right.length)) return 0
+  return [...left, ...right].reduce((sum, s) => sum + s.agility, 0)
+}
 
 /**
  * 结算一场遭遇。
@@ -122,8 +136,10 @@ export function resolveBattle(
   attackers: readonly CombatSword[],
   defenders: readonly CombatSword[],
 ): BattleResult {
-  const aBonus = generationBonus(attackers)
-  const dBonus = generationBonus(defenders)
+  const cut = instantCuts(attackers, defenders)
+  const activeA = attackers.filter(s => !cut.a.has(s.id)), activeD = defenders.filter(s => !cut.b.has(s.id))
+  const aBonus = generationBonus(activeA)
+  const dBonus = generationBonus(activeD)
 
   // **取整要在判定之前做，不能判定完了再各取各的。**
   // 相生加成会带小数（给方耐久的一半按被生剑数平分，100/2/3 = 16.67），
@@ -141,6 +157,7 @@ export function resolveBattle(
     myBonus: ReadonlyMap<string, { attack: number; durability: number }>,
     theirs: readonly CombatSword[],
     theirBonus: ReadonlyMap<string, { attack: number }>,
+    cutIds: ReadonlySet<string>,
   ): SwordOutcome[] => {
     if (mine.length === 0) return []
     // 官方算例（corpus/4309）：逐属性分摊，仅「我克」的那部分额外 +50%。
@@ -150,8 +167,8 @@ export function resolveBattle(
       dur: effDurability(s, myBonus),
       total: theirs.reduce((sum, t) => sum + effAttack(t, theirBonus)
         * (isCountering(t.element, s.element) ? COUNTER_MULTIPLIER : 1), 0),
-      incoming: 0,
-      broken: false,
+      incoming: cutIds.has(s.id) ? effDurability(s, myBonus) : 0,
+      broken: cutIds.has(s.id),
     }))
 
     // **断一把就重新分摊。** 一次性均摊解释不了真实战报：102139#L45 里 4 把同款
@@ -160,7 +177,7 @@ export function resolveBattle(
     // < 40960，第四把该是「完好无损」。改成断剑后幸存者重分摊：27187 先断掉前三把，
     // 最后一把独自吃 108748 ≥ 40960，正好对上。
     // 全库 31 场全表战报 6804 条记录：一次性均摊有 642 条「数学上不可能断」，迭代后降到 87。
-    let alive = rows
+    let alive = rows.filter(r => !r.broken)
     for (;;) {
       const n = alive.length
       if (n === 0) break
@@ -182,8 +199,8 @@ export function resolveBattle(
   }
 
   return {
-    attacker: side(attackers, aBonus, defenders, dBonus),
-    defender: side(defenders, dBonus, attackers, aBonus),
+    attacker: side(attackers, aBonus, activeD, dBonus, cut.a),
+    defender: side(defenders, dBonus, activeA, aBonus, cut.b),
     tangleSeconds: tangleDuration(attackers, defenders),
   }
 }

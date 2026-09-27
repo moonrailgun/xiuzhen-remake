@@ -21,7 +21,7 @@
 
 import { schedule, type GameEvent } from './timeline.ts'
 import { rand, randInt } from './rng.ts'
-import { resolveBattle, defenseOrder, type CombatSword } from './combat.ts'
+import { resolveBattle, defenseOrder, isCountering, COUNTER_MULTIPLIER, type CombatSword } from './combat.ts'
 import { lootFrom, knockback, woundedText, vaultCapacity } from './loot.ts'
 import { allNpcsAt } from './npc.ts'
 import { cancelAllMyOrders, ctxOf, applyCtx } from './market.ts'
@@ -71,6 +71,8 @@ export function defenders(state: GameState): readonly CombatSword[] {
         attack: panelStat(t.attack, a.quality, a.refine),
         durability: panelStat(t.durability, a.quality, a.refine),
         agility: panelStat([t.agility, t.agility], a.quality, a.refine),
+        // 同剑心通明按每级2%重建。
+        instantDefenseRatio: Math.max(0, Math.min(20, state.player.skills['剑心通灵'] ?? 0)) * 0.02,
       }
     })
     .filter((x): x is CombatSword => x !== null)
@@ -141,6 +143,13 @@ export function resolveRaid(state: GameState, event: GameEvent): GameState {
     durability: power * 2,
     agility: Math.max(1, Math.round(power / 8)),
   }))
+  // 先天先于法宝自动防御（2008-12-31 官方更新说明）。剑气20/级有后期旁证，罡气同量级重建。
+  const innate = (name: string) => Math.max(0, Math.min(20, s0.player.skills[name] ?? 0)) * 20
+  const cut = power * 2 < innate('先天剑气') * (isCountering(s0.player.element, element) ? COUNTER_MULTIPLIER : 1)
+  const repelled = power * (isCountering(element, s0.player.element) ? COUNTER_MULTIPLIER : 1) < innate('先天罡气')
+  if (cut || repelled) {
+    return { ...s0, mail: [raidMail(s0, attackerName, null, cut ? '先天剑气' : '先天罡气'), ...s0.mail].slice(0, 200) }
+  }
   const myItems = defenders(s0)
   const result = resolveBattle(attackers, myItems)
 
@@ -182,6 +191,7 @@ function raidMail(
   s: GameState,
   attacker: string,
   hurt: { readonly taken: FiveQi; readonly at: { x: number; y: number } } | null,
+  defense = '法宝',
 ): MailItem {
   const base = {
     id: `raid:${s.clock.gameT}:${attacker}`,
@@ -196,7 +206,7 @@ function raidMail(
       subject: `${attacker}攻击你`,
       body: {
         kind: 'text',
-        paragraphs: [`　　${attacker}的飞剑向你飞来，被你的法宝挡了下来。`],
+        paragraphs: [`　　${attacker}的飞剑向你飞来，被你的${defense}挡了下来。`],
       },
     }
   }

@@ -239,3 +239,15 @@ test('★tick 会自己安排来袭（不用 UI 主动调用）', () => {
   }
   assert.ok(sawRaid, '两个月里一次来袭都没有，说明没接进主循环')
 })
+
+test('先天剑气/罡气在护身之前生效，无装备也能挡住来袭；阈值含五行相克', () => {
+  for (const [skill, below, equal] of [['先天剑气', 14, 15], ['先天罡气', 19, 20]] as const) {
+    const b = withQi(base(), 10000)
+    const s = { ...b, player: { ...b.player, skills: { [skill]: 1 } } }
+    const held = resolveRaid(s, raidEvent(s, below))
+    assert.deepEqual(held.player.qi, s.player.qi, skill)
+    assert.deepEqual([held.player.x, held.player.y], [100, 100])
+    assert.match(JSON.stringify(held.mail[0]!.body), new RegExp(skill))
+    assert.notDeepEqual(resolveRaid(s, raidEvent(s, equal)).player.qi, s.player.qi)
+  }
+})

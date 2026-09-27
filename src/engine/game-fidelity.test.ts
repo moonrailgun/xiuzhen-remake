@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { newGame, importGame, currentQiPerHour, tick, terrainOf } from './game.ts'
-import { serialize } from './save.ts'
+import { serialize, SaveError } from './save.ts'
 import { DAY, HOUR } from './clock.ts'
 import { terrainAt } from '../data/world.ts'
 import { artifactUpkeepPerHour } from './craft.ts'
+import { socialOf } from './social.ts'
 import type { GameState } from './state.ts'
 
 const born = () => newGame({ name: '测试', gender: 'f', element: '木', school: '通天', x: 100, y: 100, seed: 8 }, 0)
@@ -60,4 +61,21 @@ test('主循环处理败劫碎丹并保留其他任务', () => {
   assert.equal(result.mail[0]?.body.won, false)
   assert.deepEqual(result.quests.entries.map(e => e.id), ['newbie:qi:1'])
   assert.deepEqual(importGame(serialize(result, 0)), result)
+})
+
+test('v8迁移v9补持久关系并立即迁走旧押镖，坏旧档统一SaveError', () => {
+  const s = born()
+  assert.ok(s.social)
+  const old = { ...s, v: 8, social: undefined, timeline: { events: [{ id: 'move:escort', kind: 'move', finishAt: DAY, payload: { op: 'escort', x: 101, y: 100, fee: 66 } }] } }
+  const migrated = importGame(JSON.stringify({ v: 8, savedAt: 0, state: old }))
+  assert.equal(migrated.v, 9)
+  assert.deepEqual(migrated.social, socialOf(s))
+  assert.equal(migrated.timeline.events.length, 0)
+  assert.deepEqual(migrated.quests.escort?.to, [101, 100])
+  assert.equal(migrated.player.silver, s.player.silver)
+  assert.equal(migrated.player.x, 100)
+  assert.deepEqual(importGame(serialize(migrated, 0)), migrated)
+  for (const npc of [null, {}, { bases: [null] }, { bases: '坏', patches: {} }]) {
+    assert.throws(() => importGame(JSON.stringify({ v: 8, savedAt: 0, state: { ...old, npc } })), SaveError)
+  }
 })

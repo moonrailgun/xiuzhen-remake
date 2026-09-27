@@ -6,6 +6,7 @@ import {
   acceptEscort,
   canReadFree,
   cancelEscort,
+  completeEscort,
   commerceLevel,
   exchangeNote,
   hourlyIncomeOf,
@@ -207,6 +208,18 @@ test('银两不够换不出大面额银票', () => {
 
 // —— 镖局：押镖 ——
 
+test('零本金新档可从未投资的城镇押镖赚取本金并开始投资', () => {
+  const village = town({ kind: '村庄', x: 0, y: 0, investments: [] })
+  const r = acceptEscort(state({ silver: 0, x: 0, y: 0 }), village, { x: 4, y: 0 })
+  assert.ok(r.ok)
+  const out = completeEscort({ ...r.state, player: { ...r.state.player, x: 4, y: 0 } }, { x: 4, y: 0 })
+  assert.ok(out.ok)
+  assert.equal(out.state.player.silver, 132)
+  const invested = invest(out.state, village, 100)
+  assert.ok(invested.ok)
+  assert.equal(hourlyIncomeOf(invested.town, out.state.player.name), 100)
+})
+
 test('运镖报价还原原文算例：Lv.1 村 → 105 格 = 3465 两', () => {
   const village = town({ kind: '村庄', investments: [{ owner: '别人', silver: 100 }] })
   const q = quoteEscort(village, { x: village.x + 105, y: village.y })
@@ -216,22 +229,28 @@ test('运镖报价还原原文算例：Lv.1 村 → 105 格 = 3465 两', () => {
   assert.equal(q.seconds, 105 * ESCORT_SECONDS_PER_CELL)
 })
 
-test('接镖到点：人到目的地，佣金入账', () => {
+test('接镖后时间流逝不会代替行走；到达目标与NPC交付才得佣金', () => {
   const village = town({ kind: '村庄', x: 0, y: 0, investments: [{ owner: '别人', silver: 100 }] })
-  const r = acceptEscort(state(), village, { x: 105, y: 0 })
+  const r = acceptEscort(state({ x: 0, y: 0 }), village, { x: 105, y: 0 })
   assert.ok(r.ok)
 
   const out = advanceTo<GameState>(r.state, r.state.timeline, 999_999, (s, ev) => ({
     state: ev.id === ESCORT_EVENT_ID ? resolveEscort(s, ev) : s,
   }))
-  assert.equal(out.state.player.silver, 3465)
-  assert.equal(out.state.player.x, 105)
-  assert.equal(out.state.player.y, 0)
+  assert.equal(out.state.player.silver, 0)
+  assert.equal(out.state.player.x, 0)
+  assert.equal(out.state.timeline.events.length, 0)
+  assert.equal(completeEscort(out.state, { x: 105, y: 0 }).ok, false)
+  const paid = completeEscort({ ...out.state, player: { ...out.state.player, x: 105, y: 0 } }, { x: 105, y: 0 })
+  assert.ok(paid.ok)
+  assert.equal(paid.state.player.silver, 3465)
+  assert.equal(paid.state.quests.escort, undefined)
+  assert.equal(completeEscort(paid.state, { x: 105, y: 0 }).ok, false)
 })
 
 test('一次只能接一趟镖', () => {
   const village = town({ kind: '村庄', x: 0, y: 0, investments: [{ owner: '别人', silver: 100 }] })
-  const first = acceptEscort(state(), village, { x: 10, y: 0 })
+  const first = acceptEscort(state({ x: 0, y: 0 }), village, { x: 10, y: 0 })
   assert.ok(first.ok)
   const second = acceptEscort(first.state, village, { x: 20, y: 0 })
   assert.equal(second.ok, false)
@@ -240,7 +259,7 @@ test('一次只能接一趟镖', () => {
 
 test('花 1 仙石取消跑镖', () => {
   const village = town({ kind: '村庄', x: 0, y: 0, investments: [{ owner: '别人', silver: 100 }] })
-  const accepted = acceptEscort(state({ coin: 1 }), village, { x: 10, y: 0 })
+  const accepted = acceptEscort(state({ coin: 1, x: 0, y: 0 }), village, { x: 10, y: 0 })
   assert.ok(accepted.ok)
 
   const r = cancelEscort(accepted.state)
@@ -281,4 +300,12 @@ test('心动任务「千金散尽」交 100 万两给李员外', () => {
   const r = payLiYuanwai({ ...active, quests: { ...active.quests, entries: [{ id: 'realm:qianjin:1', acceptedAt: 0, done: false }] } })
   assert.ok(r.ok)
   assert.equal(r.state.player.silver, 0)
+})
+
+
+test('旧自动押镖事件迁入待交付合同，不传送或自动发钱', () => {
+  const s = state()
+  const migrated = resolveEscort(s, { id: ESCORT_EVENT_ID, kind: 'move', finishAt: 100, payload: { op: 'escort', x: 30, y: 106, fee: 66 } })
+  assert.deepEqual([migrated.player.x, migrated.player.y, migrated.player.silver], [28, 106, 0])
+  assert.deepEqual(migrated.quests.escort?.to, [30, 106])
 })

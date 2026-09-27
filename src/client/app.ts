@@ -34,7 +34,7 @@ import { SKILL_TREES } from '../data/skills.ts'
 import { ranking } from '../engine/npc.ts'
 import {
   MAX_INVESTMENTS, commerceLevel, totalInvested, shareOf, hourlyIncomeOf,
-  invest, readBook, canReadFree, exchangeNote, teleport, payLiYuanwai, acceptEscort, quoteEscort,
+  invest, readBook, canReadFree, exchangeNote, teleport, payLiYuanwai, acceptEscort, completeEscort, cancelEscort, quoteEscort,
   BANK_NOTES, redeemNote, withdrawInvestment, type Town,
 } from '../engine/town.ts'
 import {
@@ -368,6 +368,7 @@ function rightVm(s: GameState) {
       abandonable: q.category !== 'realm',
     }
   })
+  if (s.quests.escort) quests.push({ id: 'escort', title: '押镖', detail: `请前往 (${s.quests.escort.to.join(',')}) 镖局交付`, abandonable: false })
   if (s.treasure) quests.push({ id: 'treasure', title: '机缘遇宝',
     detail: `目标地点：(${s.treasure.x},${s.treasure.y})`, abandonable: false })
   return { quests, guardingMe: socialOf(s).guardians.length, guardingOthers: socialOf(s).guardians.length, guardCap: 7 }
@@ -870,6 +871,9 @@ export function installGameActions(): void {
     const r = acceptEscort(s, town, { x, y })
     return r.ok ? r.state : { error: r.reason }
   })
+
+  g['completeEscort'] = () => withTown((town, s) => { const r = completeEscort(s, town); return r.ok ? r.state : { error: r.reason } })
+  g['cancelEscort'] = () => { if (state) { const r = cancelEscort(state); if (r.ok) { state = r.state; step() } } }
 
   g['readBook'] = (name: string) => withTown((town, s) => {
     const r = readBook(s, name, town.kind, { free: canReadFree(town, s.player.name) })
@@ -2074,6 +2078,12 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
 
   switch (def.id) {
     case 'escort': {
+      if (s.quests.escort) {
+        const e = s.quests.escort
+        const arrived = e.to[0] === town.x && e.to[1] === town.y
+        return box(`正在押镖：(${e.from.join(',')}) → (${e.to.join(',')})，佣金 ${e.fee} 两。<BR>` +
+          (arrived ? act('交付镖银', 'completeEscort()') : '请自行前往目的地镖局交付。') + act('放弃押镖', 'cancelEscort()'))
+      }
       // 唯一一段原文对话
       const dialog = escortDialog({ kind: town.kind, name: town.name, x: town.x, y: town.y, level })
       let destination: { x: number; y: number } | null = null
@@ -2475,6 +2485,12 @@ function skillWindow(s: GameState, id: number): string {
 }
 
 function questWindow(s: GameState, id: string): string {
+  if (id === 'escort' && s.quests.escort) {
+    const e = s.quests.escort
+    return `<DIV data-live-quest=escort class=middle style="padding:12px"><B>押镖</B><BR>
+从(${e.from.join(',')})前往(${e.to.join(',')})的镖局交付，完成后获得${e.fee}两银子。<BR>
+<A class=skillup href="#" onclick="cancelEscort()">放弃押镖</A></DIV>`
+  }
   if (id === 'treasure' && s.treasure) return `<DIV data-live-quest=treasure class=middle style="padding:12px"><B>机缘遇宝</B><BR>
 循着${esc(s.treasure.source)}的指引，前往(${s.treasure.x},${s.treasure.y})寻找宝藏。<BR>
 <A class=skillup href="#" onclick="claimTreasure()">开启宝藏</A></DIV>`

@@ -95,18 +95,22 @@ test('驿站拒绝世界外坐标、非整数和来袭中传送且不扣仙石',
   assert.equal(town.teleport(attacked, { x: 5, y: 5 }).ok, false)
 })
 
-test('押镖显示目的地与倒计时，并和普通移动互斥', () => {
+test('押镖保留目的地合同，玩家自行移动抵达后手交', () => {
   const s = base(), destination = { x: 7, y: 5 }
   const accepted = town.acceptEscort(s, localTown(), destination)
   assert.ok(accepted.ok)
-  const event = accepted.state.timeline.events.find(e => e.id === town.ESCORT_EVENT_ID)!
-  assert.deepEqual(moveDisplay(accepted.state), { current: { ...destination, seconds: event.finishAt } })
-  assert.equal(startMove(accepted.state, 6, 5).ok, false)
-  const moving = startMove(s, 6, 5)
+  assert.deepEqual(accepted.state.quests.escort?.to, [7, 5])
+  assert.equal(accepted.state.timeline.events.some(e => e.id === town.ESCORT_EVENT_ID), false)
+  const moving = startMove(accepted.state, 6, 5)
   assert.ok(moving.ok)
+  assert.equal(moveDisplay(moving.state)?.current?.x, 6)
+  assert.equal(town.completeEscort(moving.state, destination).ok, false)
   assert.equal(town.acceptEscort(moving.state, localTown(), destination).ok, false)
+  const arrived = tick(moving.state, 24 * 3600 * 1000).state
+  assert.equal(arrived.player.x, 6)
+  assert.equal(arrived.player.silver, s.player.silver)
+  assert.ok(arrived.quests.escort)
 })
-
 
 test('金丹可分批汇聚，压缩事件到点获得真元，十份后可交付', () => {
   const s = base()

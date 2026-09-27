@@ -10,11 +10,12 @@ import {
   loadGame,
   importGame,
 } from './game.ts'
-import { acceptEscort, hourlyIncomeOf, type Town } from './town.ts'
+import { acceptEscort, completeEscort, hourlyIncomeOf, type Town } from './town.ts'
 import { entryOf, startCoreCompression, CORE_COMPRESS_SECONDS, CORE_QI_POINTS } from './quest.ts'
 import { listQi, listArtifact, ctxOf, applyCtx, LISTING_DELAY_SECONDS, NPC_PURCHASE_DELAY_SECONDS, injectSecondsFor } from './market.ts'
 import { JINDAN_CHAIN } from '../data/quests.ts'
 import { launch } from './battle.ts'
+import { startMove } from './move.ts'
 import { startCultivate, capacityOf } from './cultivate.ts'
 import { DAY, HOUR, WEEK } from './clock.ts'
 import { isOutOfProtection } from './state.ts'
@@ -315,18 +316,26 @@ test('主循环结算全部产业收入，在线小步与离线一致', () => {
   assert.equal(online.player.silver, offline.player.silver)
 })
 
-test('运镖到期抵达并发佣金，余下离线时间按新位置产气', () => {
+test('押镖须亲自行走并手交，等待不传送或发钱，路程按真实位置产气', () => {
   const s = quiet()
   const town: Town = { id: 'town:100,100', name: '长安', kind: '小镇', x: 100, y: 100, investments: [] }
   const started = acceptEscort(s, town, { x: 101, y: 100 })
   assert.ok(started.ok)
-  const ev = started.state.timeline.events[0]!
   const terrain = (x: number) => qi(4, x === 100 ? 4 : 8, 4, 4, 4)
-  const out = tick(started.state, (ev.finishAt + HOUR) * 1000, terrain)
+  const waited = tick(started.state, HOUR * 1000, terrain).state
+  assert.equal(waited.player.x, 100)
+  assert.equal(waited.player.silver, 0)
+  const walk = startMove(waited, 101, 100)
+  assert.ok(walk.ok)
+  const ev = walk.state.timeline.events.find(e => e.kind === 'move')!
+  const out = tick(walk.state, (ev.finishAt + HOUR) * 1000, terrain)
   assert.equal(out.state.player.x, 101)
-  assert.equal(out.state.player.silver, ev.payload.fee)
+  assert.equal(out.state.player.silver, 0)
   assert.equal(out.state.player.qi[1], 12 * ev.finishAt / HOUR + 24)
-  assert.equal(out.state.timeline.events.length, 0)
+  const handIn = completeEscort(out.state, { x: 101, y: 100 })
+  assert.ok(handIn.ok)
+  assert.equal(handIn.state.player.silver, started.state.quests.escort!.fee)
+  assert.equal(completeEscort(handIn.state, { x: 101, y: 100 }).ok, false)
 })
 
 test('主循环把真实炼制完成计入炼制任务，只记一次', () => {

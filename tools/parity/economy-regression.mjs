@@ -8,6 +8,7 @@ import { serialize } from '../../src/engine/save.ts'
 import { WEEK } from '../../src/engine/clock.ts'
 import { hourlyIncomeOf } from '../../src/engine/town.ts'
 import { npcArtifactPrice } from '../../src/engine/market.ts'
+import { pathTo } from '../../src/engine/move.ts'
 import { terrainAt, WORLD_SIZE } from '../../src/data/world.ts'
 import { BANK_NOTES } from '../../src/data/town.ts'
 import { SWORDS } from '../../src/data/swords.ts'
@@ -101,21 +102,41 @@ try {
   await page.getByRole('link', { name: '镖局老板', exact: true }).click()
   await page.getByRole('link', { name: '领取运镖任务', exact: true }).click()
   const escortStarted = await saved()
-  const escort = escortStarted.timeline.events.find(e => e.payload.op === 'escort')
-  check('镖局创建真实运镖事件', !!escort)
+  const escort = escortStarted.quests.escort
+  check('镖局登记运镖委托', !!escort)
+  check('接镖不自动出发或建立传送事件', escortStarted.timeline.events.some(e => e.kind === 'move' || e.payload.op === 'escort'), false)
   check('目的地是另一处已开放城镇',
-    (escort.payload.x !== townPosition.x || escort.payload.y !== townPosition.y) &&
-    ['村庄', '小镇', '城池'].includes(terrainAt(seed, escort.payload.x, escort.payload.y, weeks)))
-  check('有产业的起点给出正佣金', escort.payload.fee > 0)
-  await page.clock.runFor(Math.ceil((escort.finishAt - escortStarted.clock.gameT) / 600) * 1000)
+    (escort.to[0] !== townPosition.x || escort.to[1] !== townPosition.y) &&
+    ['村庄', '小镇', '城池'].includes(terrainAt(seed, ...escort.to, weeks)))
+  check('有产业的起点给出正佣金', escort.fee > 0)
+  await page.clock.runFor(6000)
   current = await saved()
-  check('运镖计时完成后实际到站', [current.player.x, current.player.y], [escort.payload.x, escort.payload.y])
-  check('运镖完成消耗事件', current.timeline.events.some(e => e.id === escort.id), false)
-  check('运镖佣金和途中产业收益均到账', current.player.silver - escortStarted.player.silver,
-    escort.payload.fee + incomeBetween(escortStarted.towns[townKey], escortStarted.clock.gameT, current.clock.gameT))
+  check('原地等待不会完成押镖或移动', [current.player.x, current.player.y, !!current.quests.escort], [townPosition.x, townPosition.y, true])
+  await page.locator('#bigmenu a[href="map.jsp"]').click()
+  const path = pathTo(current.player.x, current.player.y, ...escort.to)
+  for (let i = 0; i < path.length; i += 2) {
+    const step = path[Math.min(i + 1, path.length - 1)]
+    await page.evaluate(({ x, y }) => onMapCellClick(x, y), step)
+    await page.locator('a[onclick="mapMenuMove()"]').click()
+    const walking = await saved()
+    const move = walking.timeline.events.find(e => e.kind === 'move')
+    assert.ok(move, '地图操作建立真实赶路事件')
+    const seconds = move.payload.legs.reduce((sum, leg) => sum + leg.seconds, 0)
+    await page.clock.runFor(Math.ceil(seconds / 600) * 1000)
+  }
+  current = await saved()
+  check('地图赶路完成后实际到站但仍须交镖', [current.player.x, current.player.y, !!current.quests.escort], [...escort.to, true])
+  check('到站之前只结算产业收益', current.player.silver - escortStarted.player.silver,
+    incomeBetween(escortStarted.towns[townKey], escortStarted.clock.gameT, current.clock.gameT))
   check('到站后重新显示当地镖局', await page.getByRole('link', { name: '镖局老板', exact: true }).isVisible())
+  await page.getByRole('link', { name: '镖局老板', exact: true }).click()
+  const beforeDelivery = await saved()
+  await page.getByRole('link', { name: '交付镖银', exact: true }).click()
+  current = await saved()
+  check('当地镖局交付才给佣金并清除委托', [current.player.silver, current.quests.escort], [beforeDelivery.player.silver + escort.fee, undefined])
 
   console.log('产业撤资确认与取消')
+  await page.locator('a[href="player.jsp"]').first().click()
   await page.locator('a[onclick*="estate.jsp"]').click()
   await page.getByRole('link', { name: '撤资', exact: true }).click()
   check('撤资显示真实确认框', await page.locator('#mwindow2').isVisible())
@@ -194,7 +215,8 @@ try {
   const coinAfterBuy = current.player.coin
   await page.clock.runFor(6000)
   check('继续推进不会重复结算法宝出售', (await saved()).player.coin, coinAfterBuy)
-  console.log('品质提升')
+
+  console.log('品质提升和普通书籍寄卖')
   await page.locator('a[href="item.jsp"]').first().click()
   const beforeQuality = await saved()
   const qualityIndex = beforeQuality.player.artifacts.findIndex(a => a.id === qualityArtifact.id) + 1

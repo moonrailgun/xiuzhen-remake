@@ -128,8 +128,9 @@ export const PAYOUT_BASE_INCOME = 100
 export const PAYOUT_EXPONENT = Math.log(262 / 33) / Math.log(2100 / 100)
 
 export function payoutIndex(kind: TownKind, level: number): number {
-  const { income } = commerceRow(kind, level)
-  if (income <= 0) return 0
+  // [重建] 零级沿用一级基础佣金，避免单机新档零本金、零佣金的死锁。
+  // 只影响运镖报价，商业等级和产业收益仍按实际投资计算。见 DECISIONS-rules §43。
+  const { income } = commerceRow(kind, Math.max(1, level))
   return Math.round(PAYOUT_BASE_INDEX * (income / PAYOUT_BASE_INCOME) ** PAYOUT_EXPONENT)
 }
 

@@ -5,12 +5,12 @@
  * 钱庄掌柜、村长(镇长/太守)，城池另有驿站与李员外。数值与对话见 `src/data/town.ts`。
  *
  * 证据强弱差很多：**商业等级表、书籍阅历表、镖局对话**是原文；
- * **运镖佣金公式、运镖耗时、驿站价目**是重建（`town.ts` 里逐条标了）。
+ * **运镖佣金公式、驿站价目**是重建（`town.ts` 里逐条标了）；运镖沿用玩家行走时间。
  *
  * 城镇保存在 `GameState.towns`；投资操作返回新城镇，由调用方更新对应条目。
  */
 
-import { schedule, cancel, type GameEvent } from './timeline.ts'
+import { cancel, type GameEvent } from './timeline.ts'
 import type { Artifact, GameState } from './state.ts'
 import { spendCoin, type StartResult } from './cultivate.ts'
 import { activeQuests, paySilver } from './quest.ts'
@@ -270,50 +270,48 @@ export function quoteEscort(from: Town, to: { readonly x: number; readonly y: nu
   }
 }
 
-/** 接镖。运到目的地后与当地镖局老板对话完成（这里到点即结算）。 */
+/** 接镖只登记委托；须自行移动至目的地并找当地NPC交付。 */
 export function acceptEscort(
   state: GameState,
   from: Town,
   to: { readonly x: number; readonly y: number },
 ): StartResult {
   if (!Number.isInteger(to.x) || !Number.isInteger(to.y) || !inWorld(to.x, to.y)) return { ok: false, reason: '目的地坐标不正确' }
-  if (state.timeline.events.some((e) => e.id === ESCORT_EVENT_ID)) {
+  if (state.quests.escort || state.timeline.events.some((e) => e.id === ESCORT_EVENT_ID)) {
     return { ok: false, reason: '你已经有一趟镖在身上了' }
   }
   if (state.timeline.events.some(e => e.kind === 'move')) return { ok: false, reason: '移动途中无法接镖' }
+  if (state.player.x !== from.x || state.player.y !== from.y) return { ok: false, reason: '请先到达起点镖局' }
   const quote = quoteEscort(from, to)
   if (quote.distance <= 0) return { ok: false, reason: '请选择别的州县' }
 
-  const event: GameEvent = {
-    id: ESCORT_EVENT_ID,
-    kind: 'move',
-    finishAt: state.clock.gameT + quote.seconds,
-    payload: { op: 'escort', x: to.x, y: to.y, fee: quote.fee },
-  }
-  return { ok: true, state: { ...state, timeline: schedule(state.timeline, event) } }
+  return { ok: true, state: { ...state, quests: { ...state.quests,
+    escort: { from: [from.x, from.y], to: [to.x, to.y], fee: quote.fee, acceptedAt: state.clock.gameT },
+  } } }
 }
 
-/** 花 1 仙石取消跑镖。[原文] 2009-12-25 公告。 */
+/** 花1仙石取消沿用既有实现；价格只见晚期资料，基准期取值属于重建。 */
 export function cancelEscort(state: GameState): StartResult {
-  if (!state.timeline.events.some((e) => e.id === ESCORT_EVENT_ID)) {
-    return { ok: false, reason: '你没有在跑镖' }
-  }
+  if (!state.quests.escort && !state.timeline.events.some((e) => e.id === ESCORT_EVENT_ID)) return { ok: false, reason: '你没有在跑镖' }
   const paid = spendCoin(state, ESCORT_CANCEL_COIN)
   if (!paid.ok) return paid
-  return { ok: true, state: { ...paid.state, timeline: cancel(paid.state.timeline, ESCORT_EVENT_ID) } }
+  return { ok: true, state: { ...paid.state, quests: { ...paid.state.quests, escort: undefined }, timeline: cancel(paid.state.timeline, ESCORT_EVENT_ID) } }
 }
 
-/** 运镖到点：人到目的地，佣金入账。 */
+export function completeEscort(state: GameState, town: { readonly x: number; readonly y: number }): StartResult {
+  const escort = state.quests.escort
+  if (!escort) return { ok: false, reason: '你没有在跑镖' }
+  if (state.timeline.events.some(e => e.kind === 'move') || state.player.x !== escort.to[0] || state.player.y !== escort.to[1] || town.x !== escort.to[0] || town.y !== escort.to[1]) return { ok: false, reason: '请到目的地与当地NPC交付镖物' }
+  return { ok: true, state: { ...state, quests: { ...state.quests, escort: undefined }, player: { ...state.player, silver: state.player.silver + escort.fee } } }
+}
+
+/** 旧档自动运镖事件保留佣金与目的地，迁为待完成合同；绝不自动传送、发钱。 */
 export function resolveEscort(state: GameState, event: GameEvent): GameState {
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      x: event.payload['x'] as number,
-      y: event.payload['y'] as number,
-      silver: state.player.silver + (event.payload['fee'] as number),
-    },
-  }
+  if (state.quests.escort) return { ...state, timeline: cancel(state.timeline, event.id) }
+  return { ...state, timeline: cancel(state.timeline, event.id), quests: { ...state.quests, escort: {
+    from: [state.player.x, state.player.y], to: [Number(event.payload['x']), Number(event.payload['y'])],
+    fee: Number(event.payload['fee']), acceptedAt: Math.min(state.clock.gameT, event.finishAt),
+  } } }
 }
 
 // —— 驿站 ——
@@ -330,6 +328,7 @@ export function teleport(
   if (!Number.isInteger(to.x) || !Number.isInteger(to.y) || !inWorld(to.x, to.y)) return { ok: false, reason: '目的地坐标不正确' }
   const blocked = sanctuaryEntryBlocker(state, to.x, to.y)
   if (blocked) return { ok: false, reason: blocked }
+  if (state.quests.escort) return { ok: false, reason: '押镖途中不能使用驿站，请自行前往目的地' }
   if (opts.underAttack || state.timeline.events.some(e => e.kind === 'raid')) return { ok: false, reason: '你正在被攻击，无法使用驿站' }
   if (state.timeline.events.some(e => e.kind === 'move')) return { ok: false, reason: '移动途中无法使用驿站' }
   if (opts.fromKind && opts.fromKind !== '城池') return { ok: false, reason: '只有城池才有驿站' }

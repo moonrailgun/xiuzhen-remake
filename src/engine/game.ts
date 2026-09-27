@@ -37,7 +37,7 @@ import { socialOf } from './social.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
 export const MIGRATIONS: readonly Migration[] = [
-  // v8 → v9：本地关系持久化。
+  // v8 → v9：本地关系持久化；新增任务与战斗字段均可选，旧押镖在校验后迁走。
   { from: 8, migrate: (old) => {
     const s = old as GameState | null
     // 校验前只读取最小安全形状；坏旧档交给 validateGameState 统一报 SaveError。
@@ -347,7 +347,14 @@ export function importGame(text: string): GameState {
 function settleLoaded(state: GameState): GameState {
   // **读档不补货。** 补货只在整点边界做（见 `tick` 末尾那段注释），在这里补会让
   // 存档往返不是恒等 —— 存盘时 0 张、读回来 12 张。老存档的播种交给 v3→v4 迁移。
-  return { ...state, quests: expireDailyQuests(state.quests, state.clock.gameT), v: SAVE_VERSION }
+  let settled = state
+  for (const event of state.timeline.events) {
+    if (event.kind === 'move' && event.payload.op === 'escort') {
+      settled = resolveEscort(settled, event)
+      settled = { ...settled, timeline: cancel(settled.timeline, event.id) }
+    }
+  }
+  return { ...settled, quests: expireDailyQuests(settled.quests, settled.clock.gameT), v: SAVE_VERSION }
 }
 
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */
@@ -363,6 +370,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const optionalNumber = (v: unknown) => v === undefined || number(v)
   const integer = (v: unknown) => number(v) && Number.isSafeInteger(v)
   const coordinate = (v: unknown) => integer(v) && (v as number) < WORLD_SIZE
+  const point = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(coordinate)
   const xy = (v: Record<string, unknown>) => coordinate(v.x) && coordinate(v.y)
   const ids = (v: unknown) => Array.isArray(v) && v.every(integer)
   const idMap = (v: unknown, valid: (item: unknown) => boolean) => object(v) &&
@@ -393,7 +401,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
         return number(data.toLevel) && (data.system === 'skill' ? string(data.id)
           : ['meridian', 'body'].includes(data.system as string) && number(data.index) && Number.isInteger(data.index) && data.index < (data.system === 'body' ? 8 : 12))
       case 'move':
-        if (data.op === 'escort') return numeric(data, ['x', 'y', 'fee'])
+        if (data.op === 'escort') return xy(data) && number(data.fee)
         if (data.op === 'flight') return numeric(data, ['x', 'y']) && string(data.swordId) &&
           [data.x, data.y].every(v => Number.isInteger(v) && (v as number) < WORLD_SIZE)
         return number(data.index) && Number.isInteger(data.index) &&
@@ -465,6 +473,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
         (q.coreElement === undefined || element(q.coreElement)) &&
         (q.coreElements === undefined || Array.isArray(q.coreElements) && q.coreElements.length <= 10 && q.coreElements.every(element)) &&
         optionalRatio(q.corePurity) && (q.coreEventId === undefined || string(q.coreEventId)) && optionalBool(q.cleared)) ||
+      (quests.escort !== undefined && (!object(quests.escort) || !point(quests.escort.from) || !point(quests.escort.to) || !numeric(quests.escort, ['fee', 'acceptedAt']))) ||
       (quests.sanctuaries !== undefined && !arrayOf(quests.sanctuaries, place => xy(place) && ['福地', '洞天'].includes(place.kind as string) && number(place.occupiedAt))) ||
       !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
         optionalNumber(o.listedAt) &&

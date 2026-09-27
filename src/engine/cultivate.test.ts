@@ -217,8 +217,8 @@ test('加速不影响炼器事件（只作用于修炼队列）', () => {
   }
   const r = speedUp(withCraft, 'finish')
   const after = (r as { state: GameState }).state
-  assert.equal(after.timeline.events[0]!.finishAt, 10000, '炼器事件不受影响')
-  assert.equal(after.timeline.events[1]!.finishAt, s.clock.gameT, '修炼事件立即完成')
+  assert.equal(after.timeline.events.find(e => e.id === 'c1')!.finishAt, 10000, '炼器事件不受影响')
+  assert.equal(after.timeline.events.find(e => e.id === 'cultivate:body:0')!.finishAt, s.clock.gameT, '修炼事件立即完成')
 })
 
 test('★加速：队列空着不扣仙石，结丹压缩也不在加速范围内', () => {
@@ -329,4 +329,21 @@ test('F05：丹田新修炼不开放后期36级，既有36级容量仍保留', (
   const s = state({ body: [0, 0, 0, 0, 0, 30, 0, 0] })
   assert.equal(startCultivate(s, { system: 'body', index: 5 }).ok, false)
   assert.equal(capacityOf(state({ body: [0, 0, 0, 0, 0, 36, 0, 0] })), 1400000)
+})
+
+test('F23：普通VIP第二项接在第一项之后，半/完加速同时重排', () => {
+  const s = state({ vip: true })
+  const first = startCultivate(s, { system: 'meridian', index: 0 })
+  assert.ok(first.ok)
+  const secondTarget = { system: 'body', index: 0 } as const
+  const second = startCultivate(first.state, secondTarget)
+  assert.ok(second.ok)
+  const [a, b] = second.state.timeline.events
+  assert.equal(b!.finishAt, a!.finishAt + planUpgrade(first.state, secondTarget).seconds)
+  const half = speedUp(second.state, 'half')
+  assert.ok(half.ok)
+  assert.deepEqual(half.state.timeline.events.map(e => e.finishAt), [a!.finishAt / 2, b!.finishAt / 2])
+  const finish = speedUp(second.state, 'finish')
+  assert.ok(finish.ok)
+  assert.ok(finish.state.timeline.events.every(e => e.finishAt === s.clock.gameT))
 })

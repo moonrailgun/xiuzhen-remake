@@ -1268,7 +1268,7 @@ export function installGameActions(): void {
     }))
   }
 
-  /** 怀旧版设置里的 VIP 开关。规则照原版：多一条修炼队列、多 5 个法宝格。 */
+  /** 怀旧版设置里的 VIP 开关。规则照原版：多一个待修名额（顺序修炼）、多 5 个法宝格。 */
   g['toggleVip'] = () => {
     if (!state) return
     state = { ...state, player: { ...state.player, vip: !state.player.vip } }

@@ -155,8 +155,8 @@ export function startCultivate(
   // 那句话写在它之前。占队列的话，非 VIP 结丹期间 10 轮 × 12 小时 = 120 游戏小时
   // 连一条经脉都升不了，这个惩罚没有任何依据。[重建：按炼器同例处理]
   const inQueue = state.timeline.events
-    .filter((e) => e.kind === 'cultivate' && e.payload['op'] !== 'goldenCore').length
-  if (inQueue >= slots) {
+    .filter((e) => e.kind === 'cultivate' && e.payload['op'] !== 'goldenCore')
+  if (inQueue.length >= slots) {
     return { ok: false, reason: '修炼队列已满' }
   }
 
@@ -173,7 +173,8 @@ export function startCultivate(
   const event: GameEvent = {
     id,
     kind: 'cultivate',
-    finishAt: state.clock.gameT + plan.seconds,
+    // 50102-p1.txt：普通VIP是串行等待，第二项在第一项之后完成。
+    finishAt: Math.max(state.clock.gameT, ...inQueue.map(e => e.finishAt)) + plan.seconds,
     payload: { ...target, toLevel: plan.toLevel },
   }
 
@@ -292,5 +293,6 @@ export function speedUp(
         }
       : e,
   )
+  events.sort((a, b) => a.finishAt - b.finishAt)
   return { ok: true, state: { ...paid.state, timeline: { events } } }
 }

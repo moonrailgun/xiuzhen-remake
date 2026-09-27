@@ -21,7 +21,7 @@ export type SettingsVm = {
   /** 存档是否可用（隐私模式下可能不可用） */
   readonly storageOk: boolean
   /**
-   * VIP 是否开着。原版 VIP 是充值功能（多一条修炼队列、多 5 个法宝格）；
+   * VIP 是否开着。原版 VIP 是充值功能（多一个待修名额（顺序修炼）、多 5 个法宝格）；
    * 单机版没有收费的意义，所以做成这里的一个开关，让那条队列摸得到。
    */
   readonly vip: boolean
@@ -55,7 +55,7 @@ ${row(
     'VIP',
     `${vm.vip ? '<B>已开</B>' : '已关'}　` +
     `<A class=skillup href="#" onclick="toggleVip()">${vm.vip ? '关掉' : '打开'}</A><BR>` +
-    '<SPAN class=smallgray>原版 VIP 是充值功能：多一条修炼队列、多 5 个法宝格。' +
+    '<SPAN class=smallgray>原版 VIP 是充值功能：多一个待修名额（顺序修炼）、多 5 个法宝格。' +
     '单机版不收费，做成开关。</SPAN>',
   )}
 ${row(

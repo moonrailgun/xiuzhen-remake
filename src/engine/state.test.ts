@@ -49,6 +49,15 @@ test('道行的中文写法（排行榜「九年零二个月」）', () => {
   assert.equal(daoxingText(4380), '一年')
   assert.equal(daoxingText(0), '零个月')
   assert.equal(daoxingText(13 * 4380), '十三年')
+  for (const [years, expected] of [
+    [99, '九十九'], [100, '一百'], [101, '一百零一'], [110, '一百一十'],
+    [117, '一百一十七'], [1000, '一千'], [1010, '一千零一十'],
+    [10000, '一万'], [10010, '一万零一十'], [100000, '十万'],
+    [100000001, '一亿零一'],
+  ] as const) {
+    assert.equal(daoxingText(years * DAOXING_PER_YEAR), `${expected}年`)
+  }
+  assert.equal(daoxingText(1017 * DAOXING_PER_YEAR + 11 * 365), '一千零一十七年零十一个月')
 })
 
 // —— 保护期 ——

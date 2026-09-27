@@ -183,10 +183,15 @@ export function daoxingText(points: number): string {
   const totalMonths = Math.floor((points / DAOXING_PER_YEAR) * 12)
   const years = Math.floor(totalMonths / 12)
   const months = totalMonths % 12
-  const cn = (n: number): string => {
+  const cn = (n: number, leading = true): string => {
     const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
     if (n < 10) return digits[n]!
-    if (n < 20) return n === 10 ? '十' : `十${digits[n % 10]}`
+    for (const [unit, label] of [[1e12, '兆'], [1e8, '亿'], [1e4, '万'], [1000, '千'], [100, '百']] as const) {
+      if (n < unit) continue
+      const remainder = n % unit
+      return `${cn(Math.floor(n / unit))}${label}${remainder ? `${remainder < unit / 10 ? '零' : ''}${cn(remainder, false)}` : ''}`
+    }
+    if (n < 20) return `${leading ? '' : '一'}十${n % 10 ? digits[n % 10] : ''}`
     return `${digits[Math.floor(n / 10)]}十${n % 10 ? digits[n % 10] : ''}`
   }
   if (years === 0) return `${cn(months)}个月`

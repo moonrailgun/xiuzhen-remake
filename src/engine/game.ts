@@ -12,14 +12,14 @@ import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { artifactUpkeepPerHour, resolveCraft } from './craft.ts'
-import { generateNpcs } from './npc.ts'
+import { allNpcsAt, generateNpcs } from './npc.ts'
 import { applyQuestProgress, emptyQuestLog, expireDailyQuests, resolveQuestBattle } from './quest.ts'
 import { resolveEscort, settleTownIncome } from './town.ts'
 import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, settleNpcPurchases, ctxOf, applyCtx } from './market.ts'
 import { scheduleRaid, resolveRaidEvent } from './raid.ts'
 import { seedRng } from './rng.ts'
 import { save, load, importSave, SaveError, SAVE_VERSION, type Storage, type Migration } from './save.ts'
-import { floorQi, type GameState, type Player, type FiveQi } from './state.ts'
+import { floorQi, isOutOfProtection, PROTECTION_DAYS, PROTECTION_POINTS, type GameState, type Player, type FiveQi } from './state.ts'
 import {
   hourlyQi,
   groupElement,
@@ -188,6 +188,13 @@ export function currentQiPerHour(
 
   const upkeep = state.player.artifacts.map(a => artifactUpkeepPerHour(a, self))
 
+  const sharingPlayers = isOutOfProtection(state.player, state.clock.gameT, DAY) &&
+    sanctuaryQi(state, state.player.x, state.player.y) === null
+    ? 1 + allNpcsAt(state.npc, state.clock.gameT, state.worldSeed).filter(n =>
+      n.x === state.player.x && n.y === state.player.y &&
+      (n.daoxing >= PROTECTION_POINTS || state.clock.gameT - n.base.bornAt >= PROTECTION_DAYS * DAY)).length
+    : 1
+
   return ELEMENTS.map((element, i) => {
     // 找出炼化这种真气的那一组经脉；克我的那一种没有对应组，恒为 0
     const group = MERIDIAN_GROUPS.find((g) => groupElement(self, g) === element)
@@ -201,6 +208,7 @@ export function currentQiPerHour(
     return hourlyQi({
       terrainQi: terrainQi[i] ?? 0,
       meridianLevels: [levels[0] ?? 0, levels[1] ?? 0, levels[2] ?? 0],
+      sharingPlayers,
       itemUpkeep: upkeep.reduce((sum, qi) => sum + qi[i]!, 0),
     })
   }) as unknown as FiveQi
@@ -223,7 +231,10 @@ export function tick(
   while (true) {
     const event = sorted(current.timeline)[0]
     const purchaseAt = nextNpcPurchaseAt(current)
-    const at = Math.max(current.clock.gameT, Math.min(clock.gameT, nextHour, event?.finishAt ?? Infinity, purchaseAt ?? Infinity))
+    // 建号时刻不一定在整点；出保会改变地气分享，必须在准确边界分段。
+    const protectionAt = Math.min(...[current.player.createdAt, ...current.npc.bases.map(n => n.bornAt)]
+      .map(t => t + PROTECTION_DAYS * DAY).filter(t => t > current.clock.gameT))
+    const at = Math.max(current.clock.gameT, Math.min(clock.gameT, nextHour, protectionAt, event?.finishAt ?? Infinity, purchaseAt ?? Infinity))
     const elapsed = at - current.clock.gameT
     if (elapsed > 0) {
       const weeks = Math.floor(at / WEEK) - Math.floor(current.clock.gameT / WEEK)

@@ -450,6 +450,9 @@ function render(live = false): void {
       morph(current, next, { keepDrafts: live })
     }
   }
+  for (const quest of app.querySelectorAll<HTMLElement>('[data-live-quest]')) {
+    if (quest.parentElement) morph(quest.parentElement, questWindow(s, quest.dataset['liveQuest']!), { keepDrafts: true })
+  }
   startCountdowns(app)
 }
 
@@ -2501,7 +2504,7 @@ function questWindow(s: GameState, id: string): string {
   const entry = s.quests.entries.find((e) => e.id === id)
   const done = entry ? goalMet(q, entry, s) : false
   const loc = q.goal.kind === 'slay' ? (entry?.at ?? questLocation(s, q)) : null
-  return renderQuest({
+  return `<DIV data-live-quest="${esc(id)}">${renderQuest({
     id: q.id,
     title: questTitle(q),
     summary: q.summary,
@@ -2517,7 +2520,7 @@ function questWindow(s: GameState, id: string): string {
       : q.goal.kind === 'choice' ? { kind: 'choice' }
       : q.goal.kind === 'goldenCore' ? { kind: 'goldenCore', gathered: entry?.coreQi ?? 0, cores: entry?.count ?? 0, compressing: !!entry?.coreEventId }
       : undefined,
-  })
+  })}</DIV>`
 }
 
 function rankVm(s: GameState, tab: RankTab) {

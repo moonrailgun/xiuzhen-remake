@@ -153,17 +153,6 @@ test('来袭祭剑计入同时控制上限，拒绝援助不会占用 NPC 装备
   assert.equal(npcAt(accepted.npc, friend, s.clock.gameT, s.worldSeed).artifacts[0]!.status, '空闲')
 })
 
-test('旧存档出击快照缺吸收时仍沿用同剑品质淬炼的搬运容量', () => {
-  const a = artifact('a', { refine: 4 }), s = state([a]), base = s.npc.bases[0]!
-  const r = launch({ ...s, npc: patchNpc(s.npc, base.id, { artifacts: [] }) }, { ...monster, kind: 'player', npcId: base.id, name: base.name }, [sword(a)])
-  assert.ok(r.ok)
-  const event = r.state.timeline.events[0]!
-  const stored = event.payload['swords'] as LaunchSword[]
-  const { absorb: _absorb, ...oldStats } = stored[0]!.launchedStats!
-  const old = { ...r.state, timeline: { events: [{ ...event, payload: { ...event.payload, swords: [{ ...stored[0]!, launchedStats: oldStats }] } }] } }
-  assert.ok((finish(old).npc.patches[base.id]?.qiLost ?? 0) > 0)
-})
-
 test('护身拖延中开启免战，结束来袭会释放已祭剑与护身', () => {
   const guard = artifact('guard', { kind: 'guard', name: '指玄道藏碑', quality: '上品', refine: 5 })
   const a = artifact('a'), s = state([guard, a])
@@ -175,4 +164,33 @@ test('护身拖延中开启免战，结束来袭会释放已祭剑与护身', ()
   const ended = resolveRaidEvent({ ...raised.state, peaceUntil: waiting.finishAt + 1 }, waiting)
   assert.deepEqual(ended.state.player.artifacts.map(a => a.status), ['空闲', '空闲'])
   assert.ok(!ended.follow?.length)
+})
+
+test('调教任务按指定时长占剑，出发与返航仍走同一事件线', () => {
+  const a = artifact('a'), s = state([a])
+  const launched = launch(s, { ...monster, trainingSeconds: 7200, questId: 'training:1' }, [sword(a)])
+  assert.ok(launched.ok)
+  const outbound = launched.state.timeline.events[0]!
+  const arrived = resolveBattleEvent(launched.state, outbound)
+  const fight = arrived.follow![0]!
+  assert.equal(fight.finishAt - outbound.finishAt, 7200)
+  assert.equal(arrived.state.player.artifacts[0]!.status, '绞杀中')
+  const before = advanceTo(arrived.state, { events: [fight] }, fight.finishAt - 1, resolveBattleEvent)
+  assert.equal(before.state.mail.length, 0)
+  assert.equal(before.timeline.events.length, 1)
+  const ended = resolveBattleEvent(before.state, fight)
+  assert.ok(ended.outcome?.won)
+  assert.equal(ended.follow![0]!.payload['phase'], 'returning')
+  assert.equal(ended.state.player.artifacts[0]!.status, '返回中')
+})
+
+test('旧存档出击快照缺吸收时仍沿用同剑品质淬炼的搬运容量', () => {
+  const a = artifact('a', { refine: 4 }), s = state([a]), base = s.npc.bases[0]!
+  const r = launch({ ...s, npc: patchNpc(s.npc, base.id, { artifacts: [] }) }, { ...monster, kind: 'player', npcId: base.id, name: base.name }, [sword(a)])
+  assert.ok(r.ok)
+  const event = r.state.timeline.events[0]!
+  const stored = event.payload['swords'] as LaunchSword[]
+  const { absorb: _absorb, ...oldStats } = stored[0]!.launchedStats!
+  const old = { ...r.state, timeline: { events: [{ ...event, payload: { ...event.payload, swords: [{ ...stored[0]!, launchedStats: oldStats }] } }] } }
+  assert.ok((finish(old).npc.patches[base.id]?.qiLost ?? 0) > 0)
 })

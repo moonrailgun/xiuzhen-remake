@@ -35,8 +35,8 @@ import {
   type Realm,
 } from './state.ts'
 import { ELEMENTS, MERIDIANS, generatedBy, generates, groupElement, overcomes, type Element } from '../data/meridian.ts'
-import { sanctuaryEntryBlocker, sanctuaryKindAt } from './sanctuary.ts'
 import { WORLD_SIZE } from '../data/world.ts'
+import { sanctuaryEntryBlocker, sanctuaryKindAt } from './sanctuary.ts'
 import {
   SANSHI_SPAWN_WEEKDAY,
   chainsFor,
@@ -84,8 +84,8 @@ export type QuestLog = {
   /** 已领的境界奖励累计的丹田上限加成（辟谷 +5000、心动 +10000、元婴 160000）。 */
   readonly dantianBonus: number
   readonly escort?: { readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly fee: number; readonly acceptedAt: number }
-  readonly wenchang?: { readonly usedWeek: number; readonly expiresAt: number; readonly at: readonly [number, number]; readonly book: string; readonly reward?: string }
   readonly sanctuaries?: readonly { readonly x: number; readonly y: number; readonly kind: '福地' | '洞天'; readonly occupiedAt: number }[]
+  readonly wenchang?: { readonly usedWeek: number; readonly expiresAt: number; readonly at: readonly [number, number]; readonly book: string; readonly reward?: string }
 }
 
 export const emptyQuestLog = (line: NewbieLine = 'qi'): QuestLog => ({
@@ -273,7 +273,7 @@ export function goalMet(q: Quest, entry: QuestEntry, state: GameState): boolean 
  */
 export function questLocation(state: GameState, q: Quest): readonly [number, number] {
   if (q.at) return q.at
-  if (q.series === '祭炼石碑') return [state.player.x, state.player.y]
+  if (q.series === '祭炼石碑' || q.series === '调教侠客') return [state.player.x, state.player.y]
   const seed = state.worldSeed
   // 三尸「只在周六现身」，所以它每周换一处；其余任务的落点只由 worldSeed + 任务 id 决定。
   const weekKey = q.series === '斩却三尸' ? Math.floor(state.clock.gameT / (7 * DAY)) : 0
@@ -498,6 +498,8 @@ export type QuestBattleTarget = {
   readonly agility: number
   readonly hp: number
   readonly element: Monster['element']
+  readonly trainingSeconds?: number
+  readonly questId?: string
 }
 
 export const targetOfMonster = (
@@ -517,9 +519,11 @@ export const targetOfMonster = (
 /** 已领取的斩妖任务的出击目标；不是斩妖任务或没领取时返回 null。 */
 export function questTarget(log: QuestLog, id: string, gameT?: number): QuestBattleTarget | null {
   const entry = entryOf(log, id)
-  const goal = questOf(log, id)?.goal
+  const q = questOf(log, id)
+  const goal = q?.goal
   if (!entry || entry.done || entry.cleared || goal?.kind !== 'slay' || !entry.at || (gameT !== undefined && dailyQuestExpired(log, entry, gameT))) return null
-  return targetOfMonster(goal.monster, entry.at)
+  const target = targetOfMonster(goal.monster, entry.at)
+  return q?.trainingSeconds ? { ...target, trainingSeconds: q.trainingSeconds, questId: id } : target
 }
 
 /**

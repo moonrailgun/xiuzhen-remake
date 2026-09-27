@@ -414,6 +414,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
         return ['outbound', 'fighting', 'returning'].includes(data.phase as string) &&
           object(data.target) && strings(data.target, ['name']) && ['monster', 'player'].includes(data.target.kind as string) &&
           xy(data.target) && numeric(data.target, ['attack', 'agility', 'hp']) && combatElement(data.target.element) && optionalNumber(data.target.npcId) &&
+          optionalNumber(data.target.trainingSeconds) && (data.target.questId === undefined || string(data.target.questId)) &&
           Array.isArray(data.swordIds) && data.swordIds.every(string) && arrayOf(data.swords, launchSword) &&
           (data.defenders === undefined || arrayOf(data.defenders, combatSword)) && aid(data.aid) &&
           (data.loot === undefined || numbers(data.loot, 5)) &&

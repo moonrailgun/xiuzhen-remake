@@ -407,10 +407,10 @@ test('心动→金丹的任务描述是唯一有原文的境界任务描述', ()
 // 通用不变量
 // ===========================================================================
 
-test('每条任务都带 source，id 不重复，总数 140', () => {
+test('每条任务都带 source，id 不重复，总数 147', () => {
   for (const line of ['qi', 'sword'] as const) {
     const all = questsFor(line)
-    assert.equal(all.length, 22 + 100 + 16 + 2, `${line} 线总数`)
+    assert.equal(all.length, 22 + 100 + 16 + 7 + 2, `${line} 线总数`)
     assert.equal(new Set(all.map((q) => q.id)).size, all.length, `${line} 线 id 不重复`)
     for (const q of all) {
       assert.ok(q.source.length > 0, `${q.id} 缺 source`)

@@ -33,6 +33,8 @@ export type BattleTarget = {
   readonly kind: 'monster' | 'player'
   /** NPC稳定标识；旧存档仅在名字唯一时回退。 */
   readonly npcId?: number
+  readonly trainingSeconds?: number
+  readonly questId?: string
   readonly name: string
   readonly x: number
   readonly y: number
@@ -209,7 +211,7 @@ function enemySwords(state: GameState, target: BattleTarget, event?: GameEvent):
   return npc ? npcCombatArtifacts(npc) : [targetToCombat(target)]
 }
 const battleSeconds = (target: BattleTarget, swords: readonly CombatSword[], enemies: readonly CombatSword[]) =>
-  tangleDuration(swords, enemies)
+  target.trainingSeconds ?? tangleDuration(swords, enemies)
 
 export type BattleOutcome = {
   readonly won: boolean

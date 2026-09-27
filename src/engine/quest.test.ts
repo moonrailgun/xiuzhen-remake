@@ -561,3 +561,18 @@ test('天雷失败碎丹，重新开放结丹；普通战败不抹掉金丹', ()
   assert.equal(resolveQuestBattle(log, event, false).entries.length, 0)
   assert.deepEqual(resolveQuestBattle(log, { ...event, payload: { target: { name: '试剑石' } } }, false), log)
 })
+
+test('调教侠客提供2小时至80小时重复派剑任务', async () => {
+  const { TRAINING_QUESTS } = await import('../data/quests.ts')
+  const s = makeState()
+  const durations = TRAINING_QUESTS.map(q => q.trainingSeconds!)
+  assert.equal(Math.min(...durations), 2 * 3600)
+  assert.equal(Math.max(...durations), 80 * 3600)
+  const q = TRAINING_QUESTS[0]!
+  const r = accept(s.quests, s, q.id)
+  assert.ok(r.ok)
+  assert.equal(questTarget(r.value, q.id)?.trainingSeconds, 2 * 3600)
+  const completed = claim(markCleared(r.value, q.id), s, q.id)
+  assert.ok(completed.ok)
+  assert.ok(accept(completed.value.log, s, q.id).ok)
+})

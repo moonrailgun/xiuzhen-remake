@@ -128,6 +128,8 @@ export type Quest = {
   /** 出处；无出处写 `reconstructed（…）` */
   readonly source: string
   readonly repeatable?: boolean
+  /** 调教侠客实际占用飞剑的战斗时长。 */
+  readonly trainingSeconds?: number
 }
 
 /** 任务栏 / 标题条上的整串写法。 */
@@ -811,6 +813,15 @@ export const REALM_QUESTS: readonly Quest[] = [
   ...JINDAN_CHAIN,
 ]
 
+/** 调教侠客时长端点见 guides/13903-p1.txt；中间档、怪物名/面板/奖气重建。 */
+export const TRAINING_QUESTS: readonly Quest[] = [2, 4, 8, 16, 24, 40, 80].map(hours => ({
+  id: `training:${hours}`, category: 'realm', series: '调教侠客', name: `${hours}小时`, step: 1, total: 1,
+  summary: `派出飞剑调教侠客，持续${hours}小时；结束后领取奖励。`,
+  goal: { kind: 'slay', monster: { name: `待调教侠客（${hours}小时）`, attack: 1, agility: 0, life: 1, element: null } },
+  reward: { qi: half(hours * 100) }, repeatable: true, trainingSeconds: hours * 3600,
+  source: 'reference/text/guides/13903-p1.txt（2小时至3天16小时）；reconstructed（中间档、怪物面板与奖励）',
+}))
+
 /** 门槛、石碑和神兽、独享5/6有原文；神兽面板重建为同境界任务可挑战的量级。 */
 export const SANCTUARY_QUESTS: readonly Quest[] = [
   { id: 'sanctuary:blessing', category: 'realm', series: '祭炼石碑', name: '福地守护神兽', step: 1, total: 1,
@@ -830,13 +841,14 @@ export const SANCTUARY_QUESTS: readonly Quest[] = [
 // ===========================================================================
 
 /**
- * 一条线下的全部任务定义：新手22 + 百妖100 + 境界16 + 神兽2 = 140。
+ * 一条线下的全部任务定义：新手22 + 百妖100 + 境界16 + 调教7 + 神兽2 = 147。
  * 新手任务的同一步在两条线里 `step` 不同但 `id` 相同，所以索引必须分线建。
  */
 export const questsFor = (line: NewbieLine): readonly Quest[] => [
   ...newbieChain(line),
   ...BEAST_QUESTS,
   ...REALM_QUESTS,
+  ...TRAINING_QUESTS,
   ...SANCTUARY_QUESTS,
 ]
 
@@ -856,5 +868,6 @@ export const chainsFor = (line: NewbieLine): readonly (readonly Quest[])[] => [
   SANSHI_CHAIN,
   QIANJIN_CHAIN,
   JINDAN_CHAIN,
+  ...TRAINING_QUESTS.map(q => [q]),
   ...SANCTUARY_QUESTS.map(q => [q]),
 ]

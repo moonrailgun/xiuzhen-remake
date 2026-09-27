@@ -22,6 +22,7 @@ import { distance } from '../data/world.ts'
 import { lootFrom } from './loot.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
 import { npcAt, patchNpc } from './npc.ts'
+import { swordByName } from '../data/swords.ts'
 
 /** 战斗事件的四种状态，对应原版事件栏的四种句式。 */
 export type BattlePhase = 'outbound' | 'fighting' | 'returning'
@@ -91,7 +92,8 @@ export function launch(
 ): LaunchResult {
   if (swords.length === 0) return { ok: false, reason: '请选择出击的飞剑' }
 
-  if (!availableSwords(state, swords)) return { ok: false, reason: '只能选择空闲且不重复的飞剑' }
+  const selectionError = swordSelectionError(state, swords)
+  if (selectionError) return { ok: false, reason: selectionError }
   swords = prepareSwords(state, swords)
   const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {
@@ -152,11 +154,16 @@ function swordStatus(state: GameState, swords: readonly LaunchSword[], status: s
     ids.has(artifact.id) ? { ...artifact, status } : artifact) } }
 }
 
-function availableSwords(state: GameState, swords: readonly LaunchSword[]): boolean {
+function swordSelectionError(state: GameState, swords: readonly LaunchSword[]): string | null {
   const out = new Set(state.timeline.events.filter((event) => event.kind === 'battle')
     .flatMap((event) => event.payload['swordIds'] as string[] ?? []))
-  return new Set(swords.map((sword) => sword.id)).size === swords.length && swords.every((sword) =>
-    !out.has(sword.id) && !state.player.artifacts.some((artifact) => artifact.id === sword.id && artifact.status !== '空闲'))
+  if (new Set(swords.map((sword) => sword.id)).size !== swords.length || swords.some((sword) =>
+    out.has(sword.id) || state.player.artifacts.some((artifact) => artifact.id === sword.id && artifact.status !== '空闲'))) {
+    return '只能选择空闲且不重复的飞剑'
+  }
+  const unmet = swords.map((sword) => swordByName(sword.name))
+    .find((sword) => sword && sword.wieldLevel > (state.player.skills['御剑术'] ?? 0))
+  return unmet ? `驱使${unmet.name}需要御剑术${unmet.wieldLevel}级` : null
 }
 
 /** 旧存档没有出击快照时沿用原面板值。 */
@@ -379,7 +386,8 @@ export function reinforce(
     return { ok: false, reason: '飞剑已经在返回途中' }
   }
 
-  if (!availableSwords(state, swords)) return { ok: false, reason: '只能选择空闲且不重复的飞剑' }
+  const selectionError = swordSelectionError(state, swords)
+  if (selectionError) return { ok: false, reason: selectionError }
   swords = prepareSwords(state, swords)
   const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {

@@ -326,7 +326,8 @@ test('主循环把真实炼制完成计入炼制任务，只记一次', () => {
 })
 
 test('主循环在打赢时推进斩杀任务，抵达与返回不提前发奖', () => {
-  const s = quiet()
+  const base = quiet()
+  const s = { ...base, player: { ...base.player, skills: { 御剑术: 1 } } }
   const active: GameState = { ...s, quests: { ...s.quests, entries: [{ id: 'beast:1', acceptedAt: 0, done: false }] } }
   const launched = launch(active,
     { kind: 'monster', name: '三青鸟', x: 100, y: 100, attack: 14, agility: 10, hp: 30, element: null },
@@ -512,7 +513,8 @@ test('v6 旧挂单从迁移时刻开始等待买家，标准存档与裸导出�
 })
 
 test('新版与旧版出击、返航载荷均可保存，旧返航不会重新补发战利品', () => {
-  const s = quiet()
+  const base = quiet()
+  const s = { ...base, player: { ...base.player, skills: { 御剑术: 1 } } }
   const launched = launch(s,
     { kind: 'player', name: '对手', x: 100, y: 100, attack: 1, agility: 1, hp: 1, element: '火', npcId: 1 },
     [{ id: 'sword:strong', name: '青龙伏魔剑', quality: '极品', refine: 0, attack: [1000, 1000], durability: [1000, 1000], agility: 100, speed: 100, element: '金' }])

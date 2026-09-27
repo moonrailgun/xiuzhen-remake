@@ -26,7 +26,7 @@ import { renderEstate } from '../pages/estate.ts'
 import { renderBattleEvent } from '../pages/battleevent.ts'
 import { renderHelp, HELP_TOPICS, HELP_ENTRIES } from '../pages/help.ts'
 import {
-  skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel,
+  skillVm, itemVm, tradeVm, allyVm, msgVm, skillNodeById, artifactLabel, artifactItemId,
   townHere, townKey, sceneNpcNames, refinePairAt,
 } from './vm.ts'
 import { SWORDS, swordByName, craftCostFor, isComplete, type Sword } from '../data/swords.ts'
@@ -1752,7 +1752,7 @@ function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly
   s.player.artifacts.forEach((a) => {
     if (a.kind !== 'sword' || a.status !== '空闲') return
     const t = swordByName(a.name)
-    if (!t || t.speed === null || t.agility === null) return
+    if (!t || t.speed === null || t.agility === null || t.wieldLevel > (s.player.skills['御剑术'] ?? 0)) return
     out.push({
       table: t,
       sword: {
@@ -1790,7 +1790,8 @@ function fightWindow(s: GameState, targetName: string): string {
   const rows = launchableSwords(s).map(({ sword }) => ({
     id: sword.id,
     name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
-    itemId: 0,
+    itemId: artifactItemId(sword),
+    itemsn: s.player.artifacts.findIndex((a) => a.id === sword.id) + 1,
     attack: launchedSwordStats(sword, s.player.skills).attack,
     durability: launchedSwordStats(sword, s.player.skills).durability,
     agility: launchedSwordStats(sword, s.player.skills).agility,
@@ -1807,7 +1808,7 @@ function fightWindow(s: GameState, targetName: string): string {
     kind: 'attack',
     targetName: target.name,
     at: [target.x, target.y],
-    summary: `${target.name}　攻击:${target.attack} 敏捷:${target.agility} 生命:${target.hp} 属性:${target.element}`,
+    summary: `${target.name}　攻击:${target.attack} 敏捷:${target.agility} 生命:${target.hp} 属性:${target.element ?? '无'}`,
     swords: rows,
     limit: swordsOutLimit(wanjian),
     out: swordsOut(s),
@@ -1856,7 +1857,7 @@ function battleEventVm(s: GameState, tab: number) {
         owner: s.player.name,
         ownerId: 0,
         name: `${sw.quality}${sw.name}${sw.refine > 0 ? `+${sw.refine}` : ''}`,
-        itemId: 0,
+        itemId: artifactItemId(sw),
         stats: [
           (sw.launchedStats ?? launchedSwordStats(sw, {})).attack,
           (sw.launchedStats ?? launchedSwordStats(sw, {})).durability,
@@ -1900,7 +1901,8 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
   const rows = launchableSwords(s).map(({ sword }) => ({
     id: sword.id,
     name: artifactLabel(s.player.artifacts.find((a) => a.id === sword.id)!),
-    itemId: 0,
+    itemId: artifactItemId(sword),
+    itemsn: s.player.artifacts.findIndex((a) => a.id === sword.id) + 1,
     attack: launchedSwordStats(sword, s.player.skills).attack,
     durability: launchedSwordStats(sword, s.player.skills).durability,
     agility: launchedSwordStats(sword, s.player.skills).agility,
@@ -1913,7 +1915,7 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
     kind,
     targetName: t.name,
     at: [t.x, t.y],
-    summary: `${t.name}　攻击:${t.attack} 敏捷:${t.agility} 生命:${t.hp} 属性:${t.element}`,
+    summary: `${t.name}　攻击:${t.attack} 敏捷:${t.agility} 生命:${t.hp} 属性:${t.element ?? '无'}`,
     swords: rows,
     limit: swordsOutLimit(s.player.skills['万剑诀'] ?? 0),
     out: swordsOut(s),

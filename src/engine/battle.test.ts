@@ -25,7 +25,8 @@ const state = (over: Partial<GameState['player']> = {}): GameState => {
     0,
   )
   // 战利品测试从 0 真气起算，入账后的真气就是战利品本身
-  return { ...s, player: { ...s.player, qi: s.player.qi.map(() => 0) as unknown as typeof s.player.qi, ...over } }
+  return { ...s, player: { ...s.player, qi: s.player.qi.map(() => 0) as unknown as typeof s.player.qi, ...over,
+    skills: { 御剑术: 1, ...over.skills } } }
 }
 
 /** 极品青龙伏魔剑（原版数值：攻 16~160、耐 8~80、速 7、敏 3）。 */
@@ -78,6 +79,20 @@ test('不选飞剑无法出击', () => {
   const r = launch(state(), skeleton(), [])
   assert.equal(r.ok, false)
   assert.match((r as { reason: string }).reason, /请选择出击的飞剑/)
+})
+
+test('御剑术不足时不能出击或支援，拒绝操作不改变状态', () => {
+  const novice = state({ skills: { 御剑术: 0 } })
+  const before = structuredClone(novice)
+  assert.deepEqual(launch(novice, skeleton(), [qinglong()]), { ok: false, reason: '驱使青龙伏魔剑需要御剑术1级' })
+  assert.deepEqual(novice, before)
+  const started = launch(state(), skeleton(), [qinglong('first')])
+  assert.ok(started.ok)
+  const support = { ...started.state, player: { ...started.state.player, skills: {} } }
+  const supportBefore = structuredClone(support)
+  assert.deepEqual(reinforce(support, support.timeline.events[0]!.id, [qinglong('second')]),
+    { ok: false, reason: '驱使青龙伏魔剑需要御剑术1级' })
+  assert.deepEqual(support, supportBefore)
 })
 
 test('超过同时在外上限时拒绝', () => {

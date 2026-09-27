@@ -29,6 +29,7 @@ export type FightSword = {
   /** 全名，含品质前缀与 `+N` */
   readonly name: string
   readonly itemId: number
+  readonly itemsn?: number
   readonly attack: number
   readonly durability: number
   readonly agility: number
@@ -102,7 +103,7 @@ ${when(
     () => each(vm.swords, (s) =>
       `<TR class="trbg middle" align=middle>
 <TD><INPUT type=checkbox name=sword value="${esc(s.id)}"></TD>
-<TD align=left><A class=middlebold href="#" onclick="openRWindow('${js(s.name)}','itemmid.jsp?itemsn=${num(s.itemId)}&item=${num(s.itemId)}')">${esc(s.name)}</A></TD>
+<TD align=left><A class=middlebold href="#" onclick="openRWindow('${js(s.name)}','itemmid.jsp?item=${num(s.itemId)}${s.itemsn === undefined ? '' : `&itemsn=${num(s.itemsn)}`}')">${esc(s.name)}</A></TD>
 <TD>${num(s.attack)}</TD><TD>${num(s.durability)}</TD><TD>${num(s.agility)}</TD>
 <TD class=small noWrap>${formatDuration(s.seconds)}</TD></TR>`),
   )}

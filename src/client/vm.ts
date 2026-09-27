@@ -103,7 +103,7 @@ export function itemListGroups(s: GameState): readonly ItemGroup[] {
 }
 
 /** 物品 id：飞剑按表里的序号排，其余给个稳定的占位号（只用来开物品窗）。 */
-export function artifactItemId(a: Artifact): number {
+export function artifactItemId(a: Pick<Artifact, 'name'>): number {
   const idx = SWORDS.findIndex((s) => s.name === a.name)
   if (idx >= 0) return 50100 + idx * 100
   const gi = DEFENSIVE_ARTIFACTS.findIndex((d) => d.name === a.name)

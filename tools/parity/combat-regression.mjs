@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// 独立浏览器存档；只导入装备、容量和位置，任务进度与战斗事件全部由页面操作产生。
+// 独立浏览器存档；只导入装备、技能、容量和位置，任务进度与战斗事件全部由页面操作产生。
 import { chromium } from 'playwright'
+import { panelStat } from '../../src/data/artifacts.ts'
+import { swordByName } from '../../src/data/swords.ts'
 
 const browser = await chromium.launch()
 const page = await browser.newPage()
@@ -18,6 +20,7 @@ const envelope = () => page.evaluate(() => JSON.parse(localStorage.getItem('xiuz
 const saved = async () => (await envelope()).state
 const swordId = 'combat-regression-sword'
 const sword = state => state.player.artifacts.find(item => item.id === swordId)
+const detailAttack = () => page.locator('#rwindowcontent .itemmid > table').nth(1).locator('tr').nth(2).locator('td').first().textContent()
 const battle = state => state.timeline.events.find(event => event.kind === 'battle')
 const importState = async state => {
   const payload = { ...await envelope(), state }
@@ -68,7 +71,10 @@ try {
   const prepared = await saved()
   const accepted = prepared.quests.entries.find(entry => entry.id === 'beast:1')
   check('页面领取百妖第一回，尚未击杀或领奖', !!accepted?.at && !accepted.cleared && !accepted.done)
-  prepared.player.artifacts = [{ id: swordId, kind: 'sword', name: '青龙伏魔剑', quality: '极品', refine: 3, status: '空闲', count: 1 }]
+  prepared.player.artifacts = [
+    { id: swordId, kind: 'sword', name: '青龙伏魔剑', quality: '极品', refine: 3, status: '空闲', count: 1 },
+    { id: 'support-sword', kind: 'sword', name: '玉虚桃木剑', quality: '上品', refine: 1, status: '空闲', count: 1 },
+  ]
   prepared.player.body[5] = 30
   prepared.player.x = accepted.at[0]
   prepared.player.y = accepted.at[1]
@@ -76,12 +82,37 @@ try {
   check('合法导入只准备装备与位置，保留未完成任务', JSON.stringify((await saved()).quests) === JSON.stringify(prepared.quests) && (await saved()).timeline.events.length === 0)
   await openQuest()
   await page.locator('#lwindowcontent a[href*="fight.jsp"], #lwindowcontent a[onclick*="fight.jsp"]').click()
+  check('御剑术不足的青龙剑不可选，玉虚剑仍可选',
+    await page.locator(`#fightform input[value="${swordId}"]`).count() === 0 &&
+    await page.locator('#fightform input[value="support-sword"]').count() === 1)
+  prepared.player.skills['御剑术'] = 1
+  await importState(prepared)
+  await openQuest()
+  await page.locator('#lwindowcontent a[href*="fight.jsp"], #lwindowcontent a[onclick*="fight.jsp"]').click()
   check('任务详情可打开飞剑选择', await page.locator(`#fightform input[value="${swordId}"]`).count() === 1)
+  check('无属性目标显示无而非 null', (await page.locator('#lwindowcontent').textContent()).includes('属性:无'))
+  await page.locator('#fightform a').first().click()
+  check('出击飞剑详情显示所选装备的品质和淬炼',
+    await page.locator('#rwindowcontent .itemmid').count() === 1 &&
+    Number(await detailAttack()) === panelStat(swordByName('青龙伏魔剑').attack, '极品', 3))
+  await page.evaluate(() => closeRWindow())
   const outbound = await launchSelected()
   const goldBefore = outbound.player.qi[0]
   check('选择飞剑出击后进入斩杀队列', battle(outbound)?.payload.phase === 'outbound' && sword(outbound)?.status === '斩杀中')
   check('出击阶段不提前完成任务', !outbound.quests.entries.find(entry => entry.id === 'beast:1').cleared)
   check('出击事件在页面显示目标', (await openEvents(2)).includes('你放去攻击'))
+  await page.locator('#gmid a[onclick*="battleevent.jsp?tab=2"]').first().click()
+  await page.locator('#bwindowcontent a[onclick*="itemmid.jsp"]').first().click()
+  check('战斗事件中的飞剑详情可打开', await page.locator('#rwindowcontent .itemmid').count() === 1)
+  await page.evaluate(() => closeRWindow())
+  await page.locator('#bwindowcontent a').filter({ hasText: '支援' }).first().click()
+  await page.evaluate(() => closeBWindow())
+  check('支援目标同样显示无属性', (await page.locator('#lwindowcontent').textContent()).includes('属性:无'))
+  await page.locator('#fightform a').first().click()
+  check('支援飞剑详情对应仍空闲的第二把剑',
+    await page.locator('#rwindowcontent .itemmid').count() === 1 &&
+    Number(await detailAttack()) === panelStat(swordByName('玉虚桃木剑').attack, '上品', 1))
+  await page.evaluate(() => { closeRWindow(); closeLWindow(); closeBWindow() })
 
   const fighting = await reachNextPhase()
   check('飞到目标后进入缠斗而非立即结算', battle(fighting)?.payload.phase === 'fighting' && sword(fighting)?.status === '绞杀中' && !fighting.mail.some(mail => mail.kind === 'battle'))

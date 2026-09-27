@@ -91,7 +91,7 @@ test('总消耗随等级单调递增', () => {
 })
 
 test('总消耗过实测锚点', () => {
-  assert.equal(totalCost('meridian', 3), 1130, '足阳明胃经 Lv2→3')
+  assert.equal(totalCost('meridian', 3, undefined, { meridianGroup: '足三阳' }), 1130, '足阳明胃经 Lv2→3')
   assert.equal(totalCost('meridian', 4), 1890, '主脉 3→4')
   assert.equal(totalCost('skill', 4), 623, '炼丹之术 Lv3→4')
   assert.equal(totalCost('body', 28), 783000, '丹田 Lv27→28')
@@ -147,9 +147,35 @@ test('丹田容量：基准版用 2008-11 序列，Lv9 不应是 2010 年的 100
 })
 
 test('upgradeCost 返回五个整数且总和接近总消耗', () => {
-  const cost = upgradeCost('meridian', 3, '木')
+  const cost = upgradeCost('meridian', 3, '木', undefined, { meridianGroup: '足三阳' })
   assert.equal(cost.length, 5)
   for (const v of cost) assert.ok(Number.isInteger(v) && v >= 0)
   const sum = cost.reduce((a, b) => a + b, 0)
   assert.ok(Math.abs(sum - 1130) <= 10, `总和 ${sum}`)
+})
+
+
+test('F03：五行拆分精确保留总量', () => {
+  for (const self of ELEMENTS) for (const total of [375, 405, 410, 440, 623, 783000]) {
+    for (const system of ['meridian', 'body', 'skill'] as const) {
+      assert.equal(splitByElement(total, self, system).reduce((a, b) => a + b, 0), total)
+    }
+  }
+})
+
+test('F05：基准期丹田13/14级容量锚点', () => {
+  assert.equal(dantianCapacity(13), 21000)
+  assert.equal(dantianCapacity(14), 26000)
+})
+
+test('F05：基准29/30级只从28级末端外推，9月35/36级仅供旧档兼容', () => {
+  // 截止28级的log-PCHIP末端外推结果；不能由9月锚点参与基准插值。
+  assert.deepEqual([29, 30].map(dantianCapacity), [403929, 494419])
+  assert.deepEqual([29, 30].map(level => totalCost('body', level)), [862669, 950445])
+  assert.deepEqual([35, 36].map(dantianCapacity), [1200000, 1400000])
+  assert.deepEqual([35, 36].map(level => totalCost('body', level)), [4390000, 5570000])
+})
+
+test('F05：本体配比直接使用基准28级截图，不平均9月的成本配比', () => {
+  assert.deepEqual(upgradeCost('body', 28, '金'), [240000, 190000, 160000, 23000, 170000])
 })

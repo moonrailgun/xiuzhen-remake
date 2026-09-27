@@ -12,7 +12,7 @@
 
 import { schedule, countByKind, type GameEvent, type Timeline } from './timeline.ts'
 import { addQi, subQi, canAfford, clampQi, totalQi, REALMS, type FiveQi, type GameState } from './state.ts'
-import { upgradeCost, upgradeSeconds, dantianCapacity } from '../data/upgrade.ts'
+import { upgradeCost, upgradeSeconds, dantianCapacity, BASE_DANTIAN_MAX_LEVEL } from '../data/upgrade.ts'
 import {
   MERIDIANS,
   MAX_LEVEL as MERIDIAN_MAX_LEVEL,
@@ -45,10 +45,10 @@ export const BODY_DANTIAN = 5 // 丹田气海：真气容量
 
 /**
  * 丹田气海的等级上限。其余 7 项本体按经脉的满级 20 处理
- * （`upgrade.ts` 的 `dantianCurve` 就夹在 36，本体成本曲线也只重建到 20）。
+ * 基准期上限缺表，丹田暂重建为30；旧档的更高等级与容量保留。
  */
 export const BODY_MAX_LEVEL = 20
-export const DANTIAN_MAX_LEVEL = 36
+export const DANTIAN_MAX_LEVEL = BASE_DANTIAN_MAX_LEVEL
 
 /**
  * 这一项还能不能再升。
@@ -97,8 +97,11 @@ export type CultivatePlan = {
 export function planUpgrade(state: GameState, target: CultivateTarget): CultivatePlan {
   const from = levelOf(state, target)
   const to = from + 1
-  const cost = upgradeCost(target.system, to, state.player.element, target.system === 'skill' ? target.id : undefined)
+  const context = { meridianGroup: target.system === 'meridian' ? MERIDIANS[target.index]?.group : undefined,
+    bodyPart: target.system === 'body' ? BODY_PARTS[target.index] : undefined }
+  const cost = upgradeCost(target.system, to, state.player.element, target.system === 'skill' ? target.id : undefined, context)
   const seconds = upgradeSeconds(target.system, to, {
+    ...context,
     steelLevel: state.player.body[BODY_STEEL] ?? 0,
     calmLevel: state.player.body[BODY_CALM] ?? 0,
     skillId: target.system === 'skill' ? target.id : undefined,

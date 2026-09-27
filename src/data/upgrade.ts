@@ -19,7 +19,7 @@
  */
 
 import { makeCurve, type Anchor } from './curve.ts'
-import { generates, generatedBy, overcomes, overcomeBy, ELEMENTS, type Element } from './meridian.ts'
+import { generates, generatedBy, overcomes, overcomeBy, ELEMENTS, type Element, type MeridianGroup } from './meridian.ts'
 import type { FiveQi } from '../engine/state.ts'
 
 /** 五行关系，按消耗从多到少的次序。 */
@@ -41,8 +41,8 @@ export function relationOf(self: Element, other: Element): QiRelation {
 export const COST_RATIO: Record<'meridian' | 'body' | 'skill', readonly [number, number, number, number, number]> = {
   // 足阳明胃经 Lv2→3（木属性）：430/360/210/130/0，总 1130
   meridian: [0.381, 0.319, 0.186, 0.115, 0],
-  // 丹田气海 Lv27→28（金）与 Lv34→35、Lv35→36（水）三组的平均
-  body: [0.313, 0.235, 0.215, 0.204, 0.029],
+  // 基准期丹田气海 Lv27→28（金）；9月35/36级的配比不参与基准重建。
+  body: [240000 / 783000, 190000 / 783000, 170000 / 783000, 160000 / 783000, 23000 / 783000],
   // 炼丹之术 Lv3→4：生我最多、克我为 0
   skill: [0.193, 0.257, 0.401, 0.149, 0],
 }
@@ -61,7 +61,14 @@ export function splitByElement(
     我生: ratio[3],
     克我: ratio[4],
   }
-  return ELEMENTS.map((e) => Math.round(total * byRelation[relationOf(self, e)])) as unknown as FiveQi
+  // 归一化后按最大余数分配，整数拆分仍精确保留总量。
+  const sum = ratio.reduce((a, b) => a + b, 0)
+  const exact = ELEMENTS.map(e => Math.round(total) * byRelation[relationOf(self, e)] / sum)
+  const parts = exact.map(Math.floor)
+  const order = exact.map((v, i) => ({ i, remainder: v - parts[i]! }))
+    .sort((a, b) => b.remainder - a.remainder || a.i - b.i)
+  for (let n = Math.round(total) - parts.reduce((a, b) => a + b, 0), i = 0; i < n; i++) parts[order[i]!.i]!++
+  return parts as unknown as FiveQi
 }
 
 // —— 总消耗曲线 ——
@@ -70,18 +77,23 @@ export function splitByElement(
 /** 经脉：升到第 N 级的总消耗。 */
 const MERIDIAN_ANCHORS: readonly Anchor[] = [
   { level: 2, value: 375, source: 'docs/research/02-guides-and-rules.md §2.2（金属性本命脉 1→2 共 375）' },
-  { level: 3, value: 1130, source: 'reference/images/17173-live/20081225104603605_all/xiuzhen802.jpg（#3：0/430/210/130/360）' },
+  { level: 3, value: Math.round(1130 * 375 / 410), source: 'reference/images/17173-live/20081225104603605_all/xiuzhen802.jpg（#3：足三阳总1130；按已知组间比例折回本命脉为重建）' },
   { level: 4, value: 1890, source: 'docs/research/02-guides-and-rules.md §2.2（主脉 3→4）' },
   // 往上没有直接锚点，用「三转周天后道行 ≈12 年」这个累计锚点约束（见测试）
   { level: 13, value: 120000, source: 'reconstructed（由累计锚点「三转周天≈12 年道行」反推）' },
   { level: 20, value: 2000000, source: 'reconstructed（心动前封顶 13 级，20 级是满级）' },
 ]
 
-/** 本体：升到第 N 级的总消耗。丹田气海的三个高等级锚点来自截图。 */
+/** 本体：基准期升到第 N 级的总消耗，28级之后按末端斜率外推。 */
 const BODY_ANCHORS: readonly Anchor[] = [
   { level: 2, value: 400, source: 'reconstructed（与经脉同量级）' },
-  { level: 12, value: 1800, source: 'docs/spec/DECISIONS-rules.md §4（固本培元 Lv12 = 1800）' },
+  { level: 12, value: 23000, source: 'reconstructed：13903-p1.txt L98固本12级11500秒，按耗时约等于成本及固本成本为丹田一半反推' },
+  { level: 20, value: 220000, source: 'reconstructed：13903-p1.txt L100固本20级耗时30多小时，取110000秒并按半价关系反推' },
   { level: 28, value: 783000, source: 'docs/research/04-ui-core-pages.md（丹田 Lv27→28：240000/190000/160000/23000/170000）' },
+]
+/** 9月锚点只供31–36级旧档兼容，不影响基准期插值和外推。 */
+const LEGACY_BODY_ANCHORS: readonly Anchor[] = [
+  ...BODY_ANCHORS,
   { level: 35, value: 4390000, source: 'reference/images/17173-live/20090921133953494/dfdeee02.jpg（#32）' },
   { level: 36, value: 5570000, source: 'reference/images/17173-live/20090921133953494/dfdeee03.jpg（#33）' },
 ]
@@ -95,16 +107,30 @@ const SKILL_ANCHORS: readonly Anchor[] = [
 
 const meridianCurve = makeCurve(MERIDIAN_ANCHORS)
 const bodyCurve = makeCurve(BODY_ANCHORS)
+const legacyBodyCurve = makeCurve(LEGACY_BODY_ANCHORS)
 const skillCurve = makeCurve(SKILL_ANCHORS)
 
 /** 升到 `toLevel` 需要的总真气。 */
-export function totalCost(system: keyof typeof COST_RATIO, toLevel: number, skillId?: string): number {
+export type UpgradeContext = { readonly meridianGroup?: MeridianGroup; readonly bodyPart?: string }
+/** 原文的1→2组间总成本；其他等级延用比例是重建。 */
+export const MERIDIAN_GROUP_COST = { 手三阴: 375, 手三阳: 405, 足三阴: 440, 足三阳: 410 } as const
+
+export function totalCost(system: keyof typeof COST_RATIO, toLevel: number, skillId?: string, context: UpgradeContext = {}): number {
   if (toLevel <= 0) return 0
-  const curve = system === 'meridian' ? meridianCurve : system === 'body' ? bodyCurve : skillCurve
+  const curve = system === 'meridian' ? meridianCurve : system === 'body'
+    ? (toLevel <= BASE_DANTIAN_MAX_LEVEL ? bodyCurve : legacyBodyCurve) : skillCurve
   // 易经上限500，不能拿20级法术的末段指数无限外推。原逐级表已失落，
   // 20级之后沿用最后一个重建锚点作为有界平台；不声称这是原版成本。
   // 保留1..20已有曲线，500级仍能以最高丹田支付，且成本不会倒退。
-  return curve(system === 'skill' && skillId === '易经' ? Math.min(toLevel, 20) : toLevel)
+  const total = curve(system === 'skill' && skillId === '易经' ? Math.min(toLevel, 20) : toLevel)
+  if (system === 'meridian') {
+    const group = context.meridianGroup ?? '手三阴'
+    // 截图直接锚点，避免比例反推后的整数舍入损失。
+    if (group === '足三阳' && toLevel === 3) return 1130
+    return Math.round(total * MERIDIAN_GROUP_COST[group] / 375)
+  }
+  // 13903-p1.txt：固本所需资源为同级丹田的一半；其他本体缺表，仍共用重建曲线。
+  return system === 'body' && context.bodyPart === '固本培元' ? Math.round(total / 2) : total
 }
 
 /** 升到 `toLevel` 的五行消耗。 */
@@ -113,7 +139,8 @@ export const upgradeCost = (
   toLevel: number,
   self: Element,
   skillId?: string,
-): FiveQi => splitByElement(totalCost(system, toLevel, skillId), self, system)
+  context: UpgradeContext = {},
+): FiveQi => splitByElement(totalCost(system, toLevel, skillId, context), self, system)
 
 /**
  * 升级耗时（秒）。
@@ -127,9 +154,9 @@ export const upgradeCost = (
 export function upgradeSeconds(
   system: keyof typeof COST_RATIO,
   toLevel: number,
-  opts: { readonly steelLevel?: number; readonly calmLevel?: number; readonly skillId?: string } = {},
+  opts: { readonly steelLevel?: number; readonly calmLevel?: number; readonly skillId?: string } & UpgradeContext = {},
 ): number {
-  const total = totalCost(system, toLevel, opts.skillId)
+  const total = totalCost(system, toLevel, opts.skillId, opts)
   const rate = system === 'skill' ? 1 / 0.71 : system === 'meridian' ? 1 / 0.78 : 1.0
   const base = total * rate
   const boost =
@@ -148,9 +175,14 @@ const DANTIAN_ANCHORS: readonly Anchor[] = [
   { level: 2, value: 2900, source: 'reference/images/17173-live/20081225104603605_all/xiuzhen801.jpg（#2 资源条 /2900）' },
   { level: 3, value: 3500, source: 'docs/spec/DECISIONS-rules.md §5（2008-11 序列）' },
   { level: 10, value: 8600, source: '同上' },
+  { level: 13, value: 21000, source: 'reference/text/guides/13903-p1.txt L76（2008-11-29）' },
+  { level: 14, value: 26000, source: 'reference/text/guides/13903-p1.txt L77（2008-11-29）' },
   { level: 20, value: 400000, source: 'docs/research/02-guides-and-rules.md §2.1（筑基→辟谷奖励「充满丹田」≈40 万）' },
   { level: 27, value: 270000, source: 'docs/research/04-ui-core-pages.md（Lv.27 容量 270000）' },
   { level: 28, value: 330000, source: '同上' },
+]
+const LEGACY_DANTIAN_ANCHORS: readonly Anchor[] = [
+  ...DANTIAN_ANCHORS,
   { level: 35, value: 1200000, source: 'reference/images/17173-live/20090921133953494/dfdeee03.jpg（#33）' },
   { level: 36, value: 1400000, source: '同上' },
 ]
@@ -160,7 +192,15 @@ const DANTIAN_ANCHORS: readonly Anchor[] = [
 const dantianCurve = makeCurve(
   DANTIAN_ANCHORS.filter((a) => a.level !== 20),
 )
+const legacyDantianCurve = makeCurve(
+  LEGACY_DANTIAN_ANCHORS.filter((a) => a.level !== 20),
+)
 
-/** 丹田气海第 N 级的单种真气容量。 */
-export const dantianCapacity = (level: number): number =>
-  dantianCurve(Math.max(0, Math.min(level, 36)))
+/** reconstructed：基准期明确有28级，9月才开放36；缺上限原表，暂取30。旧档容量仍支持36。 */
+export const BASE_DANTIAN_MAX_LEVEL = 30
+
+/** 丹田气海第 N 级的单种真气容量。35/36为旧档兼容锚点，不是新修炼开放上限。 */
+export const dantianCapacity = (level: number): number => {
+  const bounded = Math.max(0, Math.min(level, 36))
+  return (bounded <= BASE_DANTIAN_MAX_LEVEL ? dantianCurve : legacyDantianCurve)(bounded)
+}

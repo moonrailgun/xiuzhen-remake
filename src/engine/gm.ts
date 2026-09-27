@@ -90,7 +90,7 @@ export type GmResult =
 export const meridianCapFor = (realm: Realm): number =>
   REALMS.indexOf(realm) < REALMS.indexOf('心动期') ? MAX_LEVEL_BEFORE_XINDONG : MERIDIAN_MAX_LEVEL
 
-/** 第 i 项本体的上限：丹田气海 36，其余 20。 */
+/** 第 i 项本体的新设置上限；未修改的旧档等级保留。 */
 export const bodyCapFor = (index: number): number =>
   index === BODY_DANTIAN ? DANTIAN_MAX_LEVEL : BODY_MAX_LEVEL
 
@@ -123,7 +123,7 @@ function clamp(value: number, lo: number, hi: number, label: string, notes: stri
  *
  * 顺序是有讲究的：**先改等级和开关，再按新的上限夹资源**。
  * 丹田气海决定真气上限、袖里乾坤与 VIP 决定法宝格数 —— 反过来做的话，
- * 「把丹田从 0 升到 36 同时把真气拉满」这种最常见的操作会按旧上限被砍掉。
+ * 「把丹田升满同时把真气拉满」这种最常见的操作会按旧上限被砍掉。
  */
 export function applyGm(state: GameState, patch: GmPatch): GmResult {
   const notes: string[] = []
@@ -151,8 +151,9 @@ export function applyGm(state: GameState, patch: GmPatch): GmResult {
     return { ok: false, reason: `经脉必须是 ${MERIDIANS.length} 条` }
   }
 
-  const body = (patch.body ?? p.body).map((v, i) =>
-    clamp(int(v, 0), 0, bodyCapFor(i), `本体「${BODY_PARTS[i] ?? i}」`, notes))
+  // 表单会整组提交；修改其他本体时，未改动的旧档高等级也必须保留。
+  const body = patch.body === undefined ? p.body : patch.body.map((v, i) =>
+    v === p.body[i] ? v : clamp(int(v, 0), 0, bodyCapFor(i), `本体「${BODY_PARTS[i] ?? i}」`, notes))
   if (body.length !== BODY_PARTS.length) {
     return { ok: false, reason: `本体必须是 ${BODY_PARTS.length} 项` }
   }

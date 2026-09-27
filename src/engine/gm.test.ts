@@ -55,7 +55,7 @@ test('★经脉按境界收拢：心动期之前 13，之后 20', () => {
   assert.deepEqual([...both.player.meridians], Array(12).fill(20))
 })
 
-test('★本体收拢：丹田气海 36，其余 20', () => {
+test('★本体收拢：显式设置丹田按基准期上限，其余 20', () => {
   const s = unwrap(applyGm(fresh(), { body: Array(8).fill(999) }))
   s.player.body.forEach((lv, i) => assert.equal(lv, bodyCapFor(i), `第 ${i} 项`))
   assert.equal(s.player.body[BODY_DANTIAN], DANTIAN_MAX_LEVEL)
@@ -78,9 +78,29 @@ test('★真气按**改完之后**的丹田上限收拢', () => {
     qi: Array(5).fill(9e15),
   }))
   const cap = capacityOf(s)
-  assert.ok(cap > 1_000_000, `丹田 36 级的上限应该很大，实得 ${cap}`)
+  assert.ok(cap > capacityOf(fresh()), `丹田满级容量应高于新号，实得 ${cap}`)
   assert.deepEqual([...s.player.qi], Array(5).fill(cap))
   assert.ok(s.player.qi.every((v) => v <= cap), '不能超过丹田上限')
+})
+
+test('旧档丹田 35/36 级在修改其他本体时也保留，改动丹田才受新上限约束', () => {
+  for (const level of [35, 36]) {
+    const s0 = fresh()
+    const body = [...s0.player.body]
+    body[BODY_DANTIAN] = level
+    const state = { ...s0, player: { ...s0.player, body } }
+    assert.deepEqual(unwrap(applyGm(state, {})).player.body, body)
+    assert.deepEqual(unwrap(applyGm(state, { silver: 123 })).player.body, body)
+    assert.deepEqual(unwrap(applyGm(state, { body })).player.body, body)
+    const otherBody = [...body]
+    otherBody[0] = 1
+    const changedOther = unwrap(applyGm(state, { body: otherBody }))
+    assert.equal(changedOther.player.body[0], 1)
+    assert.equal(changedOther.player.body[BODY_DANTIAN], level)
+    const changedDantian = [...body]
+    changedDantian[BODY_DANTIAN] = 99
+    assert.equal(unwrap(applyGm(state, { body: changedDantian })).player.body[BODY_DANTIAN], DANTIAN_MAX_LEVEL)
+  }
 })
 
 test('★背包超格整份拒绝，绝不替使用者销毁法宝', () => {

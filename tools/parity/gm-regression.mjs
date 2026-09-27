@@ -2,6 +2,7 @@
 // GM 面板的跨层回归：真的点页面上的链接、真的填表单、真的看落盘后的存档。
 // 引擎侧的上限逻辑由 src/engine/gm.test.ts 守；这里守的是「表单读得对、链接接得上」。
 import { chromium } from 'playwright'
+import { serialize } from '../../src/engine/save.ts'
 
 const browser = await chromium.launch()
 const page = await browser.newPage()
@@ -60,7 +61,7 @@ try {
   await apply()
   s = await saved()
   check('经脉收拢到 20（已是元婴期）', s.player.meridians[0] === 20)
-  check('丹田气海收拢到 36', s.player.body[5] === 36)
+  check('显式设置丹田气海收拢到基准期上限 30', s.player.body[5] === 30)
   check('袖里乾坤收拢到 20', s.player.body[3] === 20)
   check('收拢的事有写出来', (await page.locator('#lwindowcontent').textContent()).includes('收拢'))
 
@@ -76,7 +77,7 @@ try {
   await page.waitForTimeout(150)
   s = await saved()
   const cap = Math.min(...s.player.qi)
-  check('一键填满：五行都等于丹田上限', s.player.qi.every(v => v === cap) && cap > 1_000_000)
+  check('一键填满：五行都等于基准期 30 级丹田上限 494419', s.player.qi.every(v => v === 494419))
   check('顶栏资源条显示的就是这个数', (await page.locator('#top').textContent()).includes(String(cap)))
   await page.locator('#lwindow a[onclick="gmZeroQi()"]').click()
   await page.waitForTimeout(150)
@@ -174,6 +175,23 @@ try {
   check('什么都不改地再点一次应用，真气不倒退',
     s.player.qi.every((v, i) => v >= before2[i]))
   await page.evaluate(() => setRate(1))
+
+  console.log('\n旧档高等级保护')
+  const legacy = await saved()
+  legacy.player.body[5] = 36
+  legacy.player.qi = Array(5).fill(1_400_000)
+  const chooser = page.waitForEvent('filechooser')
+  await page.evaluate(() => importSavePrompt())
+  await (await chooser).setFiles({ name: 'legacy-dantian.json', mimeType: 'application/json',
+    buffer: Buffer.from(serialize(legacy, Date.now())) })
+  await page.locator('a[onclick="OnMDialog2OK()"]').click()
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('xiuzhen.save')).state.player.body[5] === 36)
+  await page.evaluate(() => openGm())
+  await fill('gm-body0', '1')
+  await apply()
+  s = await saved()
+  check('修改其他本体保留旧档丹田 36 级及原容量',
+    s.player.body[0] === 1 && s.player.body[5] === 36 && s.player.qi.every(v => v === 1_400_000))
 
   console.log('\n存档始终合法')
   check('改完还能正常读回来', await page.evaluate(() => {

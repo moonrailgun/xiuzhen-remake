@@ -310,3 +310,23 @@ test('五本新秘笈必须先学习，随后走正常修炼队列，最高20级
     assert.equal(startCultivate(state({ skills: { [id]: 20 } }), target).ok, false)
   }
 })
+
+test('F03：金属性四组经脉1→2分别消耗375/405/440/410', () => {
+  const s = state({ element: '金', meridians: Array(12).fill(1) })
+  assert.deepEqual([0, 3, 6, 9].map(index => planUpgrade(s, { system: 'meridian', index }).cost.reduce((a, b) => a + b, 0)), [375, 405, 440, 410])
+})
+
+test('F04：固本12级11500秒且成本为同级丹田一半', () => {
+  const s = state({ body: [0, 0, 0, 0, 11, 11, 0, 0] })
+  const foundation = planUpgrade(s, { system: 'body', index: 4 })
+  const dantian = planUpgrade(s, { system: 'body', index: 5 })
+  assert.equal(foundation.seconds, 11500)
+  assert.equal(foundation.cost.reduce((a, b) => a + b, 0) * 2, dantian.cost.reduce((a, b) => a + b, 0))
+  assert.notEqual(foundation.cost.reduce((a, b) => a + b, 0), 1800)
+})
+
+test('F05：丹田新修炼不开放后期36级，既有36级容量仍保留', () => {
+  const s = state({ body: [0, 0, 0, 0, 0, 30, 0, 0] })
+  assert.equal(startCultivate(s, { system: 'body', index: 5 }).ok, false)
+  assert.equal(capacityOf(state({ body: [0, 0, 0, 0, 0, 36, 0, 0] })), 1400000)
+})

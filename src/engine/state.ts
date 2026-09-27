@@ -78,6 +78,7 @@ export type Player = {
 }
 
 export type GameState = {
+  readonly divination?: import('./divine.ts').DivinationSight
   readonly social?: SocialState
   /** 存档格式版本，与 `save.ts` 的 SAVE_VERSION 对应 */
   readonly v: number

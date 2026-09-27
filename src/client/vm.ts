@@ -64,6 +64,7 @@ export function skillVm(s: GameState, tab: SkillTab): SkillVm {
     tab,
     school: s.player.school,
     levels: skillLevels(s),
+    interactive: true,
     books: SECRET_BOOKS.flatMap(name => {
       const i = s.player.artifacts.findIndex(a => a.kind === 'book' && a.name === name && a.status === '空闲')
       const a = s.player.artifacts[i]

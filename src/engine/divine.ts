@@ -16,8 +16,14 @@
  */
 
 import { MERIDIANS, multiplier, groupElement, type Element } from '../data/meridian.ts'
-import type { NpcState } from './npc.ts'
-import type { MailItem, FiveQi } from './state.ts'
+import { allNpcsAt, type NpcState } from './npc.ts'
+import type { GameState, MailItem, FiveQi } from './state.ts'
+import { daoxingText } from './state.ts'
+import { next } from './rng.ts'
+import { DAY } from './clock.ts'
+import { sightRange, BODY_EYE } from './move.ts'
+import { socialOf } from './social.ts'
+import { inWorld } from '../data/world.ts'
 
 /** 八种术数。名称与效果出自官方一句话表与技能弹窗原文。 */
 export const DIVINATIONS = {
@@ -42,8 +48,9 @@ export type DivineResult =
  * 「九宫飞星法（输入玩家名推算其位置，要求己方术数修为高于对方）」；
  * 易经「每高 1 点，对方推算成功率 −10%」。
  */
-export function divineSucceeds(myYijing: number, theirYijing: number): boolean {
-  return myYijing > theirYijing
+export function divineSucceeds(myYijing: number, theirYijing: number, rollValue = 0.5): boolean {
+  // 原文给出每级 -10%；同级基准 100% 为重建。
+  return rollValue < Math.max(0, 1 - Math.max(0, theirYijing - myYijing) * 0.1)
 }
 
 /** 九宫飞星：位置 + 丹田真气 + 固本培元等级。 */
@@ -51,6 +58,7 @@ export function flyingStar(
   target: NpcState,
   at: number,
   byName: string,
+  level = 2,
 ): MailItem {
   // 原文三段连在一起
   const line = `你掐指一算，发现${target.base.name}正位于(${target.x},${target.y})。`
@@ -71,20 +79,20 @@ export function flyingStar(
       line,
       x: target.x,
       y: target.y,
-      qi,
+      ...(level >= 2 ? { qi,
       // 「固本培元」是暗仓，推算能看到等级
-      rootLevel: Math.max(0, Math.floor(target.daoxing / 20000)),
+      rootLevel: Math.max(0, Math.floor(target.daoxing / 20000)) } : {}),
     },
   }
 }
 
 /** 太乙神数：法宝列表（名称/类型/数量/状态）。 */
 export function taiyi(target: NpcState, at: number, byName: string, kind: '太乙神数' | '先天神数' = '太乙神数', showStatus = true): MailItem {
-  const rows = Array.from({ length: target.swords }, (_, i) => ({
-    name: `凡品青龙伏魔剑${i > 0 ? `+${i}` : ''}`,
-    type: '【飞剑】',
-    count: 1,
-    ...(showStatus ? { status: '空闲' } : {}),
+  const rows = target.artifacts.map(a => ({
+    name: `${a.quality}${a.name}${a.refine > 0 ? `+${a.refine}` : ''}`,
+    type: ({ sword: '【飞剑】', guard: '【护身】', pill: '【丹药】', book: '【秘笈】', misc: '【杂物】' })[a.kind],
+    count: a.count,
+    ...(showStatus ? { status: a.status } : {}),
   }))
   return {
     id: `divine:${at}:${target.base.id}:${kind}`,
@@ -225,6 +233,7 @@ export function sixRen(
   at: number,
   byName: string,
   pals: readonly NpcState[],
+  playerGuardian?: SpyRow,
 ): MailItem {
   const rows: SpyRow[] = pals.map((n) => ({
     name: n.base.name,
@@ -232,6 +241,7 @@ export function sixRen(
     daoxing: n.daoxingText,
     note: `${n.swords} 把飞剑`,
   }))
+  if (playerGuardian) rows.push(playerGuardian)
   return mail(at, byName, target.base.name, `${target.base.id}:liuren`, {
     kind: '六壬神定',
     lead: `你掐指一算，算出了${target.base.name}身边的护法。`,
@@ -283,6 +293,8 @@ export function divine(
     readonly skills: Readonly<Record<string, number>>
     readonly myYijing: number
     readonly theirYijing: number
+    readonly rollValue?: number
+    readonly school?: string
     readonly targetMeridians?: readonly number[]
     readonly inSight: boolean
     readonly located: boolean
@@ -294,23 +306,26 @@ export function divine(
     readonly tomorrow?: { readonly x: number; readonly y: number }
     /** 六壬神定：目标的护法 */
     readonly pals?: readonly NpcState[]
+    readonly playerGuardian?: SpyRow
     /** 诰命真经：正往该地点去的人 */
     readonly inbound?: readonly { readonly npc: NpcState; readonly distance: number }[]
   },
 ): DivineResult {
   const skill = kind === '九宫飞星' ? '九宫飞星法' : kind
+  if (!(kind in DIVINATIONS)) return { ok: false, reason: '没有这种术数' }
   if (!((opts.skills[skill] ?? 0) > 0)) return { ok: false, reason: `尚未学会${skill}` }
-  if (!divineSucceeds(opts.myYijing, opts.theirYijing)) {
+  if (opts.school && DIVINATIONS[kind].school && opts.school !== DIVINATIONS[kind].school) return { ok: false, reason: `${kind}是${DIVINATIONS[kind].school}独门术数` }
+  if (kind !== '水镜玄光' && kind !== '诰命真经' && !divineSucceeds(opts.myYijing, opts.theirYijing, opts.rollValue)) {
     return { ok: false, reason: '你的术数修为不及对方，推算失败' }
   }
   // 太乙神数要先看到人或先定位 [原文]
-  if (kind === '太乙神数' && !opts.inSight && !opts.located) {
+  if ((kind === '太乙神数' || kind === '梅花易数') && !opts.inSight && !opts.located) {
     return { ok: false, reason: '需要先看到对方，或用九宫飞星推算出对方的位置' }
   }
 
   switch (kind) {
     case '九宫飞星':
-      return { ok: true, mail: flyingStar(target, opts.at, opts.byName) }
+      return { ok: true, mail: flyingStar(target, opts.at, opts.byName, opts.skills[skill]) }
     case '先天神数':
       // 纯熟阈值原文未留存，以满级20重建；NPC法宝列表沿用现有太乙模型。
       return { ok: true, mail: taiyi(target, opts.at, opts.byName, kind, (opts.skills[kind] ?? 0) >= 20) }
@@ -332,11 +347,65 @@ export function divine(
         mail: plumBlossom(target, opts.at, opts.byName, opts.tomorrow ?? { x: target.x, y: target.y }),
       }
     case '六壬神定':
-      return { ok: true, mail: sixRen(target, opts.at, opts.byName, opts.pals ?? []) }
+      return { ok: true, mail: sixRen(target, opts.at, opts.byName, opts.pals ?? [], opts.playerGuardian) }
     case '诰命真经': {
       const spot = opts.spot
       if (!spot) return { ok: false, reason: '请先在地图上选定要推算的地点' }
       return { ok: true, mail: edictSutra(opts.at, opts.byName, spot.x, spot.y, opts.inbound ?? []) }
     }
   }
+}
+
+export type DivinationSight = {
+  readonly located: Readonly<Record<number, { readonly x: number; readonly y: number }>>
+  readonly scenes: readonly { readonly x: number; readonly y: number; readonly expiresAt: number }[]
+}
+/** 九宫定位随目标移动失效；水镜只保留一分钟，二者均按游戏时间。 */
+export function isDivinationVisible(s: GameState, target: { x: number; y: number; base: { id: number } }): boolean {
+  const range = sightRange(s.player.body[BODY_EYE] ?? 0)
+  if (Math.abs(s.player.x - target.x) + Math.abs(s.player.y - target.y) <= range) return true
+  const located = s.divination?.located[target.base.id]
+  return (located?.x === target.x && located.y === target.y) ||
+    (s.divination?.scenes.some(v => v.x === target.x && v.y === target.y && v.expiresAt > s.clock.gameT) ?? false)
+}
+export function performDivination(s: GameState, kind: DivinationKind, targetId?: number, spot?: { x: number; y: number }):
+  { readonly ok: boolean; readonly state: GameState; readonly reason?: string } {
+  const fail = (reason: string) => ({ ok: false, state: s, reason })
+  if (!(kind in DIVINATIONS)) return fail('没有这种术数')
+  const skill = kind === '九宫飞星' ? '九宫飞星法' : kind
+  if (!(s.player.skills[skill] ?? 0)) return fail(`尚未学会${skill}`)
+  const school = DIVINATIONS[kind].school
+  if (school && s.player.school !== school) return fail(`${kind}是${school}独门术数`)
+  const coordinate = kind === '水镜玄光' || kind === '诰命真经'
+  if (coordinate && (!spot || !inWorld(spot.x, spot.y))) return fail('请选定有效的地图坐标')
+  const all = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
+  const target = all.find(n => n.base.id === targetId) ?? (coordinate ? all[0] : undefined)
+  if (!target) return fail('找不到这位道友')
+  const visible = isDivinationVisible(s, target)
+  if (!coordinate && kind !== '九宫飞星' && !visible) return fail('需要先看到对方，或用九宫飞星推算出对方的位置')
+  const tomorrow = allNpcsAt(s.npc, s.clock.gameT + DAY, s.worldSeed)
+  const future = new Map(tomorrow.map(n => [n.base.id, n]))
+  const distance = (n: { x: number; y: number }) => Math.abs(n.x - spot!.x) + Math.abs(n.y - spot!.y)
+  const dice = next(s.rng)
+  const r = divine(kind, target, { at: s.clock.gameT, byName: s.player.name, skills: s.player.skills,
+    myYijing: s.player.skills['易经'] ?? 0, theirYijing: target.yijing, rollValue: dice.value, school: s.player.school,
+    inSight: visible, located: visible, spot,
+    targetMeridians: Array(12).fill(Math.min(20, Math.floor(target.daoxing / 9000))),
+    here: all.filter(n => n.x === spot?.x && n.y === spot.y), tomorrow: future.get(target.base.id),
+    pals: all.filter(n => socialOf(s).npcGuardians[target.base.id]?.includes(n.base.id)),
+    playerGuardian: socialOf(s).guardians.includes(target.base.id) ? {
+      name: s.player.name, realm: s.player.realm, daoxing: daoxingText(s.player.daoxing),
+      note: `${s.player.artifacts.filter(a => a.kind === 'sword').length} 把飞剑`,
+    } : undefined,
+    inbound: spot ? all.filter(n => distance(future.get(n.base.id)!) < distance(n)).map(n => ({ npc: n, distance: distance(n) })).sort((a, b) => a.distance - b.distance) : [],
+  })
+  const advanced = { ...s, rng: dice.state }
+  if (!r.ok) return { ok: false, state: advanced, reason: r.reason }
+  const sight = s.divination ?? { located: {}, scenes: [] }
+  const divination: DivinationSight = {
+    located: kind === '九宫飞星' ? { ...sight.located, [target.base.id]: { x: target.x, y: target.y } } : sight.located,
+    scenes: [...sight.scenes.filter(v => v.expiresAt > s.clock.gameT && !(kind === '水镜玄光' && v.x === spot?.x && v.y === spot?.y)),
+      ...(kind === '水镜玄光' ? [{ ...spot!, expiresAt: s.clock.gameT + 60 }] : [])],
+  }
+  return { ok: true, state: { ...advanced, divination, mail: [r.mail, ...s.mail].slice(0, 200) } }
 }

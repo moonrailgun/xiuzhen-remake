@@ -348,6 +348,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const optionalNumber = (v: unknown) => v === undefined || number(v)
   const integer = (v: unknown) => number(v) && Number.isSafeInteger(v)
   const coordinate = (v: unknown) => integer(v) && (v as number) < WORLD_SIZE
+  const xy = (v: Record<string, unknown>) => coordinate(v.x) && coordinate(v.y)
   const ids = (v: unknown) => Array.isArray(v) && v.every(integer)
   const idMap = (v: unknown, valid: (item: unknown) => boolean) => object(v) &&
     Object.entries(v).every(([key, item]) => /^(0|[1-9][0-9]*)$/.test(key) && valid(item))
@@ -403,6 +404,8 @@ export function validateGameState(value: unknown): asserts value is GameState {
         !Array.isArray(s.social.blacklist) || !s.social.blacklist.every(string) ||
         !arrayOf(s.social.guilds, g => integer(g.id) && string(g.name) && integer(g.founder) && integer(g.leader) && number(g.createdAt) &&
           ids(g.members) && ids(g.allies) && ids(g.enemies) && idMap(g.jobs, string)))) ||
+      (s.divination !== undefined && (!object(s.divination) || !idMap(s.divination.located, p => object(p) && xy(p)) ||
+        !arrayOf(s.divination.scenes, p => xy(p) && number(p.expiresAt)))) ||
       (s.treasure !== undefined && (!object(s.treasure) || !['藏宝图', '天宫秘箓'].includes(s.treasure.source as string) ||
         !numeric(s.treasure, ['x', 'y']) || ![s.treasure.x, s.treasure.y].every(v => Number.isInteger(v) && (v as number) < WORLD_SIZE) ||
         !object(s.treasure.reward) || !artifact(s.treasure.reward) || s.treasure.reward.count !== 1)) ||

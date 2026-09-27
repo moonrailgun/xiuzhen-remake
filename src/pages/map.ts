@@ -31,6 +31,7 @@ export type MapCell = {
   /** 天地元气 金木水火土 */
   readonly qi: readonly [number, number, number, number, number]
   readonly playernum: number
+  readonly revealed?: boolean
 }
 
 export type MapVm = {
@@ -141,7 +142,7 @@ function tiles(vm: MapVm): string {
   vm.cells.forEach((cell, i) => {
     const { left, top } = cellToScreen(cell.posx, cell.posy, vm.centerX, vm.centerY)
     const z = 5 * (i + 1)
-    const dist = cellDistance(cell, { posx: vm.playerX, posy: vm.playerY })
+    const dist = cell.revealed ? 0 : cellDistance(cell, { posx: vm.playerX, posy: vm.playerY })
     const suffix = visibilitySuffix(dist, vm.playerDis)
     const url = `img/map/${cell.terrain}${suffix}.gif`
 

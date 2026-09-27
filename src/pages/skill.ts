@@ -40,6 +40,7 @@ export type BookRow = {
 }
 
 export type SkillVm = {
+  readonly interactive?: boolean
   readonly tab: SkillTab
   /** 炼器树的背景图按道源分三套 `bgproduce{s,k,t}.gif`（04 §7.1 [推断]） */
   readonly school: School
@@ -132,7 +133,7 @@ ${when(
 }
 
 /** 渲染法术页左栏（`#gleft` 的内容）。 */
-export function renderSkill(vm: SkillVm): string {
+function renderSkillBody(vm: SkillVm): string {
   const tabs = SKILL_TABS.map((t) => ({ label: t.label, href: t.href }))
   const body =
     vm.tab === 'book' ? bookList(vm) : tree(SKILL_TREES[vm.tab], vm)
@@ -140,4 +141,9 @@ export function renderSkill(vm: SkillVm): string {
   return `${pageHeader(TITLE_IMG[vm.tab], tabs)}
 <DIV style="height:20px"></DIV>
 ${body}`
+}
+
+export function renderSkill(vm: SkillVm): string {
+  return renderSkillBody(vm) + (vm.tab === 'math' && vm.interactive
+    ? `<DIV class=middle style="padding:8px"><INPUT id=divinename aria-label="道友姓名" placeholder="道友姓名"><BUTTON onclick="divineByName()">九宫飞星定位</BUTTON></DIV>` : '')
 }

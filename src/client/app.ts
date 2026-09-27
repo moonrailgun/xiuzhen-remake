@@ -52,14 +52,14 @@ import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox
 import { SECRET_MATERIALS, isSecretBook } from '../data/secrets.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, terrainScene, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
-import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
+import { npcsAtCell, allNpcsAt } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation, setBlocked, receiveLetter } from '../engine/social.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { renderGm, type GmVm } from '../pages/gm.ts'
 import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
-import { divine, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
+import { performDivination, isDivinationVisible, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
@@ -212,6 +212,7 @@ function mapVm(s: GameState): MapVm {
       terrain: `${key}${terrainVariant(s.worldSeed, p.x, p.y, t)}`,
       scene: terrainScene(t, terrainVariant(s.worldSeed, p.x, p.y, t)),
       qi: qiAt(s.worldSeed, p.x, p.y, t),
+      revealed: s.divination?.scenes.some(scene => scene.x === p.x && scene.y === p.y && scene.expiresAt > s.clock.gameT) ?? false,
       // 本格的人数 = NPC + 自己
       playernum:
         npcsAtCell(s.npc, s.clock.gameT, s.worldSeed, p.x, p.y).length +
@@ -734,61 +735,25 @@ export function installGameActions(): void {
     step()
   }
 
-  /** 对选中场景进行推算（水镜玄光：按坐标推算该地修炼的玩家）。 */
-  g['spyScene'] = () => {
-    if (!state || !mapSelected) return
-    if (!((state.player.skills['水镜玄光'] ?? 0) > 0)) return openWindow('mwindow', '推算失败', '<DIV class=middle style=padding:10px>尚未学会水镜玄光。</DIV>')
-    const here = npcsAtCell(state.npc, state.clock.gameT, state.worldSeed, mapSelected.x, mapSelected.y)
-    const body = here.length === 0
-      ? '此地空无一人。'
-      : here.map((n) => `${esc(n.base.name)}${n.suffix ? `(${n.suffix})` : ''}　${esc(n.realm)}　道行 ${esc(n.daoxingText)}`).join('<BR>')
-    openWindow('mwindow', '掐指一算',
-      `<DIV class=middle style="padding:10px">(${mapSelected.x},${mapSelected.y})<BR>${body}</DIV>`)
-  }
-
-  /** 对玩家推算（掐指一算菜单）。 */
-  g['spyPlayer'] = (name: string) => {
+  /** 推算结果、坐标视野、出击资格共用引擎状态。 */
+  const castDivination = (kind: DivinationKind, name?: string, spot?: { x: number; y: number }) => {
     if (!state) return
-    const s = state
-    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
-      .find((n) => n.base.name === name)
-    if (!target) {
-      openWindow('mwindow', '掐指一算', '<DIV class=middle style="padding:10px">对方已不在你的感应范围内。</DIV>')
-      return
-    }
-    const kinds = Object.keys(DIVINATIONS) as DivinationKind[]
-    const menu = kinds.map((k) =>
-      `<DIV style="padding:3px 0"><A class=skillup href="#" onclick="doDivine('${k}','${js(name)}')">${k}</A>` +
-      `<SPAN class=smallgray>　${DIVINATIONS[k].effect}</SPAN></DIV>`).join('')
-    openWindow('lwindow', '掐指一算', `<DIV class=middle style="padding:10px">${menu}</DIV>`)
-  }
-
-  g['doDivine'] = (kind: string, name: string) => {
-    if (!state) return
-    const s = state
-    const target = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
-      .find((n) => n.base.name === name)
-    if (!target) return
-    const r = divine(kind as DivinationKind, target, {
-      at: s.clock.gameT,
-      byName: s.player.name,
-      skills: s.player.skills,
-      myYijing: s.player.skills['易经'] ?? 0,
-      theirYijing: target.yijing,
-      targetMeridians: Array(12).fill(Math.min(20, Math.floor(target.daoxing / 9000))),
-      inSight: true,
-      located: false,
-      ...divineContext(s, target),
-    })
-    if (!r.ok) {
-      openWindow('mwindow', '推算失败', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
-      return
-    }
-    state = { ...s, mail: [r.mail, ...s.mail].slice(0, 200) }
+    const target = allNpcsAt(state.npc, state.clock.gameT, state.worldSeed).find(n => n.base.name === name)
+    const r = performDivination(state, kind, target?.base.id, spot)
+    state = r.state
     closeWindow('lwindow')
-    openWindow('mwindow', '推算', `<DIV class=middle style="padding:10px">推算结果已送到你的消息里。</DIV>`)
+    openWindow('mwindow', r.ok ? '推算' : '推算失败', `<DIV class=middle style="padding:10px">${esc(r.ok ? '推算结果已送到你的消息里。' : r.reason ?? '无法推算')}</DIV>`)
     step()
   }
+  g['spyScene'] = () => { if (mapSelected) castDivination('水镜玄光', undefined, mapSelected) }
+  g['spyPlayer'] = (name: string) => {
+    if (!state) return
+    const kinds = Object.keys(DIVINATIONS) as DivinationKind[]
+    const menu = kinds.map(k => `<DIV style="padding:3px 0"><A class=skillup href="#" onclick="doDivine('${k}','${js(name)}')">${k}</A><SPAN class=smallgray>　${DIVINATIONS[k].effect}</SPAN></DIV>`).join('')
+    openWindow('lwindow', '掐指一算', `<DIV class=middle style="padding:10px">${menu}</DIV>`)
+  }
+  g['doDivine'] = (kind: string, name: string) => castDivination(kind as DivinationKind, name)
+  g['divineByName'] = () => castDivination('九宫飞星', (document.getElementById('divinename') as HTMLInputElement | null)?.value.trim())
 
   /** 出击：把勾选的飞剑派出去。 */
   g['sendFight'] = () => {
@@ -1839,8 +1804,8 @@ function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly
 
 /** 出击页。目标可以是同格的 NPC，也可以是任务里的怪。 */
 function fightWindow(s: GameState, targetName: string): string {
-  const npc = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, sightRange(s.player.body[BODY_EYE] ?? 0))
-    .find(n => n.base.name === targetName)
+  const npc = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
+    .find(n => n.base.name === targetName && isDivinationVisible(s, n))
   const quest = activeQuests(s.quests).find(q => q.goal.kind === 'slay' && q.goal.monster.name === targetName)
   const monster = quest ? questTarget(s.quests, quest.id) : null
   reinforceEventId = null
@@ -2039,8 +2004,7 @@ function guardWindow(s: GameState, tab: number): string {
 
 /** 「点击此处查看更多玩家」：视野内的人，按道行排。 */
 function playerListWindow(s: GameState): string {
-  const range = sightRange(s.player.body[BODY_EYE] ?? 0)
-  const list = npcsInSight(s.npc, s.clock.gameT, s.worldSeed, s.player.x, s.player.y, range)
+  const list = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed).filter(n => isDivinationVisible(s, n))
     .sort((a, b) => b.daoxing - a.daoxing)
     .slice(0, 30)
   if (list.length === 0) {
@@ -2226,37 +2190,6 @@ function doRefine(rowId: number): void {
  *  - 明日位置 = 拿明天的游戏时刻再算一次（`npcAt` 按游戏日取整，天然确定）；
  *  - 护法 = 同道源、离他最近的几个人（原版护法是真人互相邀请，单机下只能这样模拟）。
  */
-function divineContext(s: GameState, target: NpcState) {
-  const spot = mapSelected ?? { x: s.player.x, y: s.player.y }
-  const all = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
-  const next = allNpcsAt(s.npc, s.clock.gameT + DAY, s.worldSeed)
-  const nextOf = (id: number) => next.find((n) => n.base.id === id)
-
-  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-    Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-
-  return {
-    spot,
-    here: all.filter((n) => n.x === spot.x && n.y === spot.y),
-    tomorrow: nextOf(target.base.id) ?? { x: target.x, y: target.y },
-    // 护法：同道源、在他身边 6 格内、按道行取前 3 个
-    pals: all
-      .filter((n) =>
-        n.base.id !== target.base.id &&
-        n.base.school === target.base.school &&
-        dist(n, target) <= 6)
-      .sort((a, b) => b.daoxing - a.daoxing)
-      .slice(0, 3),
-    // 正往选定地点去的人：明日比今日更近
-    inbound: all
-      .map((n) => ({ npc: n, to: nextOf(n.base.id) }))
-      .filter(({ npc, to }) => to !== undefined && dist(to, spot) < dist(npc, spot))
-      .map(({ npc, to }) => ({ npc, distance: dist(to!, spot) }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 10),
-  }
-}
-
 /**
  * 发消息。
  *

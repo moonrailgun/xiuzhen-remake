@@ -27,9 +27,11 @@ test('八种术数，包括1月4日开放的先天神数', () => {
   assert.equal(DIVINATIONS['九宫飞星'].school, null, '九宫飞星不是独门')
 })
 
-test('术数修为不及对方时推算失败（原文规则）', () => {
+test('易经每高一级降低对方推算成功率10%，同级可推算', () => {
   assert.equal(divineSucceeds(10, 5), true)
-  assert.equal(divineSucceeds(5, 10), false)
+  assert.equal(divineSucceeds(5, 5, 0.99), true)
+  assert.equal(divineSucceeds(5, 6, 0.89), true)
+  assert.equal(divineSucceeds(5, 6, 0.9), false)
   const r = divine('九宫飞星', target, opts({ myYijing: 1, theirYijing: 9 }))
   assert.equal(r.ok, false)
   assert.match((r as { reason: string }).reason, /术数修为不及对方/)
@@ -178,9 +180,12 @@ test('未学术数不能推算，九宫技能名映射九宫飞星法', () => {
 })
 
 
-test('九宫飞星要求易经严格高于目标，相同等级也不能推算', () => {
-  assert.equal(divineSucceeds(5, 5), false)
-  assert.equal(divine('九宫飞星', target, opts({ myYijing: 5, theirYijing: 5 })).ok, false)
+test('九宫飞星一级只定位，二级才显示真气', () => {
+  for (const level of [1, 2]) {
+    const r = divine('九宫飞星', target, opts({ skills: { 九宫飞星法: level }, myYijing: 5, theirYijing: 5 }))
+    assert.ok(r.ok)
+    assert.equal('qi' in r.mail.body, level >= 2)
+  }
 })
 
 test('先天神数学习后可看法宝，满级显示状态', () => {
@@ -190,7 +195,47 @@ test('先天神数学习后可看法宝，满级显示状态', () => {
     assert.ok(r.ok)
     assert.equal(r.mail.body.kind, '先天神数')
     const rows = r.mail.body.rows as { status?: string }[]
-    assert.equal(rows.length, 2)
+    assert.equal(rows.length, target.artifacts.length)
     assert.equal(rows[0]!.status, level === 20 ? '空闲' : undefined)
   }
+})
+
+test('正式推算跨视野定位、目标移动失效、水镜一分钟、独门与随机序列', async () => {
+  const { newGame, importGame } = await import('./game.ts')
+  const { performDivination, isDivinationVisible } = await import('./divine.ts')
+  const base = newGame({ name: '术数测试', gender: 'm', element: '金', school: '通天', x: 0, y: 0, seed: 1 }, 0)
+  const s = { ...base, player: { ...base.player, skills: { 九宫飞星法: 2, 水镜玄光: 1, 太乙神数: 1, 梅花易数: 1, 易经: 500 } } }
+  const n = npcAt(s.npc, s.npc.bases[0]!, s.clock.gameT, s.worldSeed)
+  assert.equal(isDivinationVisible(s, n), false)
+  const location = performDivination(s, '九宫飞星', n.base.id)
+  assert.ok(location.ok)
+  assert.ok(isDivinationVisible(importGame(JSON.stringify(location.state)), n))
+  assert.equal(isDivinationVisible(location.state, { ...n, x: n.x + 1 }), false)
+  assert.ok(performDivination(location.state, '太乙神数', n.base.id).ok)
+  assert.equal(performDivination(location.state, '梅花易数', n.base.id).ok, false)
+  const mirror = performDivination(s, '水镜玄光', undefined, n)
+  assert.ok(mirror.ok)
+  assert.ok(isDivinationVisible(mirror.state, n))
+  assert.equal(isDivinationVisible({ ...mirror.state, clock: { ...s.clock, gameT: 60 } }, n), false)
+  assert.deepEqual(performDivination(s, '九宫飞星', n.base.id), location)
+  assert.notDeepEqual(location.state.rng, s.rng)
+})
+
+test('六壬读取已保存的 NPC 护法，并反映玩家建立和解除的互助关系', async () => {
+  const { newGame } = await import('./game.ts')
+  const { performDivination } = await import('./divine.ts')
+  const { changeGuardian } = await import('./social.ts')
+  const base = newGame({ name: '守望道友', gender: 'm', element: '金', school: '通天', x: 0, y: 0, seed: 1 }, 0)
+  const n = npcAt(base.npc, base.npc.bases[0]!, 0, base.worldSeed)
+  const s = { ...base, player: { ...base.player, x: n.x, y: n.y, skills: { 六壬神定: 1, 易经: 500 } } }
+  const added = changeGuardian(s, n.base.id, true)
+  assert.ok(added.ok)
+  const result = performDivination(added.state, '六壬神定', n.base.id)
+  assert.ok(result.ok)
+  assert.ok((result.state.mail[0]!.body.rows as { name: string }[]).some(row => row.name === s.player.name))
+  const removed = changeGuardian(result.state, n.base.id, false)
+  assert.ok(removed.ok)
+  const again = performDivination(removed.state, '六壬神定', n.base.id)
+  assert.ok(again.ok)
+  assert.equal((again.state.mail[0]!.body.rows as { name: string }[]).some(row => row.name === s.player.name), false)
 })

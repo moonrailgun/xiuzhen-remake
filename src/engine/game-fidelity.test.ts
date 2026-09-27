@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { newGame, currentQiPerHour, tick, terrainOf } from './game.ts'
+import { newGame, importGame, currentQiPerHour, tick, terrainOf } from './game.ts'
+import { serialize } from './save.ts'
 import { DAY, HOUR } from './clock.ts'
 import { terrainAt } from '../data/world.ts'
 import { artifactUpkeepPerHour } from './craft.ts'
@@ -8,6 +9,9 @@ import type { GameState } from './state.ts'
 
 const born = () => newGame({ name: '测试', gender: 'f', element: '木', school: '通天', x: 100, y: 100, seed: 8 }, 0)
 const item = { id: 'sword', kind: 'sword', name: '青龙伏魔剑', quality: '凡品', refine: 1, count: 2, status: '空闲' } as const
+const combat = { id: 'npc:1:sword', name: '青龙伏魔剑', element: '木', attack: 20, durability: 50, agility: 10, absorb: 80, speed: 100, noReturn: false }
+const launch = { ...combat, quality: '凡品', refine: 0, attack: [10, 30], durability: [20, 60], launchedStats: { attack: 20, durability: 50, agility: 10, speed: 100, absorb: 80, noReturn: true } }
+
 test('出保才与当地出保NPC平分，保护期从各自建号计时；法宝按真实五气耗费扣除', () => {
   const s = born(), npc = { ...s.npc.bases[0]!, profile: '羊' as const, homeX: 100, homeY: 100, bornAt: 0 }
   const mature: GameState = { ...s, clock: { ...s.clock, gameT: 10 * DAY }, npc: { bases: [npc], patches: {} } }
@@ -38,4 +42,22 @@ test('保护期边界、三尸跨日和福地占领接入主循环', () => {
   assert.deepEqual(terrainOf(sanctuary)(...at), [0, 0, 0, 0, 0])
   const owned = { ...sanctuary, quests: { ...s.quests, sanctuaries: [{ x: at[0], y: at[1], kind: '福地' as const, occupiedAt: sanctuary.clock.gameT }] } }
   assert.deepEqual(terrainOf(owned)(...at), [5, 5, 5, 5, 5])
+})
+
+test('主循环处理败劫碎丹并保留其他任务', () => {
+  const s = born()
+  const state: GameState = { ...s, player: { ...s.player, artifacts: [item] },
+    quests: { ...s.quests, entries: [
+      { id: 'realm:jindan:1', acceptedAt: 0, done: true, count: 10 },
+      { id: 'realm:jindan:2', acceptedAt: 0, done: false },
+      { id: 'newbie:qi:1', acceptedAt: 0, done: true },
+    ] },
+    timeline: { events: [{ id: 'battle:thunder', kind: 'battle', finishAt: 60, payload: {
+      phase: 'fighting', target: { kind: 'monster', name: '天雷', x: 100, y: 100, attack: 9999, agility: 1, hp: 9999, element: null },
+      swords: [launch], swordIds: ['sword'],
+    } }] } }
+  const result = tick(state, 60000).state
+  assert.equal(result.mail[0]?.body.won, false)
+  assert.deepEqual(result.quests.entries.map(e => e.id), ['newbie:qi:1'])
+  assert.deepEqual(importGame(serialize(result, 0)), result)
 })

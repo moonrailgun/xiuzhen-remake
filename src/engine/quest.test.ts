@@ -554,3 +554,10 @@ test('金丹纯度按十份输出的五行调和评分，同属性十份并非�
   assert.equal(balanced.count, 10)
   assert.equal(balanced.cleared, true)
 })
+
+test('天雷失败碎丹，重新开放结丹；普通战败不抹掉金丹', () => {
+  const log = { ...emptyQuestLog(), entries: [{ id: 'realm:jindan:1', acceptedAt: 0, done: true, count: 10, cleared: true }, { id: 'realm:jindan:2', acceptedAt: 0, done: false }] }
+  const event: GameEvent = { id: '雷', kind: 'battle', finishAt: 10, payload: { target: { name: '天雷' } } }
+  assert.equal(resolveQuestBattle(log, event, false).entries.length, 0)
+  assert.deepEqual(resolveQuestBattle(log, { ...event, payload: { target: { name: '试剑石' } } }, false), log)
+})

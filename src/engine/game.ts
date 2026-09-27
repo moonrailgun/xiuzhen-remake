@@ -285,8 +285,8 @@ function resolveEvent(state: GameState, event: GameEvent): { state: GameState; f
   if (event.kind === 'move') return event.payload.op === 'escort' ? { state: resolveEscort(state, event) } : resolveMove(state, event)
   if (event.kind === 'battle') {
     const out = resolveBattleEvent(state, event)
-    return out.outcome?.won
-      ? { ...out, state: { ...out.state, quests: resolveQuestBattle(out.state.quests, event, true) } }
+    return out.outcome
+      ? { ...out, state: { ...out.state, quests: resolveQuestBattle(out.state.quests, event, out.outcome.won) } }
       : out
   }
   if (event.kind === 'craft') return { state: resolveCraft(state, event) }

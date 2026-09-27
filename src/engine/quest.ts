@@ -525,9 +525,13 @@ export function questTarget(log: QuestLog, id: string, gameT?: number): QuestBat
  * 按 `payload.target.name` 认怪，与 `battle.ts` 的事件载荷对得上，但不依赖它的类型。
  */
 export function resolveQuestBattle(log: QuestLog, event: GameEvent, won: boolean): QuestLog {
-  if (event.kind !== 'battle' || !won) return log
+  if (event.kind !== 'battle') return log
   log = expireDailyQuests(log, event.finishAt)
   const target = event.payload['target'] as { readonly name?: unknown } | undefined
+  if (!won) {
+    if (target?.name !== '天雷' || !entryOf(log, 'realm:jindan:2') || entryOf(log, 'realm:jindan:3')?.done) return log
+    return { ...log, entries: log.entries.filter(e => !e.id.startsWith('realm:jindan:')) }
+  }
   return typeof target?.name === 'string' ? recordSlain(log, target.name) : log
 }
 

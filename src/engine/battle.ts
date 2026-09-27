@@ -15,11 +15,10 @@
  */
 
 import { schedule, type GameEvent } from './timeline.ts'
-import { resolveBattle, tangleDuration, type CombatSword } from './combat.ts'
+import { resolveBattle, tangleDuration, combatDamage, absorbedLoot, type CombatSword } from './combat.ts'
 import { addQi, totalQi, ZERO_QI, type FiveQi, type GameState, type MailItem, clampQi } from './state.ts'
 import { capacityOf } from './cultivate.ts'
 import { distance } from '../data/world.ts'
-import { lootFrom } from './loot.ts'
 import { panelStat, type Quality } from '../data/artifacts.ts'
 import { npcAt, patchNpc } from './npc.ts'
 import { swordByName } from '../data/swords.ts'
@@ -77,6 +76,9 @@ export function flightSeconds(dist: number, speed: number): number {
   return Math.max(60, Math.round((dist * 3600) / Math.max(1, speed)))
 }
 
+export type SwordArt = '碎玉剑法' | '小周天剑法' | '吸星剑法'
+export type LaunchOptions = { readonly wanjianLevel?: number; readonly sightRange?: number; readonly swordArt?: SwordArt }
+
 export type LaunchResult =
   | { readonly ok: true; readonly state: GameState }
   | { readonly ok: false; readonly reason: string }
@@ -88,13 +90,13 @@ export function launch(
   state: GameState,
   target: BattleTarget,
   swords: readonly LaunchSword[],
-  opts: { readonly wanjianLevel?: number; readonly sightRange?: number } = {},
+  opts: LaunchOptions = {},
 ): LaunchResult {
   if (swords.length === 0) return { ok: false, reason: '请选择出击的飞剑' }
 
-  const selectionError = swordSelectionError(state, swords)
+  const selectionError = swordSelectionError(state, swords) ?? swordArtError(state, opts.swordArt)
   if (selectionError) return { ok: false, reason: selectionError }
-  swords = prepareSwords(state, swords)
+  swords = prepareSwords(state, swords, opts.swordArt)
   const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {
     return { ok: false, reason: `最多只能同时控制 ${limit} 把飞剑` }
@@ -128,6 +130,8 @@ export function launch(
 
 export type LaunchedSwordStats = {
   readonly instantAttackRatio?: number
+  readonly absorb?: number
+  readonly noReturn?: boolean
   readonly attack: number
   readonly durability: number
   readonly agility: number
@@ -135,21 +139,29 @@ export type LaunchedSwordStats = {
 }
 
 /** 被动仅出击生效。攻耐每级1%由战报反推（02 §3）；速度幅度按同量级重建。 */
-export function launchedSwordStats(sword: LaunchSword, skills: Readonly<Record<string, number>>): LaunchedSwordStats {
+export function launchedSwordStats(sword: LaunchSword, skills: Readonly<Record<string, number>>, art?: SwordArt): LaunchedSwordStats {
   const bonus = (name: string) => 1 + Math.max(0, Math.min(20, skills[name] ?? 0)) / 100
   return {
-    attack: Math.floor(panelStat(sword.attack, sword.quality, sword.refine) * bonus('心剑诀')),
-    durability: Math.floor(panelStat(sword.durability, sword.quality, sword.refine) * bonus('身剑诀')),
-    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine),
+    attack: Math.floor(panelStat(sword.attack, sword.quality, sword.refine) * bonus('心剑诀') * (art === '碎玉剑法' ? 2 : art === '小周天剑法' ? 0.25 : 1)),
+    durability: Math.floor(panelStat(sword.durability, sword.quality, sword.refine) * bonus('身剑诀') * (art === '吸星剑法' ? 0.25 : 1)),
+    agility: panelStat([sword.agility, sword.agility], sword.quality, sword.refine) * (art === '小周天剑法' ? 2 : 1),
+    absorb: panelStat(swordByName(sword.name)?.absorb ?? [0, 0], sword.quality, sword.refine) * (art === '吸星剑法' ? 2 : 1),
+    noReturn: art === '碎玉剑法',
     speed: sword.speed * bonus('大周天剑法'),
     // Lv1 2% 见 article-105340-p1；逐级线性增长为重建。
     instantAttackRatio: Math.max(0, Math.min(20, skills['剑心通明'] ?? 0)) * 0.02,
   }
 }
 
-const statsOf = (sword: LaunchSword): LaunchedSwordStats => sword.launchedStats ?? launchedSwordStats(sword, {})
-const prepareSwords = (state: GameState, swords: readonly LaunchSword[]): LaunchSword[] =>
-  swords.map((sword) => ({ ...sword, launchedStats: launchedSwordStats(sword, state.player.skills) }))
+const statsOf = (sword: LaunchSword): LaunchedSwordStats => ({ ...launchedSwordStats(sword, {}), ...sword.launchedStats })
+export const prepareSwords = (state: GameState, swords: readonly LaunchSword[], art?: SwordArt): LaunchSword[] =>
+  swords.map((sword) => ({ ...sword, launchedStats: launchedSwordStats(sword, state.player.skills, art) }))
+
+export function swordArtError(state: GameState, art?: SwordArt): string | null {
+  if (!art) return null
+  if (!['碎玉剑法', '小周天剑法', '吸星剑法'].includes(art)) return '未知剑术'
+  return (state.player.skills[art] ?? 0) > 0 ? null : `尚未学会${art}`
+}
 
 function swordStatus(state: GameState, swords: readonly LaunchSword[], status: string): GameState {
   const ids = new Set(swords.map((sword) => sword.id))
@@ -241,11 +253,13 @@ export function resolveBattleEvent(
   }
 
   const result = resolveBattle(swords.map(s => toCombat(s, target.kind)), [targetToCombat(target)])
-  const lost = result.attacker.filter((outcome) => outcome.broken).map((outcome) => outcome.id)
+  const playerOutcomes = result.attacker.map(o => swords.some(s => s.id === o.id && statsOf(s).noReturn) ? { ...o, broken: true } : o)
+  const lost = playerOutcomes.filter((outcome) => outcome.broken).map((outcome) => outcome.id)
   const won = result.defender.every((outcome) => outcome.broken)
   // 战利品是**飞剑驮回来的**：一把都没活着回来就没有返航事件，也就没有东西能入账。
   // 这时还照样去扣 NPC 的库存，那点真气就凭空蒸发了（对方少了，玩家没多）。
   const anySurvivor = swords.some((sword) => !lost.includes(sword.id))
+  const capacity = swords.filter(s => !lost.includes(s.id)).reduce((sum, s) => sum + (statsOf(s).absorb ?? 0), 0)
   let loot: FiveQi = ZERO_QI
   let npc = state.npc
   if (won && anySurvivor && target.kind === 'player') {
@@ -255,25 +269,24 @@ export function resolveBattleEvent(
       // 与九宫飞星保持同一NPC状态及五行/暗仓推导，不重复使用出击时的库存快照。
       const current = npcAt(state.npc, base, event.finishAt, state.worldSeed)
       const qi = Array(5).fill(Math.floor(current.qi / 5)) as unknown as FiveQi
-      loot = lootFrom(qi, Math.max(0, Math.floor(current.daoxing / 20000))).taken
+      loot = absorbedLoot(qi, Math.max(0, Math.floor(current.daoxing / 20000)), capacity)
       const previous = npc.patches[base.id]
       npc = patchNpc(npc, base.id, { qiLost: (previous?.qiLost ?? 0) + totalQi(loot) })
     } else {
       // 兼容旧版已保存的显式战利品载荷。
-      loot = lootFrom((event.payload['targetQi'] as FiveQi) ?? ZERO_QI,
-        (event.payload['targetRootLevel'] as number) ?? 0).taken
+      loot = absorbedLoot((event.payload['targetQi'] as FiveQi) ?? ZERO_QI, (event.payload['targetRootLevel'] as number) ?? 0, capacity)
     }
   } else if (won && anySurvivor) {
     // 怪物没有暗仓，按生命折算战利品 [重建]。
     loot = Array(5).fill(target.hp * 2) as unknown as FiveQi
   }
 
-  const report = buildReport(state, target, swords, result, won, event)
+  const report = buildReport(state, target, swords, { ...result, attacker: playerOutcomes }, won, event)
   const survivors = swords.filter((sword) => !lost.includes(sword.id))
   const nextState = swordStatus({
     ...state,
     npc,
-    player: { ...state.player, artifacts: state.player.artifacts.filter((artifact) => !lost.includes(artifact.id)) },
+    player: { ...state.player, artifacts: combatDamage(state.player.artifacts, playerOutcomes) },
     mail: [report, ...state.mail].slice(0, 200),
   }, survivors, '返回中')
   return {
@@ -380,7 +393,7 @@ export function reinforce(
   state: GameState,
   eventId: string,
   swords: readonly LaunchSword[],
-  opts: { readonly wanjianLevel?: number } = {},
+  opts: LaunchOptions = {},
 ): LaunchResult {
   if (swords.length === 0) return { ok: false, reason: '请选择支援的飞剑' }
 
@@ -390,9 +403,9 @@ export function reinforce(
     return { ok: false, reason: '飞剑已经在返回途中' }
   }
 
-  const selectionError = swordSelectionError(state, swords)
+  const selectionError = swordSelectionError(state, swords) ?? swordArtError(state, opts.swordArt)
   if (selectionError) return { ok: false, reason: selectionError }
-  swords = prepareSwords(state, swords)
+  swords = prepareSwords(state, swords, opts.swordArt)
   const limit = swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)
   if (swordsOut(state) + swords.length > limit) {
     return { ok: false, reason: `最多只能同时控制 ${limit} 把飞剑` }

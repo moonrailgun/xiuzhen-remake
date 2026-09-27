@@ -158,7 +158,7 @@ test('法宝名格式：品质 + 名称 + 淬炼（原版格式）', () => {
   assert.equal(rows[0]!.name, '极品青龙伏魔剑+6')
 })
 
-test('打不过时飞剑被斩断，并从背包移除', () => {
+test('打不过时飞剑被斩断，保留损坏实体供修理', () => {
   // 废品剑 攻 16 耐 8 打 攻 4000 生命 9999 的强敌 → 必断
   const weak: LaunchSword = { ...qinglong('weak'), quality: '废品' }
   const boss: BattleTarget = { kind: 'monster', name: '天雷', x: 101, y: 100, attack: 9999, agility: 1, hp: 9999, element: null }
@@ -174,7 +174,8 @@ test('打不过时飞剑被斩断，并从背包移除', () => {
 
   const rows = (out.state.mail[0]!.body as { rows: { result: string }[] }).rows
   assert.equal(rows[0]!.result, '惨被斩断')
-  assert.equal(out.state.player.artifacts.length, 0, '断掉的剑应从背包移除')
+  assert.equal(out.state.player.artifacts.length, 1, '断剑仍应在背包中')
+  assert.equal(out.state.player.artifacts[0]!.status, '损坏')
 })
 
 test('剑没断的话会飞回来（返回事件）', () => {
@@ -232,7 +233,7 @@ test('打赢玩家时只抢走超出对方暗仓的部分（原文规则）', ()
     attack: 1, agility: 1, hp: 1, element: null,
   }
   // 对方丹田 5000/各，固本 12 级 → 每种护住 1800 → 可抢 3200
-  const r = launch(s, victim, [qinglong()], { sightRange: 10 })
+  const r = launch(s, victim, [qinglong('s1', 9)], { sightRange: 10 })
   const started = (r as { state: GameState }).state
   const withVictimInfo: GameState = {
     ...started,

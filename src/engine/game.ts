@@ -380,7 +380,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
           Array.isArray(data.swordIds) && data.swordIds.every(string) &&
           arrayOf(data.swords, sword => strings(sword, ['id', 'name', 'quality']) && numeric(sword, ['refine', 'speed', 'agility']) &&
             numbers(sword.attack, 2) && numbers(sword.durability, 2) && combatElement(sword.element) &&
-            (sword.launchedStats === undefined || object(sword.launchedStats) && numeric(sword.launchedStats, ['attack', 'durability', 'speed', 'agility']) && optionalNumber(sword.launchedStats.instantAttackRatio))) &&
+            (sword.launchedStats === undefined || object(sword.launchedStats) && numeric(sword.launchedStats, ['attack', 'durability', 'speed', 'agility']) && optionalNumber(sword.launchedStats.instantAttackRatio) && optionalNumber(sword.launchedStats.absorb) && (sword.launchedStats.noReturn === undefined || typeof sword.launchedStats.noReturn === 'boolean'))) &&
           (data.loot === undefined || numbers(data.loot, 5)) &&
           (data.targetQi === undefined || numbers(data.targetQi, 5)) && optionalNumber(data.targetRootLevel)
       case 'craft':

@@ -62,7 +62,7 @@ import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCap
 import { performDivination, isDivinationVisible, DIVINATIONS, type DivinationKind } from '../engine/divine.ts'
 import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
-  launchedSwordStats, type LaunchSword, type BattleTarget,
+  launchedSwordStats, type LaunchSword, type BattleTarget, type SwordArt,
 } from '../engine/battle.ts'
 import { usePill as consumePill, craftRecipe, upgradeArtifactQuality, upgradeAllArtifactQuality, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, ITEM_STATUSES } from '../pages/item.ts'
@@ -767,15 +767,11 @@ export function installGameActions(): void {
       openWindow('mwindow', '出击', '<DIV class=middle style="padding:10px">请选择出击的飞剑</DIV>')
       return
     }
-    // 从战斗事件里点「支援 / 还击」进来的，并进原事件；否则是一次新的出击
+    const swordArt = (document.getElementById('fightswordart') as HTMLSelectElement | null)?.value as SwordArt | undefined
+    const opts = { wanjianLevel: state.player.skills['万剑诀'] ?? 0, ...(swordArt ? { swordArt } : {}) }
     const r = reinforceEventId
-      ? reinforce(state, reinforceEventId, swords, {
-          wanjianLevel: state.player.skills['万剑诀'] ?? 0,
-        })
-      : launch(state, fightTarget, swords, {
-          wanjianLevel: state.player.skills['万剑诀'] ?? 0,
-          sightRange: sightRange(state.player.body[BODY_EYE] ?? 0),
-        })
+      ? reinforce(state, reinforceEventId, swords, opts)
+      : launch(state, fightTarget, swords, { ...opts, sightRange: sightRange(state.player.body[BODY_EYE] ?? 0) })
     if (!r.ok) {
       openWindow('mwindow', '无法出击', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
@@ -1802,6 +1798,9 @@ function launchableSwords(s: GameState): { readonly sword: LaunchSword; readonly
   return out
 }
 
+const learnedSwordArts = (s: GameState): SwordArt[] =>
+  (['碎玉剑法', '小周天剑法', '吸星剑法'] as SwordArt[]).filter(k => (s.player.skills[k] ?? 0) > 0)
+
 /** 出击页。目标可以是同格的 NPC，也可以是任务里的怪。 */
 function fightWindow(s: GameState, targetName: string): string {
   const npc = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
@@ -1844,6 +1843,7 @@ function fightWindow(s: GameState, targetName: string): string {
     limit: swordsOutLimit(wanjian),
     out: swordsOut(s),
     passives,
+    arts: learnedSwordArts(s),
     ...(rows.length === 0 ? { blocked: '没有空闲的飞剑可以出击' } : {}),
   })
 }
@@ -1951,6 +1951,7 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
     limit: swordsOutLimit(s.player.skills['万剑诀'] ?? 0),
     out: swordsOut(s),
     passives: [],
+    arts: learnedSwordArts(s),
     ...(rows.length === 0 ? { blocked: '没有空闲的飞剑可以派出' } : {}),
   })
 }

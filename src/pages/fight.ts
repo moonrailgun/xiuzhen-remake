@@ -13,12 +13,13 @@
  *
  * 其余（表单布局、剑列表列宽、法术选择控件）按 `09 §1.10` 的页头通式 +
  * `09 §1.1` 的表格通式重建，与法宝一览页同构：`TABLE.tablebg cellSpacing=1 width=460`。
- * 「选择法术」这一步基准期只有被动剑诀（`artifacts.ts` 的 `PASSIVE_SWORD_ARTS`），
- * 没有可选项，所以这里只显示已生效的被动加成，不做下拉 —— 不编造不存在的控件。
+ * 主动剑术数值据 guides/9260-p1.txt：碎玉攻击倍增；小周天攻击四分之一、
+ * 敏捷翻倍；吸星耐久四分之一、吸收翻倍。选择控件布局仍属重建。
  */
 
 import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader } from './shell.ts'
+import type { SwordArt } from '../engine/battle.ts'
 import { formatDuration } from '../engine/clock.ts'
 
 export type FightKind = 'attack' | 'reinforce' | 'counter'
@@ -52,6 +53,8 @@ export type FightVm = {
   readonly out: number
   /** 生效中的被动剑诀，`名称 Lv.N` */
   readonly passives: readonly string[]
+  /** 已学会、出击时可选择的主动剑术。 */
+  readonly arts?: readonly SwordArt[]
   /** 没有剑可派时的原因 */
   readonly blocked?: string
 }
@@ -92,6 +95,10 @@ ${when(vm.passives.length > 0, () =>
 <TD class=bigbold align=middle>选择飞剑<SPAN class=smallbold>(${num(vm.out)}/${num(vm.limit)})</SPAN></TD>
 </TR></TBODY></TABLE>
 <FORM id=fightform>
+${when((vm.arts?.length ?? 0) > 0, () => `<TABLE class="tablebg middle" cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
+<TR class="trbg middle"><TD>选择剑术</TD><TD><SELECT id=fightswordart name=swordArt><OPTION value="">普通御剑</OPTION>${each(vm.arts ?? [], art => `<OPTION value="${esc(art)}">${esc(art)}</OPTION>`)}</SELECT>
+<SPAN class=smallgray>碎玉：攻击倍增、战后断剑；小周天：攻击减为四分之一、敏捷翻倍；吸星：耐久减为四分之一、吸收翻倍。</SPAN></TD></TR>
+</TBODY></TABLE>`)}
 <TABLE class="tablebg middle" cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
 <TR class="titlebg middlebold" align=middle>
 <TD width="8%"><INPUT onclick=selectAllSwords(this.checked) type=checkbox></TD>

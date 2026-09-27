@@ -17,7 +17,8 @@ import type { Element } from '../data/meridian.ts'
 import { generates, overcomes } from '../data/meridian.ts'
 import { DEFENSIVE_ARTIFACTS, panelStat } from '../data/artifacts.ts'
 import { swordByName } from '../data/swords.ts'
-import type { Artifact } from './state.ts'
+import { lootFrom } from './loot.ts'
+import { totalQi, type Artifact, type FiveQi } from './state.ts'
 
 /** 参战的一把法宝（飞剑或护身）。数值已是面板值（含品质、淬炼、人物加成）。 */
 export type CombatSword = {
@@ -33,6 +34,7 @@ export type CombatSword = {
   readonly instantDefenseRatio?: number
   readonly absorb?: number
   readonly speed?: number
+  readonly noReturn?: boolean
 }
 
 /** 同一装备在NPC情报、主动战斗与来袭使用同一面板；在身上的剑没有出击被动。 */
@@ -60,6 +62,19 @@ export function combatDamage(items: readonly Artifact[], outcomes: readonly Swor
     return { ...a, refine: Math.max(0, a.refine - (a.kind === 'sword' && o.damageTaken > o.durability / 2 ? 1 : 0)),
       status: o.broken ? '损坏' : '空闲' }
   })
+}
+
+/** 吸收是胜剑合计可携带的五气总额；按可掠夺五气比例分配并按列补余数。[分配重建] */
+export function absorbedLoot(qi: FiveQi, root: number, capacity: number): FiveQi {
+  const available = lootFrom(qi, root).taken, total = totalQi(available)
+  const limit = Math.min(total, Math.max(0, Math.floor(capacity)))
+  if (total <= limit) return available
+  const taken = available.map(v => Math.floor(v * limit / total))
+  let remaining = limit - taken.reduce((a, b) => a + b, 0)
+  for (let i = 0; i < 5 && remaining; i++) {
+    if (taken[i]! < available[i]!) { taken[i]!++; remaining-- }
+  }
+  return taken as unknown as FiveQi
 }
 
 export type SwordOutcome = {

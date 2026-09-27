@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { newGame, importGame } from './game.ts'
-import { socialOf, changeGuardian, canRequestAid, createGuild, joinGuild, setGuildRelation } from './social.ts'
+import { socialOf, changeGuardian, canRequestAid, createGuild, joinGuild, setGuildRelation, setBlocked, receiveLetter } from './social.ts'
 
 const fresh = () => newGame({ name: '测试', gender: 'm', element: '金', school: '蜀山', x: 10, y: 10, seed: 1 }, 0)
 test('护法关系持久保存，陌生人不能应邀参战，解除后立即失去权限', () => {
@@ -30,4 +30,12 @@ test('玩家门派独立于道源，加入与外交均检查成员和掌门权�
   assert.ok(joined.ok)
   assert.equal(setGuildRelation(joined.state, 2, 'enemy').ok, false)
   assert.equal(joined.state.player.school, '蜀山')
+})
+test('黑名单过滤指定玩家来信，系统战报不被屏蔽', () => {
+  const s = fresh(), name = s.npc.bases[0]!.name
+  const blocked = setBlocked(s, name, true)
+  assert.ok(blocked.ok)
+  const letter = { id: 'letter', subject: '你好', from: name, at: 0, read: false, kind: 'player' as const, body: {} }
+  assert.equal(receiveLetter(blocked.state, letter), blocked.state)
+  assert.equal(receiveLetter(blocked.state, { ...letter, kind: 'battle' }).mail[0]!.id, 'letter')
 })

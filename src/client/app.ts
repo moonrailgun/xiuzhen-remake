@@ -55,7 +55,7 @@ import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
-import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation } from '../engine/social.ts'
+import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation, setBlocked, receiveLetter } from '../engine/social.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { renderGm, type GmVm } from '../pages/gm.ts'
 import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
@@ -961,6 +961,7 @@ export function installGameActions(): void {
     const npc = state.npc.bases.find(n => typeof name === 'number' ? n.id === name : n.name === name)
     applySocial(changeGuardian(state, npc?.id ?? -1, true))
   }
+  g['blockSender'] = (name: string, blocked: boolean) => { if (state) applySocial(setBlocked(state, name, blocked)) }
   g['removeGuardian'] = (id: number) => { if (state) applySocial(changeGuardian(state, id, false)) }
   g['guildAction'] = (action: string) => {
     if (!state) return
@@ -2023,7 +2024,7 @@ function estateVm(s: GameState) {
  * 护法页（`guard.jsp?tab=1|2`）。**零截图零 DOM**，只知道两个入口与
  * 右栏那两块「为我护法 (0/7)」「为他护法 (0/7)」。
  *
- * 单机版没有真人可护，所以这里只如实说明，不编一套假的护法名单。
+ * NPC 自动接受互为护法属于单机重建，关系与屏蔽名单随存档保存。
  */
 function guardWindow(s: GameState, tab: number): string {
   const social = socialOf(s)
@@ -2032,7 +2033,8 @@ function guardWindow(s: GameState, tab: number): string {
     return `<DIV>${esc(npc?.name ?? '')}　<A href="#" onclick="removeGuardian(${id})">解除护法</A></DIV>`
   }).join('')
   return `<DIV class=middle style="padding:12px"><B>${tab === 2 ? '为他护法' : '为我护法'}（${social.guardians.length}/7）</B><BR><BR>${rows || '暂无护法。'}<BR>
-  <SPAN class=smallgray>通过道友资料结为护法后，交战时可按姓名求援，援军需飞行抵达。</SPAN></DIV>`
+  <SPAN class=smallgray>通过道友资料结为护法后，交战时可按姓名求援，援军需飞行抵达。</SPAN><BR><BR>
+  <B>屏蔽的来信</B><BR>${social.blacklist.map(name => `${esc(name)}　<A href="#" onclick="blockSender('${js(name)}',false)">解除屏蔽</A><BR>`).join('') || '暂无屏蔽。'}</DIV>`
 }
 
 /** 「点击此处查看更多玩家」：视野内的人，按道行排。 */
@@ -2260,7 +2262,7 @@ function divineContext(s: GameState, target: NpcState) {
  *
  * 原版是投进对方的收件箱；单机版没有真人收件箱，所以**记进自己的收件箱存底**
  * （标明是寄出的），这样至少「写了、寄了、留了底」这条链是通的，
- * 而不是点一下弹「尚未接入」。收信人若是感应范围内的 NPC，会认下这个名字。
+ * 而不是点一下弹「尚未接入」。收信人须是现有 NPC；自动回执经过黑名单过滤。
  */
 function doSendMsg(): void {
   if (!state) return
@@ -2278,6 +2280,8 @@ function doSendMsg(): void {
   const known = allNpcsAt(state.npc, state.clock.gameT, state.worldSeed)
     .some((n) => n.base.name === to)
 
+  if (!known) return openWindow('mwindow', '写消息', '<DIV class=middle style=padding:10px>查无此人，请填写现有道友姓名。</DIV>')
+
   const sent = {
     id: `sent:${state.clock.gameT}:${to}`,
     subject: `寄给${to}：${subject || '（无主题）'}`,
@@ -2290,13 +2294,14 @@ function doSendMsg(): void {
       paragraphs: [
         ...(content ? [`　　${content}`] : ['　　（正文为空）']),
         '',
-        known
-          ? `　　此信已寄出。${to}是个 NPC，单机版里不会有人回信。`
-          : `　　此信已寄出，但感应范围内没有叫「${to}」的人。`,
+        '　　此信已寄出，以下回执由本地道友自动生成。',
       ],
     },
   }
-  state = { ...state, mail: [sent, ...state.mail].slice(0, 200) }
+  state = receiveLetter({ ...state, mail: [sent, ...state.mail].slice(0, 200) }, {
+    id: `reply:${state.clock.gameT}:${to}`, subject: `回执：${subject || '（无主题）'}`, from: to,
+    at: state.clock.gameT, read: false, kind: 'player', body: { kind: 'text', paragraphs: ['来信已收到。此为本地道友自动回执。'] },
+  })
   openWindow('mwindow', '写消息',
     `<DIV class=middle style="padding:10px">已寄给 ${esc(to)}，副本留在你的收件箱里。</DIV>`)
   step()
@@ -2599,7 +2604,7 @@ function playerInfoWindow(s: GameState, id: number): string {
     intro: '-',
     self: me,
     deletingDays: null,
-  })
+  }) + (!me ? `<DIV class=middle style=padding:8px><A href="#" onclick="blockSender('${js(npc!.base.name)}',${!socialOf(s).blacklist.includes(npc!.base.name)})">${socialOf(s).blacklist.includes(npc!.base.name) ? '解除屏蔽来信' : '屏蔽此人来信'}</A></DIV>` : '')
 }
 
 function readDraft(): CreatePlayerVm {

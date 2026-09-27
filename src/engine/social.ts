@@ -91,3 +91,11 @@ export function setGuildRelation(s: GameState, id: number, relation: 'ally' | 'e
       enemies: [...g.enemies.filter(n => n !== other), ...(relation === 'enemy' ? [other] : [])] }
   }) }, `门派关系调整：${relation === 'ally' ? '同盟' : relation === 'enemy' ? '敌对' : '中立'}`)
 }
+export function setBlocked(s: GameState, input: string, blocked: boolean): Result {
+  const name = input.trim(), social = socialOf(s)
+  if (!name || name.length > 50 || name === s.player.name) return fail('请填写有效的玩家名')
+  return update(s, { ...social, blacklist: blocked ? [...new Set([...social.blacklist, name])] : social.blacklist.filter(n => n !== name) }, `${blocked ? '屏蔽' : '取消屏蔽'}${name}的来信`)
+}
+export function receiveLetter(s: GameState, letter: MailItem): GameState {
+  return letter.kind === 'player' && socialOf(s).blacklist.includes(letter.from) ? s : { ...s, mail: [letter, ...s.mail].slice(0, 200) }
+}

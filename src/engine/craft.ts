@@ -17,7 +17,7 @@ import { schedule, countByKind, type GameEvent } from './timeline.ts'
 import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact } from './state.ts'
 import { refineSuccessRate, refinePieces, DEFENSIVE_ARTIFACTS, type Quality } from '../data/artifacts.ts'
 import { roll, next, type RngState } from './rng.ts'
-import { capacityOf } from './cultivate.ts'
+import { capacityOf, spendCoin } from './cultivate.ts'
 import { pillRecipe } from '../data/pills.ts'
 import { canForge, swordByName, craftCostFor } from '../data/swords.ts'
 
@@ -82,6 +82,32 @@ export function craftRecipe(state: GameState, kind: CraftKind, name: string): { 
   const recipe = kind === 'sword' ? swordByName(name) : DEFENSIVE_ARTIFACTS.find(g => g.name === name)
   if (!recipe?.craftCost || !recipe.craftSeconds) return null
   return { cost: craftCostFor(recipe.craftCost, state.player.element)!, baseSeconds: recipe.craftSeconds }
+}
+
+/** reconstructed：每个未淬炼原件升一档需1仙石；保留淬炼倍率，最高上品。 */
+export const qualityUpgradeCost = (item: Artifact): number =>
+  (item.kind === 'sword' || item.kind === 'guard') && (item.quality === '废品' || item.quality === '凡品')
+    ? refinePieces(item.refine) * item.count : 0
+
+function upgradeQualities(state: GameState, items: readonly Artifact[]): CraftResult {
+  if (!items.length || items.some(a => a.status !== '空闲' || !qualityUpgradeCost(a))) return { ok: false, reason: '只能提升空闲的废品或凡品法宝，最高上品' }
+  const paid = spendCoin(state, items.reduce((sum, a) => sum + qualityUpgradeCost(a), 0))
+  if (!paid.ok) return paid
+  const ids = new Set(items.map(a => a.id))
+  return { ok: true, state: { ...paid.state, player: { ...paid.state.player,
+    artifacts: paid.state.player.artifacts.map(a => ids.has(a.id) ? { ...a, quality: a.quality === '废品' ? '凡品' : '上品' } : a),
+  } } }
+}
+
+export function upgradeArtifactQuality(state: GameState, id: string): CraftResult {
+  const item = state.player.artifacts.find(a => a.id === id)
+  return upgradeQualities(state, item ? [item] : [])
+}
+
+/** 全升将背包中同名、同类且可提升的空闲法宝各提升一档，统一校验并扣费。 */
+export function upgradeAllArtifactQuality(state: GameState, id: string): CraftResult {
+  const selected = state.player.artifacts.find(a => a.id === id)
+  return upgradeQualities(state, selected ? state.player.artifacts.filter(a => a.kind === selected.kind && a.name === selected.name && a.status === '空闲' && qualityUpgradeCost(a) > 0) : [])
 }
 
 export function usePill(state: GameState, id: string): CraftResult {

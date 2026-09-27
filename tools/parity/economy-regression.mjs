@@ -29,6 +29,7 @@ const artifact = {
   name: SWORDS.find(s => s.tradable).name,
   quality: '极品', refine: 2, status: '空闲', count: 1,
 }
+const qualityArtifact = { ...artifact, id: 'economy-fixture:quality', name: '玉虚桃木剑', quality: '废品', refine: 1 }
 const name = '经济回归道友'
 const browser = await chromium.launch()
 const page = await browser.newPage()
@@ -63,7 +64,7 @@ try {
     ...initial,
     clock: { ...initial.clock, rate: 600 },
     npc: { bases: [], patches: {} },
-    player: { ...initial.player, silver: 100000, coin: 1000, artifacts: [artifact] },
+    player: { ...initial.player, silver: 100000, coin: 1000, artifacts: [artifact, qualityArtifact] },
   }
   // 不写 localStorage 后 reload：旧页面的 pagehide 会覆盖那种夹具。
   const chooser = page.waitForEvent('filechooser')
@@ -191,6 +192,20 @@ try {
   const coinAfterBuy = current.player.coin
   await page.clock.runFor(6000)
   check('继续推进不会重复结算法宝出售', (await saved()).player.coin, coinAfterBuy)
+  console.log('品质提升')
+  await page.locator('a[href="item.jsp"]').first().click()
+  const beforeQuality = await saved()
+  const qualityIndex = beforeQuality.player.artifacts.findIndex(a => a.id === qualityArtifact.id) + 1
+  await page.locator(`input[name=selectitem1][value="${qualityIndex}"]`).check()
+  await page.locator('a[onclick="sendUpgradeItem()"]').click()
+  current = await saved()
+  check('提升品质保留淬炼并按原件数扣本地仙石',
+    [current.player.artifacts.find(a => a.id === qualityArtifact.id)?.quality, current.player.artifacts.find(a => a.id === qualityArtifact.id)?.refine, current.player.coin, current.player.bonusCoin],
+    ['凡品', 1, beforeQuality.player.coin, beforeQuality.player.bonusCoin - 2])
+  await page.locator(`input[name=selectitem1][value="${qualityIndex}"]`).check()
+  await page.locator('a[onclick="sendUpgradeAllItem()"]').click()
+  current = await saved()
+  check('全部提升可以升到上品', [current.player.artifacts.find(a => a.id === qualityArtifact.id)?.quality, current.player.coin, current.player.bonusCoin], ['上品', beforeQuality.player.coin, beforeQuality.player.bonusCoin - 4])
   check('所有经济流程无浏览器异常', errors, [])
 } catch (error) {
   console.error('页面异常：', errors)

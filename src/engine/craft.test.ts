@@ -14,6 +14,9 @@ import {
   REFINE_FAIL_TEXT,
   CRAFT_QUEUE_ID,
   BODY_HAND,
+  qualityUpgradeCost,
+  upgradeArtifactQuality,
+  upgradeAllArtifactQuality,
   type CraftOrder,
 } from './craft.ts'
 import { advanceTo, countByKind } from './timeline.ts'
@@ -341,4 +344,35 @@ test('F08：一炉逐件抽取品质且创建时固定，旧事件仍可结算',
   assert.notDeepEqual(r.state.rng, s.rng)
   const { qualities: _qualities, ...legacy } = event.payload
   assert.deepEqual(resolveCraft(r.state, { ...event, payload: { ...legacy, quality: '凡品' } }).player.artifacts.map(a => a.quality), Array(5).fill('凡品'))
+})
+
+test('F08：本地仙石提升品质逐档到上品，失败不扣钱不改物品', () => {
+  const item = { ...sword('quality', 2), quality: '废品' as const }
+  const s = state({ artifacts: [item], bonusCoin: 3, coin: 5 })
+  assert.equal(qualityUpgradeCost(item), 4)
+  const first = upgradeArtifactQuality(s, item.id)
+  assert.ok(first.ok)
+  assert.deepEqual([first.state.player.bonusCoin, first.state.player.coin], [0, 4])
+  assert.equal(first.state.player.artifacts[0]!.quality, '凡品')
+  const second = upgradeArtifactQuality(first.state, item.id)
+  assert.ok(second.ok)
+  assert.equal(second.state.player.artifacts[0]!.quality, '上品')
+  assert.equal(upgradeArtifactQuality(second.state, item.id).ok, false)
+  assert.equal(upgradeArtifactQuality({ ...s, player: { ...s.player, bonusCoin: 0, coin: 3 } }, item.id).ok, false)
+  assert.equal(upgradeArtifactQuality({ ...s, player: { ...s.player, artifacts: [{ ...item, status: '使用中' }] } }, item.id).ok, false)
+  assert.deepEqual(s.player.artifacts, [item])
+  assert.deepEqual(s.rng, first.state.rng)
+})
+
+test('F08：全部提升同名空闲法宝统一校验总价，不能部分扣款', () => {
+  const a = { ...sword('a', 1), quality: '废品' as const }
+  const b = { ...sword('b', 0), quality: '凡品' as const }
+  const busy = { ...b, id: 'busy', status: '损坏' as const }
+  const poor = state({ artifacts: [a, b, busy], bonusCoin: 0, coin: 2 })
+  assert.equal(upgradeAllArtifactQuality(poor, a.id).ok, false)
+  assert.deepEqual(poor.player.artifacts.map(a => a.quality), ['废品', '凡品', '凡品'])
+  const success = upgradeAllArtifactQuality({ ...poor, player: { ...poor.player, coin: 3 } }, a.id)
+  assert.ok(success.ok)
+  assert.equal(success.state.player.coin, 0)
+  assert.deepEqual(success.state.player.artifacts.map(a => a.quality), ['凡品', '上品', '凡品'])
 })

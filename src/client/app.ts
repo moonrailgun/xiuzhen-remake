@@ -63,7 +63,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { usePill as consumePill, craftRecipe, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { usePill as consumePill, craftRecipe, upgradeArtifactQuality, upgradeAllArtifactQuality, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
@@ -1136,8 +1136,17 @@ export function installGameActions(): void {
         step()
       })
   }
-  g['sendUpgradeItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
-  g['sendUpgradeAllItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
+  const upgradeQuality = (all: boolean) => {
+    if (!state) return
+    const item = state.player.artifacts[selected(1) - 1]
+    if (!item) return tell('提升品质', '请先选中一件法宝。')
+    const r = (all ? upgradeAllArtifactQuality : upgradeArtifactQuality)(state, item.id)
+    if (!r.ok) return tell('提升品质', r.reason)
+    state = r.state
+    step()
+  }
+  g['sendUpgradeItem'] = () => upgradeQuality(false)
+  g['sendUpgradeAllItem'] = () => upgradeQuality(true)
 
   function usePill(): void {
     if (!state) return

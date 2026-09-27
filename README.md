@@ -24,8 +24,8 @@ npm run dev     # 打开 http://localhost:5273
 
 ```bash
 npm run check      # 类型检查 + 单元测试
-npm run playtest   # 端到端试玩 58 步（需先 npm run dev）
-npm run regression # 正式入口的任务、存档、经济、战斗回归（需先 npm run dev）
+npm run playtest   # 端到端试玩（需先 npm run dev）
+npm run regression # 正式入口的任务、存档、经济、战斗及资料保真回归（需先 npm run dev）
 npm run smoke      # 全页面冒烟（需先 npm run dev）
 npm run parity     # 截图对齐检查（需先 npm run dev）
 ```
@@ -50,11 +50,13 @@ tools/
 ```
 
 `reference/`（原版 HTML、截图、论坛帖、APK 等）与 `docs/`（研究底稿、设计与开发记录）
-以完整快照保存在 `archives/original-records-2026-09-26.tar.gz`。散文件继续由 `.gitignore` 排除，
-代码中的出处路径保持不变。在新检出的仓库根目录执行以下命令即可恢复这两个目录：
+初始完整快照保存在 `archives/original-records-2026-09-26.tar.gz`；本次试玩、审计和规则修订的文档增量
+保存在 `archives/session-records-2026-09-27.tar.gz`。散文件继续由 `.gitignore` 排除，
+代码中的出处路径保持不变。在新检出的仓库根目录按顺序解压，恢复资料及最新文档：
 
 ```bash
 tar -xzf archives/original-records-2026-09-26.tar.gz
+tar -xzf archives/session-records-2026-09-27.tar.gz
 ```
 
 ## 哪些是还原，哪些是重建
@@ -76,9 +78,13 @@ tar -xzf archives/original-records-2026-09-26.tar.gz
 游戏指南 18 条词条、四种术数的结果表、五个城镇 NPC 的对话、三阴绝脉剑的炼制数值。
 
 **只能重建**（无证据，代码里标 `reconstructed`）
-经脉/本体/法术的逐级消耗曲线、世界地形分布、整个 NPC 生态与门派、
+经脉/本体/法术的逐级消耗曲线、世界地形分布、NPC 生态及门派的单机互动、
 出击选剑页与战场地图、护法页、游戏指南其余 18 条词条、
-镖局以外的城镇 NPC 对话。
+镖局以外的城镇 NPC 对话、四件缺原表护身的数值。
+
+2026-09-27 的逐项审计已按现有资料修订规则，包含免费炼丹、法宝维护、串行VIP预约、
+主动剑术、护身援助、手动交镖、文曲献书、福地占领与独立门派。证据不足的概率、价格、
+逐级曲线和NPC行为仍属重建，见本地 `docs/reviews/2026-09-27-fidelity-repair.md`。
 
 ## 证据强度
 

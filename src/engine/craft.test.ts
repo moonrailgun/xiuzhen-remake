@@ -14,6 +14,7 @@ import {
   REFINE_FAIL_TEXT,
   CRAFT_QUEUE_ID,
   BODY_HAND,
+  artifactUpkeepPerHour,
   qualityUpgradeCost,
   upgradeArtifactQuality,
   upgradeAllArtifactQuality,
@@ -299,6 +300,7 @@ test('损坏法宝修理扣气、占同类炼器队列，满包原位恢复并�
   assert.equal(startRepair(before, 'missing').ok, false)
 })
 
+
 test('F01：丹药只消耗时间并由引擎覆盖伪造配方', () => {
   const s = state({ qi: qi(0, 0, 0, 0, 0), skills: { 炼丹之术: 1 } })
   for (const [name, seconds] of [['一炼紫金丹', 81000], ['一炼五行丹', 86400]] as const) {
@@ -344,6 +346,14 @@ test('F08：一炉逐件抽取品质且创建时固定，旧事件仍可结算',
   assert.notDeepEqual(r.state.rng, s.rng)
   const { qualities: _qualities, ...legacy } = event.payload
   assert.deepEqual(resolveCraft(r.state, { ...event, payload: { ...legacy, quality: '凡品' } }).player.artifacts.map(a => a.quality), Array(5).fill('凡品'))
+})
+
+test('F02：维护费按剑种、淬炼、数量和本命克我空列计算', () => {
+  const item = { ...sword('upkeep', 7), name: '古纹青石剑', count: 2 }
+  assert.deepEqual(artifactUpkeepPerHour(item, '金'), [512, 512, 512, 0, 512])
+  assert.deepEqual(artifactUpkeepPerHour({ ...item, quality: '极品' }, '金'), [512, 512, 512, 0, 512])
+  assert.deepEqual(artifactUpkeepPerHour({ ...item, name: '玉虚桃木剑', refine: 0, count: 1 }, '水'), [1, 1, 1, 1, 0])
+  assert.deepEqual(artifactUpkeepPerHour({ ...item, kind: 'guard', name: '指玄道藏碑', refine: 6, count: 1 }, '木'), [0, 640, 640, 640, 640])
 })
 
 test('F08：本地仙石提升品质逐档到上品，失败不扣钱不改物品', () => {

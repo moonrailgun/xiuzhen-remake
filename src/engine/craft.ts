@@ -20,6 +20,7 @@ import { roll, next, type RngState } from './rng.ts'
 import { capacityOf, spendCoin } from './cultivate.ts'
 import { pillRecipe } from '../data/pills.ts'
 import { canForge, swordByName, craftCostFor } from '../data/swords.ts'
+import { ELEMENTS, overcomeBy, type Element } from '../data/meridian.ts'
 
 export type CraftKind = 'sword' | 'guard' | 'pill'
 
@@ -82,6 +83,17 @@ export function craftRecipe(state: GameState, kind: CraftKind, name: string): { 
   const recipe = kind === 'sword' ? swordByName(name) : DEFENSIVE_ARTIFACTS.find(g => g.name === name)
   if (!recipe?.craftCost || !recipe.craftSeconds) return null
   return { cost: craftCostFor(recipe.craftCost, state.player.element)!, baseSeconds: recipe.craftSeconds }
+}
+
+/** 原文：五行维护费不受品质影响，按淬炼所耗件数翻倍；护身扣四种可吸收真气。 */
+export function artifactUpkeepPerHour(item: Artifact, element: Element): FiveQi {
+  const pieces = refinePieces(item.refine) * item.count
+  if (item.kind === 'sword') {
+    const sword = swordByName(item.name)
+    return sword ? craftCostFor(sword.upkeepPerHour, element)!.map(v => v * pieces) as unknown as FiveQi : [0, 0, 0, 0, 0]
+  }
+  const guard = item.kind === 'guard' ? DEFENSIVE_ARTIFACTS.find(g => g.name === item.name) : undefined
+  return ELEMENTS.map(e => guard && e !== overcomeBy(element) ? guard.upkeepPerHour * pieces : 0) as unknown as FiveQi
 }
 
 /** reconstructed：每个未淬炼原件升一档需1仙石；保留淬炼倍率，最高上品。 */

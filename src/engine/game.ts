@@ -11,7 +11,7 @@ import { cancel, schedule, sorted, emptyTimeline, type GameEvent } from './timel
 import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
-import { resolveCraft } from './craft.ts'
+import { artifactUpkeepPerHour, resolveCraft } from './craft.ts'
 import { generateNpcs } from './npc.ts'
 import { applyQuestProgress, emptyQuestLog, resolveQuestBattle } from './quest.ts'
 import { resolveEscort, settleTownIncome } from './town.ts'
@@ -174,8 +174,7 @@ export function currentQiPerHour(
   const self = state.player.element
   const terrainQi = terrain(state.player.x, state.player.y)
 
-  // 身上法宝的每小时耗气（阶段 2 先只算飞剑，护身在阶段 4a 接上）
-  const upkeep = state.player.artifacts.filter((a) => a.kind === 'sword').length
+  const upkeep = state.player.artifacts.map(a => artifactUpkeepPerHour(a, self))
 
   return ELEMENTS.map((element, i) => {
     // 找出炼化这种真气的那一组经脉；克我的那一种没有对应组，恒为 0
@@ -190,7 +189,7 @@ export function currentQiPerHour(
     return hourlyQi({
       terrainQi: terrainQi[i] ?? 0,
       meridianLevels: [levels[0] ?? 0, levels[1] ?? 0, levels[2] ?? 0],
-      itemUpkeep: upkeep,
+      itemUpkeep: upkeep.reduce((sum, qi) => sum + qi[i]!, 0),
     })
   }) as unknown as FiveQi
 }

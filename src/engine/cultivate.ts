@@ -119,6 +119,7 @@ export function skillUpgradeBlockReason(state: GameState, id: string): string | 
   const nodes = Object.values(SKILL_TREES).flat()
   const node = nodes.find((n) => n.name === id)
   if (!node) return '没有这门法术'
+  if (node.school && node.school !== state.player.school) return `${node.name}是${node.school}专属法术`
   if ((state.player.skills[id] ?? 0) >= node.cap) return '该法术已修炼至上限'
   for (const requirement of node.requires ?? []) {
     const parent = nodes.find((n) => n.id === requirement.id)!

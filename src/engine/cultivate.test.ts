@@ -331,6 +331,14 @@ test('F05：丹田新修炼不开放后期36级，既有36级容量仍保留', (
   assert.equal(capacityOf(state({ body: [0, 0, 0, 0, 0, 36, 0, 0] })), 1400000)
 })
 
+test('F08/F14：门派专属法术在引擎拒绝跨派学习', () => {
+  const skills = { 铸剑之术: 1, 百炼之法: 5, 易经: 64, 九宫飞星法: 1, 梅花易数: 3 }
+  for (const [school, id] of [['蜀山', '炼器总纲'], ['昆仑', '梅花易数'], ['蜀山', '太乙神数']] as const) {
+    assert.equal(startCultivate(state({ school, skills }), { system: 'skill', id }).ok, false)
+  }
+  assert.equal(startCultivate(state({ school: '通天', skills: { 易经: 5, 九宫飞星法: 1 } }), { system: 'skill', id: '太乙神数' }).ok, true)
+})
+
 test('F23：普通VIP第二项接在第一项之后，半/完加速同时重排', () => {
   const s = state({ vip: true })
   const first = startCultivate(s, { system: 'meridian', index: 0 })

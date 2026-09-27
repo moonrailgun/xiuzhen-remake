@@ -84,8 +84,8 @@ function treeBg(vm: SkillVm): string {
 const levelOf = (levels: SkillVm['levels'], id: number): number => levels[id] ?? 0
 
 /** 前置全部满足才解锁；未解锁显示原版的「?」图标（04 §7.2：米黄底 + 居中粗黑问号）。 */
-export function isUnlocked(node: SkillNode, levels: SkillVm['levels']): boolean {
-  return (node.requires ?? []).every((r) => levelOf(levels, r.id) >= r.level)
+export function isUnlocked(node: SkillNode, levels: SkillVm['levels'], school?: School): boolean {
+  return (!school || !node.school || node.school === school) && (node.requires ?? []).every((r) => levelOf(levels, r.id) >= r.level)
 }
 
 /** 法术树：一张 460×425 背景图 + 绝对定位的图标格与 `(当前/上限)`。 */
@@ -95,7 +95,7 @@ ${each(nodes, (n) => {
     const x = COL_X[n.col]
     const y = ROW_Y[n.row]
     const lv = levelOf(vm.levels, n.id)
-    const icon = isUnlocked(n, vm.levels) ? `${n.id}.gif` : 'unknown.gif'
+    const icon = isUnlocked(n, vm.levels, vm.school) ? `${n.id}.gif` : 'unknown.gif'
     // 计数在图标右下角外侧：文字左缘 = 图标右缘 +1，文字底 ≈ 图标底 +3（04 §7.2）
     return `<A class=skillcell style="left:${x}px;top:${y}px" href="#" ` +
       `onclick="openRWindow('${js(n.name)} Lv.${lv}','skillmid.jsp?skill=${n.id}')">` +

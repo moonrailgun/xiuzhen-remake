@@ -69,6 +69,18 @@ test('前置要全部满足才解锁（大周天剑法要心剑诀与身剑诀�
   assert.equal(isUnlocked(node, { 202: 3, 203: 3 }), true)
 })
 
+test('门派专属法术前置满足后仍按门派解锁', () => {
+  const levels = { 301: 64, 302: 1, 104: 5 }
+  for (const [name, school, other] of [['梅花易数', '蜀山', '通天'], ['太乙神数', '通天', '昆仑'], ['炼器总纲', '昆仑', '蜀山']] as const) {
+    const node = [...SKILL_TREES.math, ...SKILL_TREES.produce].find(n => n.name === name)!
+    assert.equal(isUnlocked(node, levels, school), true)
+    assert.equal(isUnlocked(node, levels, other), false)
+  }
+  const html = renderSkill(vm({ tab: 'math', school: '昆仑', levels }))
+  assert.ok(!html.includes('src="img/skill/303.gif"'))
+  assert.ok(!html.includes('src="img/skill/304.gif"'))
+})
+
 test('点图标打开 R 窗，参数照原版 skillmid.jsp?skill={id}，标题带 Lv.N', () => {
   const h = renderSkill(vm({ levels: { 102: 3 } }))
   assert.ok(h.includes(`openRWindow('炼丹之术 Lv.3','skillmid.jsp?skill=102')`))

@@ -6,6 +6,8 @@ export type SkillNode = {
   readonly name: string
   /** `(当前/上限)` 的分母，来自 04 §7.3 的逐格读数 */
   readonly cap: number
+  /** 9260-p1.txt：三派独门法术。 */
+  readonly school?: '昆仑' | '蜀山' | '通天'
   readonly col: 0 | 1 | 2
   readonly row: 0 | 1 | 2 | 3
   /** 解锁前置 = 背景图上指进这一格的箭头与其 Lv.N 标注；要全部满足 */
@@ -30,7 +32,7 @@ const PRODUCE_NODES: readonly SkillNode[] = [
   { id: 103, name: '铸剑之术', cap: 20, col: 1, row: 0 },
   { id: 104, name: '百炼之法', cap: 20, col: 1, row: 1, requires: [{ id: 103, level: 1 }] },
   { id: 101, name: '灵宝真经', cap: 20, col: 2, row: 1, requires: [{ id: 104, level: 3 }] },
-  { id: 107, name: '炼器总纲', cap: 4, col: 1, row: 2, requires: [{ id: 104, level: 5 }] },
+  { id: 107, name: '炼器总纲', school: '昆仑', cap: 4, col: 1, row: 2, requires: [{ id: 104, level: 5 }] },
   { id: 106, name: '御宝秘录', cap: 20, col: 2, row: 2, requires: [{ id: 101, level: 5 }] },
 ]
 
@@ -67,14 +69,16 @@ const SWORD_NODES: readonly SkillNode[] = [
 const MATH_NODES: readonly SkillNode[] = [
   { id: 301, name: '易经', cap: 500, col: 0, row: 0 },
   { id: 302, name: '九宫飞星法', cap: 2, col: 2, row: 0 },
-  { id: 303, name: '梅花易数', cap: 20, col: 1, row: 1, requires: [{ id: 301, level: 5 }] },
+  { id: 303, name: '梅花易数', school: '蜀山', cap: 20, col: 1, row: 1, requires: [{ id: 301, level: 5 }] },
   {
     id: 304,
     name: '太乙神数',
+    school: '通天',
     cap: 20,
     col: 2,
     row: 1,
-    requires: [{ id: 302, level: 1 }, { id: 303, level: 3 }],
+    // reconstructed：原格位对应不确定，不能要求学习另一门派专属梅花。
+    requires: [{ id: 302, level: 1 }, { id: 301, level: 5 }],
   },
   {
     id: 305,
@@ -82,9 +86,9 @@ const MATH_NODES: readonly SkillNode[] = [
     cap: 20,
     col: 0,
     row: 2,
-    requires: [{ id: 301, level: 64 }, { id: 303, level: 20 }],
+    requires: [{ id: 301, level: 64 }], // reconstructed：公共术数不再依赖蜀山专属梅花
   },
-  { id: 306, name: '水镜玄光', cap: 2, col: 2, row: 2, requires: [{ id: 304, level: 1 }] },
+  { id: 306, name: '水镜玄光', cap: 2, col: 2, row: 2, requires: [{ id: 302, level: 1 }] }, // reconstructed：公共水镜以前置九宫替代通天专属太乙
 ]
 
 export const SKILL_TREES: Record<'produce' | 'sword' | 'math', readonly SkillNode[]> = {

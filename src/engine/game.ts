@@ -32,6 +32,8 @@ import { dantianCapacity } from '../data/upgrade.ts'
 import { qiRewardFor, type QiReward } from '../data/quests.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
+import { findBook } from '../data/town.ts'
+import { isSecretBook } from '../data/secrets.ts'
 import { sanctuaryQi } from './sanctuary.ts'
 import { socialOf } from './social.ts'
 
@@ -362,7 +364,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const object = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
   const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0
   const numbers = (v: unknown, length: number): boolean => Array.isArray(v) && v.length === length && v.every(number)
-  const string = (v: unknown): boolean => typeof v === 'string'
+  const string = (v: unknown): v is string => typeof v === 'string'
   const strings = (v: Record<string, unknown>, keys: string[]) => keys.every((key) => string(v[key]))
   const numeric = (v: Record<string, unknown>, keys: string[]) => keys.every((key) => number(v[key]))
   const arrayOf = (v: unknown, valid: (item: Record<string, unknown>) => boolean): boolean =>
@@ -475,6 +477,9 @@ export function validateGameState(value: unknown): asserts value is GameState {
         optionalRatio(q.corePurity) && (q.coreEventId === undefined || string(q.coreEventId)) && optionalBool(q.cleared)) ||
       (quests.escort !== undefined && (!object(quests.escort) || !point(quests.escort.from) || !point(quests.escort.to) || !numeric(quests.escort, ['fee', 'acceptedAt']))) ||
       (quests.sanctuaries !== undefined && !arrayOf(quests.sanctuaries, place => xy(place) && ['福地', '洞天'].includes(place.kind as string) && number(place.occupiedAt))) ||
+      (quests.wenchang !== undefined && (!object(quests.wenchang) || !integer(quests.wenchang.usedWeek) || !number(quests.wenchang.expiresAt) ||
+        !point(quests.wenchang.at) || !string(quests.wenchang.book) || !findBook(quests.wenchang.book) ||
+        (quests.wenchang.reward !== undefined && (!string(quests.wenchang.reward) || !isSecretBook(quests.wenchang.reward))))) ||
       !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
         optionalNumber(o.listedAt) &&
         [o.offer, o.want].every((a) => object(a) && ELEMENTS.includes(a.element as Element) && number(a.amount))) ||

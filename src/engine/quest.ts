@@ -84,6 +84,7 @@ export type QuestLog = {
   /** 已领的境界奖励累计的丹田上限加成（辟谷 +5000、心动 +10000、元婴 160000）。 */
   readonly dantianBonus: number
   readonly escort?: { readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly fee: number; readonly acceptedAt: number }
+  readonly wenchang?: { readonly usedWeek: number; readonly expiresAt: number; readonly at: readonly [number, number]; readonly book: string; readonly reward?: string }
   readonly sanctuaries?: readonly { readonly x: number; readonly y: number; readonly kind: '福地' | '洞天'; readonly occupiedAt: number }[]
 }
 

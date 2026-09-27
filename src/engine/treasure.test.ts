@@ -123,3 +123,44 @@ test('基准版19本秘笈均可学习，高级寻宝奖池覆盖新增五本', 
     if (name !== '物理通明') assert.ok(rewards.has(name), name)
   }
 })
+
+test('请神香每自然周一次、一小时书籍换气循环，失败不吞书不重掷奖励', async () => {
+  const { useWenchangIncense, claimWenchang, requestWenchang } = await import('./treasure.ts')
+  const s = born()
+  const incense = item('请神香·文曲星君')
+  const ready = { ...s, rng: [0, 0, 0, 0] as const, player: { ...s.player, artifacts: [{ ...incense, count: 2 }] } }
+  const called = useWenchangIncense(ready, incense.id)
+  assert.ok(called.ok)
+  const task = called.state.quests.wenchang!
+  assert.equal(task.expiresAt, 3600)
+  assert.ok(task.reward)
+  assert.equal(useWenchangIncense(called.state, incense.id).ok, false)
+  const withBook = { ...called.state, player: { ...called.state.player, x: task.at[0], y: task.at[1], artifacts: [item(task.book, 'book')] } }
+  const done = claimWenchang(withBook)
+  assert.ok(done.ok)
+  assert.deepEqual(done.state.player.qi, withBook.player.qi, '稀有秘笈与真气是二选一奖励')
+  assert.equal(done.state.player.artifacts[0]?.name, task.reward)
+  const qiReward = claimWenchang({ ...withBook, player: { ...withBook.player, qi: [0, 0, 0, 0, 0] }, quests: { ...withBook.quests, wenchang: { ...task, reward: undefined } } })
+  assert.ok(qiReward.ok)
+  assert.ok(qiReward.state.player.qi.every(n => n > 0))
+  assert.ok(done.state.quests.wenchang)
+  assert.deepEqual(claimWenchang(withBook), done)
+  const expired = { ...withBook, clock: { ...withBook.clock, gameT: 3600 } }
+  assert.equal(claimWenchang(expired).ok, false)
+  assert.equal(requestWenchang(expired).ok, false)
+  const before = JSON.stringify(expired)
+  assert.equal(JSON.stringify(expired), before)
+  const nextWeek = { ...called.state, clock: { ...called.state.clock, gameT: 6 * 86400 } }
+  assert.equal(useWenchangIncense(nextWeek, incense.id).ok, true)
+})
+
+test('普通藏宝图奖池可获得请神香', () => {
+  const s = born()
+  let found = false
+  for (let seed = 1; seed <= 300 && !found; seed++) {
+    const base = newGame({ name: '香', gender: 'm', element: '木', school: '昆仑', x: 100, y: 100, seed }, 0)
+    const r = startTreasure({ ...base, player: { ...base.player, artifacts: [item('藏宝图')] } }, '藏宝图')
+    found = r.ok && r.state.treasure?.reward.name === '请神香·文曲星君'
+  }
+  assert.ok(found)
+})

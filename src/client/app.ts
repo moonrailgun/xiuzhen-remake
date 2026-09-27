@@ -48,7 +48,7 @@ import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
 import { newGame, tick, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
 import { startMove, startFlight, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
-import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox } from '../engine/treasure.ts'
+import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox, useWenchangIncense, requestWenchang, claimWenchang } from '../engine/treasure.ts'
 import { SECRET_MATERIALS, isSecretBook } from '../data/secrets.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, terrainScene, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
@@ -368,9 +368,10 @@ function rightVm(s: GameState) {
       abandonable: q.category !== 'realm',
     }
   })
-  if (s.quests.escort) quests.push({ id: 'escort', title: '押镖', detail: `请前往 (${s.quests.escort.to.join(',')}) 镖局交付`, abandonable: false })
   if (s.treasure) quests.push({ id: 'treasure', title: '机缘遇宝',
     detail: `目标地点：(${s.treasure.x},${s.treasure.y})`, abandonable: false })
+  if (s.quests.escort) quests.push({ id: 'escort', title: '押镖', detail: `请前往 (${s.quests.escort.to.join(',')}) 镖局交付`, abandonable: false })
+  if (s.quests.wenchang && s.quests.wenchang.expiresAt > s.clock.gameT) quests.push({ id: 'wenchang', title: '文曲星君', detail: `献书地点：(${s.quests.wenchang.at.join(',')})`, abandonable: false })
   return { quests, guardingMe: socialOf(s).guardians.length, guardingOthers: socialOf(s).guardians.length, guardCap: 7 }
 }
 
@@ -926,9 +927,9 @@ export function installGameActions(): void {
     const npc = state.npc.bases.find(n => typeof name === 'number' ? n.id === name : n.name === name)
     applySocial(changeGuardian(state, npc?.id ?? -1, true))
   }
-  g['blockSender'] = (name: string, blocked: boolean) => { if (state) applySocial(setBlocked(state, name, blocked)) }
-  g['buyPeace'] = () => { if (state) applySocial(buyPeace(state)) }
   g['removeGuardian'] = (id: number) => { if (state) applySocial(changeGuardian(state, id, false)) }
+  g['buyPeace'] = () => { if (state) applySocial(buyPeace(state)) }
+  g['blockSender'] = (name: string, blocked: boolean) => { if (state) applySocial(setBlocked(state, name, blocked)) }
   g['guildAction'] = (action: string) => {
     if (!state) return
     const val = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? ''
@@ -1081,14 +1082,24 @@ export function installGameActions(): void {
     const treasure = ['藏宝图', '天宫秘箓'].includes(item.name)
     const material = SECRET_MATERIALS.some(n => n === item.name)
     const box = item.name === '新手玄武玉匣'
-    if (!treasure && !material && !box && !BANK_NOTES.some(note => note.name === item.name)) return tell('任务物品', '任务物品在对应任务完成时自动消耗。')
-    const r = treasure ? startTreasure(state, item.id) : material ? combineSecret(state) : box ? openNoviceBox(state, item.id) : redeemNote(state, item.name)
+    const incense = item.name === '请神香·文曲星君'
+    if (!treasure && !material && !box && !incense && !BANK_NOTES.some(note => note.name === item.name)) return tell('任务物品', '任务物品在对应任务完成时自动消耗。')
+    const r = incense ? useWenchangIncense(state, item.id) : treasure ? startTreasure(state, item.id) : material ? combineSecret(state) : box ? openNoviceBox(state, item.id) : redeemNote(state, item.name)
     if (!r.ok) return tell('使用', r.reason)
     state = r.state
     step()
     if (treasure) openWindow('lwindow', '机缘遇宝', questWindow(state, 'treasure'))
+    if (incense) openWindow('lwindow', '文曲星君', questWindow(state, 'wenchang'))
     if (material) tell('天宫秘箓', '四件材料已合成天宫秘箓，可在法宝栏使用。')
     if (box) tell('新手玄武玉匣', `获得${artifactLabel(state.player.artifacts.at(-1)!)}。`)
+  }
+  for (const action of ['requestWenchang', 'claimWenchang'] as const) g[action] = () => {
+    if (!state) return
+    const r = (action === 'requestWenchang' ? requestWenchang : claimWenchang)(state)
+    if (!r.ok) return tell('文曲星君', r.reason)
+    state = r.state
+    step()
+    openWindow('lwindow', '文曲星君', questWindow(state, 'wenchang'))
   }
   g['claimTreasure'] = () => {
     if (!state) return
@@ -2485,6 +2496,12 @@ function skillWindow(s: GameState, id: number): string {
 }
 
 function questWindow(s: GameState, id: string): string {
+  if (id === 'wenchang' && s.quests.wenchang) {
+    const w = s.quests.wenchang
+    return `<DIV data-live-quest=wenchang class=middle style="padding:12px"><B>文曲星君</B><BR>
+${w.expiresAt > s.clock.gameT ? `请在${formatDuration(w.expiresAt - s.clock.gameT)}内前往(${w.at.join(',')})，献上${esc(w.book)}。<BR>
+<A class=skillup href="#" onclick="claimWenchang()">献书</A>　<A class=skillup href="#" onclick="requestWenchang()">换一本书</A>` : '文曲星君已经离开。下周可再使用请神香。'}</DIV>`
+  }
   if (id === 'escort' && s.quests.escort) {
     const e = s.quests.escort
     return `<DIV data-live-quest=escort class=middle style="padding:12px"><B>押镖</B><BR>

@@ -30,6 +30,7 @@ const artifact = {
   quality: '极品', refine: 2, status: '空闲', count: 1,
 }
 const qualityArtifact = { ...artifact, id: 'economy-fixture:quality', name: '玉虚桃木剑', quality: '废品', refine: 1 }
+const book = { ...artifact, id: 'economy-fixture:book', kind: 'book', name: '西游记', quality: '凡品', refine: 0 }
 const name = '经济回归道友'
 const browser = await chromium.launch()
 const page = await browser.newPage()
@@ -64,7 +65,7 @@ try {
     ...initial,
     clock: { ...initial.clock, rate: 600 },
     npc: { bases: [], patches: {} },
-    player: { ...initial.player, silver: 100000, coin: 1000, artifacts: [artifact, qualityArtifact] },
+    player: { ...initial.player, silver: 100000, coin: 1000, artifacts: [artifact, qualityArtifact, book] },
   }
   // 不写 localStorage 后 reload：旧页面的 pagehide 会覆盖那种夹具。
   const chooser = page.waitForEvent('filechooser')
@@ -162,6 +163,7 @@ try {
   check('撤销挂单原样归还法宝（含淬炼等级）', current.player.artifacts.find(a => a.id === artifact.id), artifact)
   check('撤销移除挂单且不收取仙石', [current.market.artifacts.some(o => o.id === artifact.id), current.player.coin], [false, fixture.player.coin])
 
+  await page.selectOption('#sellitemform [name=item]', String(current.player.artifacts.findIndex(a => a.id === artifact.id)))
   await page.fill('#sellitemform [name=price]', String(price))
   await page.locator('#sellitemform [type=submit]').click()
   const saleStarted = await saved()
@@ -206,6 +208,17 @@ try {
   await page.locator('a[onclick="sendUpgradeAllItem()"]').click()
   current = await saved()
   check('全部提升可以升到上品', [current.player.artifacts.find(a => a.id === qualityArtifact.id)?.quality, current.player.coin, current.player.bonusCoin], ['上品', beforeQuality.player.coin, beforeQuality.player.bonusCoin - 4])
+  await page.locator('a[href="trade.jsp"]').first().click()
+  await page.getByRole('link', { name: '出售法宝', exact: true }).click()
+  const bookOption = page.locator('#sellitemform [name=item] option').filter({ hasText: '西游记' })
+  check('凡品书籍出现在可售列表', await bookOption.count(), 1)
+  await page.selectOption('#sellitemform [name=item]', await bookOption.getAttribute('value'))
+  await page.fill('#sellitemform [name=price]', '5')
+  await page.locator('#sellitemform [type=submit]').click()
+  current = await saved()
+  check('书籍寄卖保留原类别与品质', current.market.artifacts.find(o => o.id === book.id)?.artifact, book)
+  await page.getByRole('link', { name: '撤销', exact: true }).click()
+  check('撤销书籍原样归还', (await saved()).player.artifacts.find(a => a.id === book.id), book)
   check('所有经济流程无浏览器异常', errors, [])
 } catch (error) {
   console.error('页面异常：', errors)

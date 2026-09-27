@@ -28,7 +28,7 @@ import { SWORDS, craftCostFor, canForge, isComplete } from '../data/swords.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN } from '../data/artifacts.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 import { artifactSlots, BODY_SLEEVE, craftSeconds, BODY_HAND } from '../engine/craft.ts'
-import { npcArtifactPrice, injectSecondsFor, visibleOrders, type QiOrder } from '../engine/market.ts'
+import { canTradeArtifact, npcArtifactPrice, injectSecondsFor, visibleOrders, type QiOrder } from '../engine/market.ts'
 import { allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { npcsIn } from '../data/town.ts'
 import { terrainAt, sceneName } from '../data/world.ts'
@@ -294,21 +294,20 @@ export function tradeVm(
   const slice = all.slice((p - 1) * TRADE_PAGE_SIZE, p * TRADE_PAGE_SIZE)
 
   const mine = s.market.qi.filter((o) => o.seller === s.player.name)
-  // 法宝页的名称/品质筛选。市场上只有极品可交易（listArtifact 拦着），
-  // 所以 level 选「极品」等于不筛，选别的品质就是空表 —— 与原版一致。
+  // 装备只售极品；书籍、秘笈按保存的类别与品质显示。
   const search = (itemFilter.search ?? '').trim()
   const level = itemFilter.level ?? 0
   const artifacts = s.market.artifacts
     .filter((o) => o.seller !== s.player.name)
     .filter((o) => search === '' || o.name.includes(search))
-    .filter((o) => level === 0 || level === 4)
+    .filter((o) => level === 0 || ['废品', '凡品', '良品', '上品', '极品'].indexOf(o.artifact?.quality ?? '极品') === level)
   const myArtifacts = s.market.artifacts.filter((o) => o.seller === s.player.name)
 
   const toItemOffer = (o: typeof artifacts[number], i: number): ItemOffer => ({
     sheet: i,
-    name: `极品${o.name}${o.refine > 0 ? `+${o.refine}` : ''}`,
+    name: o.artifact ? artifactLabel(o.artifact) : `极品${o.name}${o.refine > 0 ? `+${o.refine}` : ''}`,
     item: 0,
-    quality: 4,
+    quality: ['废品', '凡品', '良品', '上品', '极品'].indexOf(o.artifact?.quality ?? '极品'),
     price: o.priceCoin,
   })
 
@@ -327,7 +326,7 @@ export function tradeVm(
       myItemOffers: myArtifacts.map(toItemOffer),
       sellable: s.player.artifacts
         .map((a, i) => ({ a, i }))
-        .filter(({ a }) => a.quality === '极品' && a.status === '空闲')
+        .filter(({ a }) => a.status === '空闲' && canTradeArtifact(a))
         .map(({ a, i }) => ({ id: i, name: artifactLabel(a), npcPrice: npcArtifactPrice(a) })),
     },
     sheets: {

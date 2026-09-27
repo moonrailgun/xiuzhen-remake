@@ -67,7 +67,7 @@ import { usePill as consumePill, craftRecipe, upgradeArtifactQuality, upgradeAll
 import { PILL_NAMES, PILL_TIERS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
-  ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
+  ctxOf, applyCtx, canTradeArtifact, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
 } from '../engine/market.ts'
 import type { FiveQi } from '../engine/state.ts'
 import { changeRate } from '../engine/game.ts'
@@ -1070,8 +1070,7 @@ export function installGameActions(): void {
       const sn = selected(gid)
       const item = sn ? state.player.artifacts[sn - 1] : undefined
       if (!item) return tell('出售', '请先选中一件法宝。')
-      // 卖给系统：极品才值钱，其余按原版只能销毁或挂市场
-      if (item.quality !== '极品') return tell('出售', '只有极品法宝可以出售。')
+      if (item.status !== '空闲' || !canTradeArtifact(item)) return tell('出售', '这件物品不可交易，或正在使用中。')
       tradeView = 'sellitem'
       tab = 'trade'
       render()

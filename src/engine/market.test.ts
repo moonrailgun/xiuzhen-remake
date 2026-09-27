@@ -277,7 +277,7 @@ const sword = (over: Partial<Artifact> = {}): Artifact => ({
 test('只有极品法宝可以交易', () => {
   const bad = listArtifact({ state: state({ artifacts: [sword({ quality: '上品' })] }), market: emptyMarket() }, 's1', 120)
   assert.equal(bad.ok, false)
-  assert.equal(bad.ok === false && bad.reason, '只有极品法宝可以交易')
+  assert.match(bad.ok === false ? bad.reason : '', /极品法宝/)
 
   const good = listArtifact({ state: state({ artifacts: [sword()] }), market: emptyMarket() }, 's1', 120)
   assert.equal(good.ok, true)
@@ -430,4 +430,17 @@ test('但玩家自己仍可挂非等量的单（界面不在程序上限制比�
     want: { element: '木', amount: 300 },   // 1:3，官方靠人工封号管，不是代码校验
   })
   assert.equal(r.ok, true, '程序不该拦比例')
+})
+
+
+test('F16：凡品书籍和秘笈可以寄卖，天雷万磁剑禁售', () => {
+  for (const item of [sword({ kind: 'book', name: '西游记', quality: '凡品', refine: 0 }), sword({ kind: 'misc', name: '物理通明', quality: '凡品', refine: 0 })]) {
+    const listed = listArtifact(ctxOf({ artifacts: [item] }), item.id, 10)
+    assert.ok(listed.ok)
+    const bought = buyArtifact({ ...listed.ctx, state: state({ name: '买家', coin: 10 }) }, item.id)
+    assert.ok(bought.ok)
+    assert.deepEqual(bought.ctx.state.player.artifacts[0], item)
+  }
+  const thunder = sword({ name: '天雷万磁剑' })
+  assert.equal(listArtifact(ctxOf({ artifacts: [thunder] }), thunder.id, 10).ok, false)
 })

@@ -20,6 +20,8 @@ import { addQi, clampQi, type Artifact, type FiveQi, type GameState } from './st
 import { capacityOf, spendCoin } from './cultivate.ts'
 import { canAcquireArtifacts } from './craft.ts'
 import { SWORDS, isComplete, swordByName } from '../data/swords.ts'
+import { findBook } from '../data/town.ts'
+import { isSecretBook } from '../data/secrets.ts'
 import { rand, randInt } from './rng.ts'
 import { ELEMENTS, type Element } from '../data/meridian.ts'
 
@@ -40,7 +42,7 @@ export type QiOrder = {
 export type ArtifactOrder = {
   readonly id: string
   readonly seller: string
-  /** 只有极品可交易，所以这里不存 quality */
+  /** 名称与淬炼等级兼容旧挂单；新品质与种类保存在 artifact。 */
   readonly name: string
   readonly refine: number
   /** 标价：**普通仙石**（卖法宝是普通仙石的来源之一） */
@@ -293,6 +295,15 @@ export function buyQi(ctx: MarketCtx, orderId: string): MarketResult {
  * `reference/text/guides/45336-p3`「只有极品飞剑才可以交易」），标价用**普通仙石**。
  * 在售的法宝离开背包 —— 和真气一样，在途期间不在身上。
  */
+export function canTradeArtifact(item: Artifact): boolean {
+  if (item.kind === 'book') return !!findBook(item.name)
+  if (item.kind === 'misc') return isSecretBook(item.name)
+  // 图鉴的「不可交易」不能当剑种禁售表：94153 的古纹也写不可交易，
+  // 但 97530-p1 市场 DOM 明列「极品古纹青石剑+4 120仙石」。天雷按特殊禁售保留。
+  if (item.kind === 'sword') return item.quality === '极品' && !!swordByName(item.name) && item.name !== '天雷万磁剑'
+  return item.kind === 'guard' && item.quality === '极品'
+}
+
 export function listArtifact(
   ctx: MarketCtx,
   artifactId: string,
@@ -300,7 +311,7 @@ export function listArtifact(
 ): MarketResult {
   const item = ctx.state.player.artifacts.find((a) => a.id === artifactId)
   if (!item) return { ok: false, reason: '没有这件法宝' }
-  if (item.quality !== '极品') return { ok: false, reason: '只有极品法宝可以交易' }
+  if (!canTradeArtifact(item)) return { ok: false, reason: item.name === '天雷万磁剑' ? '天雷万磁剑不能交易' : '仅书籍、秘笈和可交易的极品法宝可以交易' }
   if (item.status !== '空闲') return { ok: false, reason: '法宝不在空闲状态' }
   if (!Number.isSafeInteger(priceCoin) || priceCoin <= 0) return { ok: false, reason: '价格不正确' }
   if (ctx.market.artifacts.some(o => o.id === artifactId)) return { ok: false, reason: '挂单已存在' }
@@ -369,7 +380,8 @@ export function buyArtifact(ctx: MarketCtx, orderId: string): MarketResult {
   if (!order) return { ok: false, reason: '挂单不存在' }
   if (isMyOrder(order, ctx.state.player.name)) return { ok: false, reason: '不能买自己的挂单' }
 
-  if (!canAcquireArtifacts(ctx.state, 1)) return { ok: false, reason: '法宝携带数量已达上限' }
+  if (!canTradeArtifact(artifactOf(order))) return { ok: false, reason: '这件物品不能交易' }
+  if (!canAcquireArtifacts(ctx.state, artifactOf(order).count)) return { ok: false, reason: '法宝携带数量已达上限' }
 
   const paid = spendCoin(ctx.state, order.priceCoin, { requireNormal: true })
   if (!paid.ok) return { ok: false, reason: paid.reason }
@@ -514,7 +526,7 @@ export function refillNpcOrders(state: GameState): GameState {
   // 从 NPC 买来的原物保留编号；重新寄卖后归玩家所有，不再按 NPC 库存过期。
   const isNpcArtifactOrder = (o: ArtifactOrder): boolean => o.seller !== state.player.name && o.id.startsWith(artifactPrefix)
   const artifacts = state.market.artifacts.filter(o => !isNpcArtifactOrder(o) || hour - Number(o.id.split(':')[1]) < NPC_ORDER_TTL / 3600)
-  const swords = SWORDS.filter(s => s.tradable && isComplete(s))
+  const swords = SWORDS.filter(s => s.name !== '天雷万磁剑' && isComplete(s))
   let artifactSlot = 0
   // 包含已买入背包的 id，避免同一小时补货时产生重复物品 id。
   for (const item of [...artifacts, ...state.player.artifacts]) {

@@ -78,7 +78,16 @@ try {
 
   await page.locator('#bigmenu a[href="map.jsp"]').click()
   const destination = { x: tutorial.player.x + 1, y: tutorial.player.y }
-  await page.evaluate(({ x, y }) => onMapCellClick(x, y), destination)
+  // 点击菱形地面，而非直接调用选格函数：透明图层和人物标记都不应挡住选格。
+  for (const target of [tutorial.player, destination]) {
+    const hit = page.locator(`[onclick^="onMapCellClick(${target.x},${target.y})"]`)
+    const box = await hit.boundingBox()
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 17.5)
+    check(`点击地图地面选中 (${target.x},${target.y})`,
+      await page.locator('#spos').textContent() === `(${target.x},${target.y})`)
+  }
+  await page.waitForFunction(() => document.querySelector('#sceneimg').complete)
+  check('选中场景插图正常加载', await page.locator('#sceneimg').evaluate(img => img.naturalWidth > 0))
   await page.locator('a[onclick="mapMenuMove()"] ').click()
   const walking = await saved()
   const walk = walking.timeline.events.find(e => e.kind === 'move')

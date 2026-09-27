@@ -1,7 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import {
   terrainAt,
+  terrainVariant,
+  terrainScene,
+  TERRAIN_KEY,
   qiAt,
   sceneName,
   provinceOf,
@@ -16,6 +20,17 @@ import {
 } from './world.ts'
 
 const SEED = 20081028
+
+test('地图插画均存在，四种平原共用原版插画，福地沿用占位', () => {
+  for (let variant = 0; variant < 4; variant++) assert.equal(terrainScene('平原', variant), 'plain01')
+  assert.equal(terrainScene('福地', 0), 'plain01')
+  for (const terrain of Object.keys(TERRAIN_KEY) as Terrain[]) {
+    for (let x = 0; x < 100; x++) {
+      const scene = terrainScene(terrain, terrainVariant(SEED, x, 50, terrain))
+      assert.ok(existsSync(new URL(`../../public/img/scene/${scene}.gif`, import.meta.url)), scene)
+    }
+  }
+})
 
 test('世界 200×200（基准期；2009-06-30 才扩到 300×300）', () => {
   assert.equal(WORLD_SIZE, 200)

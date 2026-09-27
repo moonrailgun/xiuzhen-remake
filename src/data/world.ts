@@ -24,7 +24,7 @@ export type Terrain =
   | '村庄' | '小镇' | '城池'
   | '福地' | '洞天'
 
-/** 地块基名 → 地图素材 `img/map/{base}{n}.gif` 与插画 `img/scene/{base}{nn}.gif`。 */
+/** 地块基名 → 地图素材 `img/map/{base}{n}.gif`。插画例外见 terrainScene。 */
 export const TERRAIN_KEY: Record<Terrain, string> = {
   平原: 'plain', 森林: 'forest', 青山: 'mountain', 江河: 'river',
   村庄: 'village', 小镇: 'town', 城池: 'city',
@@ -172,6 +172,13 @@ export function terrainAt(seed: number, x: number, y: number, weeksOpen = 99): T
 /** 地块图的变体编号（同一地形有几张不同的图）。 */
 export const terrainVariant = (seed: number, x: number, y: number, t: Terrain): number =>
   randInt(TERRAIN_VARIANTS[t], seed, 'variant', x, y)
+
+/**
+ * 插画编号：原版 DOM 的四种平原共用 plain01（docs/research/09-pasted-dom-templates.md §3.6）。
+ * 福地 reconstructed：沿用 tools/assets/manifest.json 的平原占位，原图未存档。
+ */
+export const terrainScene = (t: Terrain, variant: number): string =>
+  t === '平原' || t === '福地' ? 'plain01' : `${TERRAIN_KEY[t]}0${variant + 1}`
 
 /**
  * 天地元气。[原文规则 + 重建分布]

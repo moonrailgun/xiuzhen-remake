@@ -48,7 +48,7 @@ import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
 import { newGame, tick, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
 import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
-import { terrainAt, qiAt, sceneName, terrainVariant, TERRAIN_KEY } from '../data/world.ts'
+import { terrainAt, qiAt, sceneName, terrainVariant, terrainScene, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
@@ -208,7 +208,7 @@ function mapVm(s: GameState): MapVm {
       posx: p.x,
       posy: p.y,
       terrain: `${key}${terrainVariant(s.worldSeed, p.x, p.y, t)}`,
-      scene: `${key}0${terrainVariant(s.worldSeed, p.x, p.y, t) + 1}`,
+      scene: terrainScene(t, terrainVariant(s.worldSeed, p.x, p.y, t)),
       qi: qiAt(s.worldSeed, p.x, p.y, t),
       // 本格的人数 = NPC + 自己
       playernum:

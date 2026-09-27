@@ -149,9 +149,11 @@ function tiles(vm: MapVm): string {
     // 可视区外的部分靠 .mapdiv 的 overflow:hidden 裁掉，这与原版用 background-position
     // 手工裁图等效，但少了几十种特例。
     out.push(
-      `<IMG class=tile src="${esc(url)}" style="left:${left}px;top:${imgTop}px;z-index:${z}" ` +
+      `<IMG class=tile src="${esc(url)}" style="left:${left}px;top:${imgTop}px;z-index:${z}">` +
+        `<A class=mapcell href="#" style="left:${left}px;top:${top}px;z-index:${z + 1}" ` +
         `title="${esc(cell.name)} (${cell.posx},${cell.posy})" ` +
-        `onclick="onMapCellClick(${cell.posx},${cell.posy})">`,
+        `aria-label="${esc(cell.name)} (${cell.posx},${cell.posy})" ` +
+        `onclick="onMapCellClick(${cell.posx},${cell.posy});return false"></A>`,
     )
 
     // 头像与小人和地块一样是 64×120、贴底的画布（原版 DOM：people/player 都是 64×120），同一套上移

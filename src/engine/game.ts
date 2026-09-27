@@ -389,7 +389,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
     if (!object(data)) return false
     switch (event.kind) {
       case 'cultivate':
-        if (data.op === 'goldenCore') return string(data.questId)
+        if (data.op === 'goldenCore') return string(data.questId) && (data.outputElement === undefined || element(data.outputElement))
         return number(data.toLevel) && (data.system === 'skill' ? string(data.id)
           : ['meridian', 'body'].includes(data.system as string) && number(data.index) && Number.isInteger(data.index) && data.index < (data.system === 'body' ? 8 : 12))
       case 'move':
@@ -461,7 +461,10 @@ export function validateGameState(value: unknown): asserts value is GameState {
       !object(quests) || !['qi', 'sword'].includes(quests.line as string) || !number(quests.dantianBonus) ||
       !arrayOf(quests.entries, (q) => string(q.id) && number(q.acceptedAt) && typeof q.done === 'boolean' &&
         (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
-        (q.coreEventId === undefined || string(q.coreEventId)) && (q.cleared === undefined || typeof q.cleared === 'boolean')) ||
+        (q.coreQiByElement === undefined || numbers(q.coreQiByElement, 5)) &&
+        (q.coreElement === undefined || element(q.coreElement)) &&
+        (q.coreElements === undefined || Array.isArray(q.coreElements) && q.coreElements.length <= 10 && q.coreElements.every(element)) &&
+        optionalRatio(q.corePurity) && (q.coreEventId === undefined || string(q.coreEventId)) && optionalBool(q.cleared)) ||
       (quests.sanctuaries !== undefined && !arrayOf(quests.sanctuaries, place => xy(place) && ['福地', '洞天'].includes(place.kind as string) && number(place.occupiedAt))) ||
       !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
         optionalNumber(o.listedAt) &&

@@ -34,7 +34,7 @@ import {
   type GameState,
   type Realm,
 } from './state.ts'
-import { ELEMENTS, MERIDIANS, groupElement } from '../data/meridian.ts'
+import { ELEMENTS, MERIDIANS, generatedBy, generates, groupElement, overcomes, type Element } from '../data/meridian.ts'
 import { sanctuaryEntryBlocker, sanctuaryKindAt } from './sanctuary.ts'
 import { WORLD_SIZE } from '../data/world.ts'
 import {
@@ -66,10 +66,15 @@ export type QuestEntry = {
   readonly cleared?: boolean
   /** 计数型条件的累计值：炼制或淬炼的件数、已交给 NPC 的银两 */
   readonly count?: number
-  /** 已汇聚、尚未开始压缩的本命真气。 */
+  /** 已汇聚、尚未开始压缩的总真气；保留旧档数字字段。 */
   readonly coreQi?: number
   /** 当前压缩对应事件，防止重复结算。 */
   readonly coreEventId?: string
+  readonly coreQiByElement?: FiveQi
+  readonly coreElement?: Element
+  readonly coreElements?: readonly Element[]
+  /** 重建：以帖子提到但未获正式服确认的4/3/2/1/0构成为基准，记录五行调和评分。 */
+  readonly corePurity?: number
 }
 
 export type QuestLog = {
@@ -346,29 +351,48 @@ export function answerQuiz(log: QuestLog, state: GameState, id: string, answer: 
 export const CORE_QI_POINTS = 286000
 export const CORE_COMPRESS_SECONDS = 12 * 3600
 
-/** [重建] 最小结丹流程只汇聚本命属性，采用资料中的纯属性压缩时长。 */
-export function gatherCoreQi(state: GameState, id: string, amount: number): QuestResult<GameState> {
+/** 汇聚可分批、混合五行且不可逆。旧档未记组成的汇聚量按此前规则补成本命属性。 */
+export function gatherCoreQi(state: GameState, id: string, amount: number, element: Element = state.player.element): QuestResult<GameState> {
   const entry = entryOf(state.quests, id)
   if (!entry || entry.done || entry.cleared || questOf(state.quests, id)?.goal.kind !== 'goldenCore') return fail('没有进行中的结丹任务')
   if (!Number.isSafeInteger(amount) || amount <= 0) return fail('请输入正整数真气数量')
   const remaining = CORE_QI_POINTS - (entry.coreQi ?? 0)
   if (amount > remaining) return fail(`本次还可汇聚${remaining}点真气`)
   if ((entry.count ?? 0) + (entry.coreEventId ? 1 : 0) >= 10) return fail('已汇聚足够的真元')
-  const index = ELEMENTS.indexOf(state.player.element)
-  if (state.player.qi[index]! < amount) return fail('本命真气不足')
+  const index = ELEMENTS.indexOf(element)
+  if (index < 0) return fail('真气属性不正确')
+  if (state.player.qi[index]! < amount) return fail(`${element}属性真气不足`)
   const qi = state.player.qi.map((n, i) => n - (i === index ? amount : 0)) as unknown as FiveQi
-  return ok({ ...state, player: { ...state.player, qi, daoxing: state.player.daoxing + amount }, quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) + amount })) })
+  return ok({ ...state, player: { ...state.player, qi, daoxing: state.player.daoxing + amount }, quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) + amount, coreQiByElement: coreInput(e, state.player.element).map((n, i) => n + (i === index ? amount : 0)) as unknown as FiveQi })) })
 }
 
-export function startCoreCompression(state: GameState, id: string): QuestResult<GameState> {
+const coreInput = (entry: QuestEntry, self: Element): FiveQi => entry.coreQiByElement
+  ?? ELEMENTS.map(e => e === self ? entry.coreQi ?? 0 : 0) as unknown as FiveQi
+
+/** 原帖40521回帖#4：同属性12小时、其他多1～4小时；按不匹配比例分四档为重建。 */
+export function coreCompressionSeconds(entry: QuestEntry, self: Element, output: Element): number {
+  const purity = coreInput(entry, self)[ELEMENTS.indexOf(output)]! / CORE_QI_POINTS
+  return CORE_COMPRESS_SECONDS + Math.ceil(4 * (1 - Math.max(0, Math.min(1, purity)))) * 3600
+}
+
+/** 原帖40521正文及#17仅能证明内测4本命/3我克/2生我/1我生；正式服比例、评分公式均为重建。 */
+function corePurity(elements: readonly Element[], self: Element): number {
+  const target = { [self]: 0.4, [overcomes(self)]: 0.3, [generatedBy(self)]: 0.2, [generates(self)]: 0.1 }
+  const distance = ELEMENTS.reduce((sum, el) => sum + Math.abs(elements.filter(e => e === el).length / elements.length - (target[el] ?? 0)), 0)
+  return Math.max(0, Math.min(1, 1 - distance / 2))
+}
+
+export function startCoreCompression(state: GameState, id: string, element: Element = state.player.element): QuestResult<GameState> {
   const entry = entryOf(state.quests, id)
   if (!entry || entry.done || entry.cleared || questOf(state.quests, id)?.goal.kind !== 'goldenCore') return fail('没有进行中的结丹任务')
+  if (!ELEMENTS.includes(element)) return fail('真元属性不正确')
   if (entry.coreEventId) return fail('真元正在压缩')
-  if ((entry.coreQi ?? 0) < CORE_QI_POINTS) return fail(`需要汇聚${CORE_QI_POINTS}点本命真气`)
+  if ((entry.count ?? 0) >= 10) return fail('已有十分真元')
+  if ((entry.coreQi ?? 0) < CORE_QI_POINTS) return fail(`需要汇聚${CORE_QI_POINTS}点真气`)
   const eventId = `quest:core:${id}:${entry.acceptedAt}:${entry.count ?? 0}`
   return ok({ ...state,
-    quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) - CORE_QI_POINTS, coreEventId: eventId })),
-    timeline: schedule(state.timeline, { id: eventId, kind: 'cultivate', finishAt: state.clock.gameT + CORE_COMPRESS_SECONDS, payload: { op: 'goldenCore', questId: id } }),
+    quests: patch(state.quests, id, e => ({ ...e, coreQi: (e.coreQi ?? 0) - CORE_QI_POINTS, coreQiByElement: ZERO_QI, coreElement: element, coreEventId: eventId })),
+    timeline: schedule(state.timeline, { id: eventId, kind: 'cultivate', finishAt: state.clock.gameT + coreCompressionSeconds(entry, state.player.element, element), payload: { op: 'goldenCore', questId: id, outputElement: element } }),
   })
 }
 
@@ -379,7 +403,10 @@ export function applyQuestProgress(before: GameState, after: GameState, event?: 
     const id = String(event.payload['questId'])
     const entry = entryOf(log, id)
     if (entry && !entry.done && entry.coreEventId === event.id) {
-      log = patch(log, id, e => ({ ...e, count: (e.count ?? 0) + 1, cleared: (e.count ?? 0) + 1 >= 10, coreEventId: undefined }))
+      const output = ELEMENTS.includes(event.payload['outputElement'] as Element) ? event.payload['outputElement'] as Element : entry.coreElement ?? after.player.element
+      const elements = [...(entry.coreElements ?? Array.from({ length: entry.count ?? 0 }, () => after.player.element)), output]
+      const purity = corePurity(elements, after.player.element)
+      log = patch(log, id, e => ({ ...e, count: elements.length, cleared: elements.length >= 10, coreEventId: undefined, coreElements: elements, corePurity: purity }))
     }
   } else if (event?.kind === 'craft') {
     const made = after.player.artifacts.filter(a => !before.player.artifacts.some(b => b.id === a.id))

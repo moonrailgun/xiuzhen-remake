@@ -1175,7 +1175,7 @@ export function installGameActions(): void {
   g['questGatherCore'] = (id: string) => {
     if (!state) return
     const amount = Number((document.getElementById('core-qi-amount') as HTMLInputElement | null)?.value)
-    const r = gatherCoreQi(state, id, amount)
+    const r = gatherCoreQi(state, id, amount, (document.getElementById('core-qi-element') as HTMLSelectElement | null)?.value as Element ?? state.player.element)
     if (!r.ok) return openWindow('mwindow', '汇聚真气', esc(r.reason))
     state = r.value
     openWindow('lwindow', '任务', questWindow(state, id))
@@ -1183,7 +1183,7 @@ export function installGameActions(): void {
   }
   g['questCompressCore'] = (id: string) => {
     if (!state) return
-    const r = startCoreCompression(state, id)
+    const r = startCoreCompression(state, id, (document.getElementById('core-output-element') as HTMLSelectElement | null)?.value as Element ?? state.player.element)
     if (!r.ok) return openWindow('mwindow', '压缩真元', esc(r.reason))
     state = r.value
     openWindow('lwindow', '任务', questWindow(state, id))
@@ -2499,7 +2499,7 @@ function questWindow(s: GameState, id: string): string {
     claimable: done,
     interaction: q.goal.kind === 'quiz' ? { kind: 'quiz' }
       : q.goal.kind === 'choice' ? { kind: 'choice' }
-      : q.goal.kind === 'goldenCore' ? { kind: 'goldenCore', gathered: entry?.coreQi ?? 0, cores: entry?.count ?? 0, compressing: !!entry?.coreEventId }
+      : q.goal.kind === 'goldenCore' ? { kind: 'goldenCore', gathered: entry?.coreQi ?? 0, cores: entry?.count ?? 0, compressing: !!entry?.coreEventId, element: s.player.element, qiByElement: entry?.coreQiByElement, coreElements: entry?.coreElements, purity: entry?.corePurity }
       : undefined,
   })}</DIV>`
 }

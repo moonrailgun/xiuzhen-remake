@@ -19,7 +19,7 @@
  */
 
 import { esc, escJs, each, num, js } from './html.ts'
-import { ELEMENTS } from '../data/meridian.ts'
+import { ELEMENTS, type Element } from '../data/meridian.ts'
 
 /** 五行图标，界面顺序「金木水火土」。 */
 const RES = ['gold', 'wood', 'water', 'fire', 'earth'] as const
@@ -58,7 +58,7 @@ export type QuestVm = {
   readonly interaction?:
     | { readonly kind: 'quiz' }
     | { readonly kind: 'choice' }
-    | { readonly kind: 'goldenCore'; readonly gathered: number; readonly cores: number; readonly compressing: boolean }
+    | { readonly kind: 'goldenCore'; readonly gathered: number; readonly cores: number; readonly compressing: boolean; readonly element?: Element; readonly qiByElement?: readonly number[]; readonly coreElements?: readonly Element[]; readonly purity?: number }
 }
 
 /** 《百妖记》任务概要的写法 [原文]（`03 §1.10` 逐回游戏内粘贴格式）。 */
@@ -118,7 +118,13 @@ function interactionRows(vm: QuestVm): string {
   const id = escJs(vm.id)
   if (action.kind === 'quiz') return section('请作答', '你的本命属性是什么？（可在人物页面查看）<BR>' + each(ELEMENTS, e => button(e, `questAnswer('${id}','${e}')`)))
   if (action.kind === 'choice') return section('选择修炼路线', button('先炼气', `questChooseLine('${id}','qi')`) + '　' + button('先炼剑', `questChooseLine('${id}','sword')`))
-  return section('汇聚本命真气', `已得真元：${num(action.cores)}/10；已汇聚：${num(action.gathered)}/286000<BR>每份真元需压缩12小时，汇聚后不能退回丹田。<BR><INPUT id=core-qi-amount type=number min=1 step=1 value="${Math.max(1, 286000 - action.gathered)}"> ${button('汇聚真气', `questGatherCore('${id}')`)}　${action.compressing ? '正在压缩真元' : button('压缩真元', `questCompressCore('${id}')`)}`)
+  const select = (id: string) => `<SELECT id=${id} aria-label="${id === 'core-qi-element' ? '汇聚属性' : '压缩属性'}">${each(ELEMENTS, e => `<OPTION value="${e}"${e === action.element ? ' selected' : ''}>${e}</OPTION>`)}</SELECT>`
+  return section('汇聚真气与压缩真元', `已得真元：${num(action.cores)}/10（${esc(action.coreElements?.join('、') ?? '')}）；已汇聚：${num(action.gathered)}/286000<BR>` +
+    `金木水火土：${action.qiByElement?.map(num).join(' / ') ?? '0 / 0 / 0 / 0 / 0'}<BR>` +
+    `同属性压缩12小时；混气会增加耗时。十份真元的本命纯度影响结丹成功率，汇聚后不能退回丹田。<BR>` +
+    `${select('core-qi-element')} <INPUT id=core-qi-amount aria-label="汇聚数量" type=number min=1 step=1 value="${Math.max(1, 286000 - action.gathered)}"> ${button('汇聚真气', `questGatherCore('${id}')`)}<BR>` +
+    `${select('core-output-element')} ${action.compressing ? '正在压缩真元' : button('压缩真元', `questCompressCore('${id}')`)}`)
+
 }
 
 /** 渲染任务详情。 */

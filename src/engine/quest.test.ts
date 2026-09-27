@@ -516,3 +516,41 @@ test('三尸跨日失效，包括已斩但未领奖；已完成步骤保留', as
   assert.equal(statusOf(log, { ...s, clock: { ...s.clock, gameT: 5 * DAY } }, 'realm:sanshi:2'), 'locked')
   assert.equal(expireDailyQuests(log, 5 * DAY).entries.length, 1)
 })
+
+test('凝丹可混合汇聚、自选输出属性；输入纯度只影响压缩时间', async () => {
+  const { gatherCoreQi, startCoreCompression, applyQuestProgress, CORE_QI_POINTS, CORE_COMPRESS_SECONDS } = await import('./quest.ts')
+  const base = makeState({ realm: '金丹期', qi: [CORE_QI_POINTS, CORE_QI_POINTS, 0, 0, 0] })
+  const s = { ...base, quests: { ...base.quests, entries: [{ id: 'realm:jindan:1', acceptedAt: 0, done: false }] } }
+  const first = gatherCoreQi(s, 'realm:jindan:1', CORE_QI_POINTS / 2, '金')
+  assert.ok(first.ok)
+  const second = gatherCoreQi(first.value, 'realm:jindan:1', CORE_QI_POINTS / 2, '木')
+  assert.ok(second.ok)
+  assert.deepEqual(second.value.player.qi, [CORE_QI_POINTS / 2, CORE_QI_POINTS / 2, 0, 0, 0])
+  const mixed = startCoreCompression(second.value, 'realm:jindan:1', '木')
+  assert.ok(mixed.ok)
+  const event = mixed.value.timeline.events[0]!
+  assert.equal(event.finishAt, CORE_COMPRESS_SECONDS + 2 * 3600)
+  const done = applyQuestProgress(mixed.value, mixed.value, event)
+  assert.deepEqual(entryOf(done.quests, 'realm:jindan:1')?.coreElements, ['木'])
+  const pure = gatherCoreQi(s, 'realm:jindan:1', CORE_QI_POINTS, '金')
+  assert.ok(pure.ok)
+  const compressed = startCoreCompression(pure.value, 'realm:jindan:1', '金')
+  assert.ok(compressed.ok)
+  assert.equal(compressed.value.timeline.events[0]!.finishAt, CORE_COMPRESS_SECONDS)
+})
+
+test('金丹纯度按十份输出的五行调和评分，同属性十份并非最纯', async () => {
+  const { applyQuestProgress } = await import('./quest.ts')
+  const base = makeState({ element: '金' })
+  const complete = (elements: readonly ('金' | '木' | '水' | '火' | '土')[]) => {
+    const event: GameEvent = { id: 'core:10', kind: 'cultivate', finishAt: 1, payload: { op: 'goldenCore', questId: 'realm:jindan:1', outputElement: '金' } }
+    const state = { ...base, quests: { ...base.quests, entries: [{ id: 'realm:jindan:1', acceptedAt: 0, done: false, count: 9, coreElements: elements, coreEventId: event.id }] } }
+    return entryOf(applyQuestProgress(state, state, event).quests, 'realm:jindan:1')!
+  }
+  const balanced = complete(['金', '金', '金', '木', '木', '木', '土', '土', '水'])
+  const single = complete(Array.from({ length: 9 }, () => '金' as const))
+  assert.equal(balanced.corePurity, 1)
+  assert.ok(Math.abs(single.corePurity! - 0.4) < 1e-9)
+  assert.equal(balanced.count, 10)
+  assert.equal(balanced.cleared, true)
+})

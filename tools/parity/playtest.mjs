@@ -267,12 +267,15 @@ check('交易页有真实挂单（NPC 自动补货）',
   tradeText.includes('注意：购买真气') && offerRows > 1, `${offerRows} 行挂单`)
 
 const allyText = await tabText('ally.jsp')
-check('门派页显示道源与掌门', allyText.includes('通天'), allyText.slice(0, 50))
+check('未入派时提供自建与加入独立门派', allyText.includes('自行立派') && allyText.includes('青云会'), allyText.slice(0, 70))
+await page.selectOption('#guildtarget', '1')
+await page.click('#gleft button:has-text("加入门派")')
+await page.waitForTimeout(250)
 
 await page.click('#gleft a[href="ally.jsp?tab=2&page=1&per=10&job=-2"]')
 await page.waitForTimeout(250)
 const memberText = (await page.locator('#gleft').textContent())?.replace(/\s+/g, ' ') ?? ''
-check('门派成员页列出同道源的人（掌门排头）', memberText.includes('掌门'), memberText.slice(0, 60))
+check('加入门派后成员页列出成员与掌门', memberText.includes('掌门'), memberText.slice(0, 60))
 
 // 消息是右侧浮窗，不换左栏
 await page.click('#bigmenu a[onclick*="msg.jsp"]')
@@ -554,19 +557,20 @@ const afterVip = await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
   return st.player.vip
 })
-check('VIP 开关能打开（第二条修炼队列才摸得到）', afterVip === !beforeVip, `${beforeVip} → ${afterVip}`)
+check('VIP 开关能打开（可预约下一项修炼）', afterVip === !beforeVip, `${beforeVip} → ${afterVip}`)
 await page.evaluate(() => window.closeLWindow())
 
-await page.evaluate(() => window.openLWindow('写消息', 'writemsg.jsp?receiver=张三'))
+const recipient = await page.evaluate(() => JSON.parse(localStorage.getItem('xiuzhen.save')).state.npc.bases[0].name)
+await page.evaluate(name => window.openLWindow('写消息', `writemsg.jsp?receiver=${encodeURIComponent(name)}`), recipient)
 await page.waitForTimeout(300)
 await page.fill('#msgsubject', '借剑一用')
 await page.fill('#msgtext', '道友，可否借飞剑一观？')
 await page.click('#lwindowcontent input[value=发送]')
 await page.waitForTimeout(400)
-const sentOk = await page.evaluate(() => {
+const sentOk = await page.evaluate(name => {
   const st = JSON.parse(localStorage.getItem('xiuzhen.save')).state
-  return st.mail.filter((m) => m.subject.startsWith('寄给张三')).length
-})
+  return st.mail.filter((m) => m.subject.startsWith(`寄给${name}：`)).length
+}, recipient)
 check('★写消息发送后留底（不再弹「尚未接入」）', sentOk === 1, `留底 ${sentOk} 封`)
 
 // 18. 产业页与排行榜浮窗能打开（原版 L 窗路由）

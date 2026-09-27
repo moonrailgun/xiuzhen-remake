@@ -202,6 +202,29 @@ try {
   await page.locator('a[onclick="OnMDialog2OK()"] ').click()
   const abandoned = await saved()
   check('放弃结丹同时移除压缩事件', !abandoned.quests.entries.some(e => e.id === 'realm:jindan:1') && !abandoned.timeline.events.some(e => e.id === coreId))
+
+  const late = await saved()
+  late.player.experience = 123
+  late.quests.entries = [{ id: 'realm:jindan:3', acceptedAt: late.clock.gameT, done: false }]
+  late.player.qi = [2000, 2000, 2000, 2000, 2000]
+  late.player.artifacts = [{ id: 'broken-sword', kind: 'sword', name: '青龙伏魔剑', quality: '上品', refine: 1, status: '损坏', count: 1 }]
+  await importText(JSON.stringify({ ...payload, state: late }))
+  await quest('realm:jindan:3')
+  const progress = await page.locator('#lwindowcontent').textContent()
+  check('境界任务显示所需阅历、当前进度和获取方式', progress.includes('1382400') && progress.includes('当前 123') && progress.includes('行走或读书'))
+  await page.evaluate(() => closeLWindow())
+  await page.locator('#bigmenu a[href="item.jsp"]').click()
+  await page.locator('input[name=selectitem1][value="1"]').check()
+  await page.locator('a[onclick="sendRepairItem()"] ').click()
+  check('修理确认前保留损坏法宝和资源', (await saved()).player.artifacts[0].status === '损坏' && (await saved()).player.qi[0] === 2000)
+  await page.locator('a[onclick="OnMDialog2OK()"] ').click()
+  const repairing = await saved()
+  check('修理进入炼器队列并扣除真气', repairing.player.artifacts[0].status === '修理中' && repairing.player.qi[0] < 2000)
+  await page.reload()
+  check('刷新保留修理中的法宝与队列', (await saved()).player.artifacts[0].status === '修理中' && (await saved()).timeline.events.some(e => e.payload.op === 'repair'))
+  await page.clock.fastForward(3600 * 1000)
+  const repaired = (await saved()).player.artifacts
+  check('修理结束保留原法宝品质与淬炼等级且不复制物品', repaired.length === 1 && repaired[0].id === 'broken-sword' && repaired[0].quality === '上品' && repaired[0].refine === 1 && repaired[0].status === '空闲')
   check('全流程无浏览器异常', errors.length === 0)
   if (errors.length) console.log(errors.join('\n'))
 } catch (error) {

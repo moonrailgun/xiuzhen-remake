@@ -61,7 +61,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { startCraft, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { usePill as consumePill, startCraft, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
@@ -1081,23 +1081,13 @@ export function installGameActions(): void {
   g['sendUpgradeItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
   g['sendUpgradeAllItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
 
-  /** 服丹：把丹药换成真气。丹药的具体加成没有存档，按「一炼 = 各 1000」线性推。 */
   function usePill(): void {
     if (!state) return
-    const sn = selected(2)
-    const item = sn ? state.player.artifacts[sn - 1] : undefined
-    if (!item || item.kind !== 'pill') return tell('服食', '请先选中一颗丹药。')
-    const tier = PILL_TIERS.findIndex((t) => item.name.startsWith(t)) + 1
-    const gain = 1000 * Math.max(1, tier)
-    const cap = resourceBarOf(state).capacity
-    state = {
-      ...state,
-      player: {
-        ...state.player,
-        qi: state.player.qi.map((v) => Math.min(cap, v + gain)) as unknown as typeof state.player.qi,
-        artifacts: state.player.artifacts.filter((_, i) => i !== sn - 1),
-      },
-    }
+    const item = state.player.artifacts[selected(2) - 1]
+    if (!item) return tell('服食', '请先选中一颗丹药。')
+    const result = consumePill(state, item.id)
+    if (!result.ok) return tell('服食', result.reason)
+    state = result.state
     step()
   }
 
@@ -2115,8 +2105,8 @@ function craftOrderFor(
       rng: q.rng,
     }
   }
-  // 丹药：百位 = 丹种，个位 = 炼数（09 §1.16 的 id 规律）
-  if (itemId >= 100 && itemId <= 609) {
+  // 丹药：百位 = 丹种，末两位 = 炼数（09 §1.16 的 id 规律）
+  if (itemId >= 100 && itemId <= 620) {
     const kindIdx = Math.floor(itemId / 100) - 1
     const tierIdx = (itemId % 100) - 1
     const kind = PILL_NAMES[kindIdx]

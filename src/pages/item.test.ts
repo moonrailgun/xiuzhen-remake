@@ -90,7 +90,7 @@ test('同种物品堆叠显示 ×N，带省略号的状态后面跟倒计时', (
   assert.ok(h.includes('<SPAN class=smallgray>空闲</SPAN>'), '空闲没有倒计时')
 })
 
-test('物品状态文案共 9 种', () => {
+test('物品状态文案包括御剑飞行中的占用状态', () => {
   assert.deepEqual([...ITEM_STATUSES], [
     '空闲', '损坏', '斩杀中', '绞杀中', '返回中', '淬炼中', '炼制中', '注入中', '修理中',
   ])

@@ -27,6 +27,8 @@
 import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader, countdown } from './shell.ts'
 import { formatDuration } from '../engine/clock.ts'
+import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
+export { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
 
 export type ItemTab = 'list' | 'sword' | 'guard' | 'pill' | 'refine'
 
@@ -269,9 +271,9 @@ ${each(rows, (r) =>
 // —— 丹药 ——
 
 /** 六种丹药。名称出自 05 §5.1 逐字转录（#68 九炼、#71 一炼）。 */
-export const PILL_NAMES = ['紫金丹', '碧罗丹', '冰雪丹', '烈炎丹', '微尘丹', '五行丹'] as const
+
 /** 一炼…九炼。#68 与 #71 各只列一档，说明页面只显示当前炼丹之术等级对应的那一档。 */
-export const PILL_TIERS = ['一炼', '二炼', '三炼', '四炼', '五炼', '六炼', '七炼', '八炼', '九炼'] as const
+
 /** 五种丹 22:30:00，五行丹 24:00:00 —— 一炼与九炼两张截图读数相同。 */
 export const PILL_SECONDS = 22 * 3600 + 30 * 60
 export const WUXING_PILL_SECONDS = 24 * 3600

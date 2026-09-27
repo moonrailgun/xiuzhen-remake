@@ -17,6 +17,8 @@ import { schedule, countByKind, type GameEvent } from './timeline.ts'
 import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact } from './state.ts'
 import { refineSuccessRate, refinePieces, type Quality } from '../data/artifacts.ts'
 import { roll } from './rng.ts'
+import { capacityOf } from './cultivate.ts'
+import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
 import { canForge, swordByName } from '../data/swords.ts'
 
 export type CraftKind = 'sword' | 'guard' | 'pill'
@@ -58,6 +60,19 @@ export type CraftOrder = {
 export type CraftResult =
   | { readonly ok: true; readonly state: GameState }
   | { readonly ok: false; readonly reason: string }
+
+export function usePill(state: GameState, id: string): CraftResult {
+  const item = state.player.artifacts.find(a => a.id === id)
+  if (!item || item.kind !== 'pill' || item.status !== '空闲' || item.count < 1) return { ok: false, reason: '请先选中一颗空闲丹药' }
+  const kind = PILL_NAMES.findIndex(n => item.name.endsWith(n))
+  const tier = PILL_TIERS.findIndex(n => item.name === n + PILL_NAMES[kind]) + 1
+  if (kind < 0 || tier === 0) return { ok: false, reason: '没有这颗丹药的服食记载' }
+  const cap = capacityOf(state)
+  return { ok: true, state: { ...state, player: { ...state.player,
+    qi: state.player.qi.map((v, i) => Math.min(cap, v + (kind === 5 ? 160 * tier : i === kind ? 1000 * tier : 0))) as unknown as FiveQi,
+    artifacts: state.player.artifacts.flatMap(a => a.id !== id ? [a] : a.count > 1 ? [{ ...a, count: a.count - 1 }] : []),
+  } } }
+}
 
 /**
  * 开始炼制。同类只能有一炉，不同类可以并行。

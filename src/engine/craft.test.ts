@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   startCraft,
+  usePill,
   resolveCraft,
   craftSeconds,
   refineArtifact,
@@ -16,6 +17,22 @@ import { newGame } from './game.ts'
 import type { FiveQi, GameState, Artifact } from './state.ts'
 
 const qi = (...v: number[]): FiveQi => v as unknown as FiveQi
+
+test('服丹只消费一颗，单行丹与五行丹按炼数恢复，并受丹田上限约束', () => {
+  const pill = (name: string): Artifact => ({ id: 'pill', kind: 'pill', name, quality: '凡品', refine: 0, status: '空闲', count: 2 })
+  const s = state({ qi: qi(0, 0, 0, 0, 0), artifacts: [pill('二炼碧罗丹')] })
+  const single = usePill(s, 'pill')
+  assert.ok(single.ok)
+  assert.deepEqual(single.state.player.qi, qi(0, 2000, 0, 0, 0))
+  assert.equal(single.state.player.artifacts[0]?.count, 1)
+  const all = usePill({ ...s, player: { ...s.player, artifacts: [pill('二十炼五行丹')] } }, 'pill')
+  assert.ok(all.ok)
+  assert.deepEqual(all.state.player.qi, qi(2000, 2000, 2000, 2000, 2000))
+  const unknown = { ...s, player: { ...s.player, artifacts: [pill('不明丹药')] } }
+  assert.equal(usePill(unknown, 'pill').ok, false)
+  assert.equal(unknown.player.artifacts[0]?.count, 2)
+  assert.deepEqual(s.player.qi, qi(0, 0, 0, 0, 0))
+})
 
 const state = (over: Partial<GameState['player']> = {}): GameState => {
   const s = newGame(

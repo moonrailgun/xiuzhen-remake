@@ -160,10 +160,25 @@ export const DEFENSIVE_ARTIFACTS: readonly DefensiveArtifact[] = [
     craftCost: [1700, 1300, 670, 0, 1330],
     source: 'reference/text/guides/4295-p1.txt（官方《护身揭密》逐字）',
   },
+  // 名称见4295-p1.txt及2008-12-01-674公告；除三件炼制超过24小时外，以下数值均为重建。
+  ...[
+    { name: '六阳神火鉴', lingbaoLevel: 8, base: 360, upkeep: 30, hours: 25, cost: 54000 },
+    { name: '先天太极图', lingbaoLevel: 12, base: 720, upkeep: 60, hours: 28, cost: 100000 },
+    { name: '镜花水月幡', lingbaoLevel: 16, base: 1080, upkeep: 90, hours: 32, cost: 160000 },
+    { name: '东皇太一钟', lingbaoLevel: 20, base: 1440, upkeep: 120, hours: 36, cost: 240000 },
+  ].map(g => ({
+    name: g.name, lingbaoLevel: g.lingbaoLevel,
+    attack: [g.base, g.base * 10] as const,
+    durability: [g.base, g.base * 10] as const,
+    agility: [g.base, g.base * 10] as const,
+    upkeepPerHour: g.upkeep, craftSeconds: g.hours * 3600,
+    craftCost: [Math.round(g.cost * .34), Math.round(g.cost * .26), Math.round(g.cost * .134), 0, Math.round(g.cost * .266)] as const,
+    source: 'reference/text/guides/4295-p1.txt；reference/text/news/xinwen-xz-2008-12-01-674.txt；reconstructed：技能门槛、属性、维护费、具体配方与耗时沿最低护身递增',
+  })),
 ]
 
 /**
- * 其余护身法宝只知道名字，数值全缺。[只能重建]
+ * 五件具名护身中，首件有完整原文；后四件缺失数值，已在上表注明重建。
  * 《护身揭密》提到「最高级的护身，六阳神火鉴、先天太极图以及镜花水月幡都是24小时以上的炼制时间」；
  * 战报与玩家帖里另见「东皇太一钟」「半月」「莲台」。
  */

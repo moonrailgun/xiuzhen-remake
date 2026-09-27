@@ -166,3 +166,14 @@ test('每小时耗气第 5 项恒为 0：水属性角色的克我（土）不扣
 test('初期最多 5 把飞剑在外', () => {
   assert.equal(MAX_SWORDS_OUT, 5)
 })
+
+
+test('F21：已知高阶护身均有注明重建的数值及配方', () => {
+  for (const name of ['六阳神火鉴', '先天太极图', '镜花水月幡', '东皇太一钟']) {
+    const guard = DEFENSIVE_ARTIFACTS.find(g => g.name === name)
+    assert.ok(guard, name)
+    assert.ok(guard.craftSeconds > 86400)
+    assert.ok(guard.craftCost?.every(v => v >= 0))
+    assert.match(guard.source, /reconstructed/)
+  }
+})

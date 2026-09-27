@@ -152,10 +152,7 @@ export function swordCraftRows(s: GameState): readonly CraftRow[] {
   })
 }
 
-/**
- * 炼制护身页。只有指玄道藏碑有完整数值（官方《护身揭密》逐字），
- * 其余四件只知道名字与「24 小时以上」，所以列出来但不可炼 —— 不编数值。
- */
+/** 五件护身共用数据表；指玄数值有原文，其余四件的重建范围在数据表标明。 */
 export function guardCraftRows(s: GameState): readonly CraftRow[] {
   const lingbao = s.player.skills['灵宝真经'] ?? 0
   const hand = s.player.body[BODY_HAND] ?? 0

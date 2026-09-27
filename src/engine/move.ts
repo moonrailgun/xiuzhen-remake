@@ -144,7 +144,11 @@ export function resolveMove(
   const leg = legs[index]
   if (!leg) return { state }
 
-  const moved: GameState = { ...state, player: { ...state.player, x: leg.x, y: leg.y } }
+  // 走路增长阅历有原文（15374.txt）；按完成路段的标准秒数给阅历为重建，见规则裁决 §41。
+  const moved: GameState = { ...state, player: {
+    ...state.player, x: leg.x, y: leg.y,
+    experience: state.player.experience + MOVE_SECONDS[leg.terrain],
+  } }
 
   const nextIndex = index + 1
   const next = legs[nextIndex]

@@ -2510,7 +2510,9 @@ function questWindow(s: GameState, id: string): string {
     summary: q.summary,
     progress: loc
       ? { kind: 'slay', monster: q.goal.kind === 'slay' ? q.goal.monster.name : '', at: loc, done }
-      : { kind: 'text', text: q.summary, done },
+      : { kind: 'text', text: q.goal.kind === 'experience'
+        ? `阅历达到 ${q.goal.points}（当前 ${Math.floor(s.player.experience)}，可通过行走或读书积累）`
+        : q.summary, done },
     reward: q.reward.qi
       ? { kind: 'qi', qi: qiRewardFor(q.reward.qi, s.player.element) }
       : { kind: 'text', text: q.reward.note ?? (q.reward.realm ? `境界提升为 ${q.reward.realm}` : '—') },

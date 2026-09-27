@@ -97,6 +97,7 @@ try {
   await page.clock.runFor(Math.ceil((walk.finishAt - walking.clock.gameT) / walking.clock.rate) * 1000)
   const arrived = await saved()
   check('倍速步行无需再点击便自动到达并清除事件', arrived.player.x === destination.x && arrived.player.y === destination.y && !arrived.timeline.events.some(e => e.id === walk.id))
+  check('正常步行积累境界所需阅历', arrived.player.experience > tutorial.player.experience)
 
   await page.evaluate(() => setRate(1))
   await page.evaluate(() => closeLWindow())

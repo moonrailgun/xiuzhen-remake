@@ -15,6 +15,7 @@ import {
   MOVE_EVENT_ID,
 } from './move.ts'
 import { advanceTo, countByKind } from './timeline.ts'
+import { purchase } from './payment.ts'
 import { newGame } from './game.ts'
 import { MOVE_SECONDS, terrainAt } from '../data/world.ts'
 import type { GameState } from './state.ts'
@@ -112,11 +113,13 @@ test('多段移动：逐段结算，每段走一格', () => {
   const step1 = advanceTo(started, started.timeline, legs[0]!.seconds, (st, ev) => resolveMove(st, ev))
   assert.equal(step1.state.player.x, 101, '走到第一格')
   assert.equal(countByKind(step1.timeline, 'move'), 1, '第二段已排上')
+  assert.equal(step1.state.player.experience, legs[0]!.seconds, '只结算已走完这一段的阅历')
 
   // 推进到全部结束
   const step2 = advanceTo(step1.state, step1.timeline, 1e9, (st, ev) => resolveMove(st, ev))
   assert.equal(step2.state.player.x, 102, '走到终点')
   assert.equal(countByKind(step2.timeline, 'move'), 0, '没有残留事件')
+  assert.equal(step2.state.player.experience, legs.reduce((sum, leg) => sum + leg.seconds, 0))
 })
 
 test('多段移动的总耗时 = 各段之和', () => {
@@ -143,6 +146,7 @@ test('取消移动：人停在当前格，不回退', () => {
   const cancelled = cancelMove({ ...midway.state, timeline: midway.timeline })
   assert.equal(countByKind(cancelled.timeline, 'move'), 0)
   assert.equal(cancelled.player.x, 101, '停在已走到的格子')
+  assert.equal(cancelled.player.experience, legs[0]!.seconds, '取消不奖励未完成路段')
 })
 
 test('事件栏显示当前段与下个目标（照截图 #114）', () => {
@@ -178,4 +182,18 @@ test('离线很久：整条路径一次走完', () => {
   assert.equal(out.state.player.x, 106)
   assert.equal(out.state.player.y, 104)
   assert.equal(countByKind(out.timeline, 'move'), 0)
+  assert.equal(out.state.player.experience, planMove(SEED, 100, 100, 106, 104)
+    .reduce((sum, leg) => sum + leg.seconds, 0), '离线只奖励实际行走时间，不奖励到达后的闲置时间')
+})
+
+
+test('仙石完成移动仍按所有已完成路段计阅历，不因后续路段秒数清零而丢失', () => {
+  const s = state({ bonusCoin: 10 })
+  const started = startMove(s, 102, 100)
+  assert.ok(started.ok)
+  const paid = purchase(started.state, 9)
+  assert.ok(paid.ok)
+  const out = advanceTo(paid.state, paid.state.timeline, paid.state.clock.gameT, resolveMove)
+  assert.equal(out.state.player.x, 102)
+  assert.equal(out.state.player.experience, planMove(SEED, 100, 100, 102, 100).reduce((n, leg) => n + MOVE_SECONDS[leg.terrain], 0))
 })

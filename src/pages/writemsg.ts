@@ -12,6 +12,10 @@
  *  - 段标题行 `TR.titlebg.middlebold`，标签格 `TD.middlebold width=80`（同 `09 §1.3` 资料表）；
  *  - 按钮用原生 `<INPUT type=button>`，与读信页的「回复/删除/关闭」一致（`09 §1.1`）；
  *  - 提交动作名 `sendmsg` 也是重建 —— `09 §1.18` 的动作全表里没有它。
+ *
+ * **不画「写消息」标题带**：窗名由浮窗标题条显示（调用方传的就是「写消息」），
+ * 原版不会在内容里重复它 —— `guides/54385-p1.html` 那份实捕里 R 窗壳子标题是「消息」，
+ * 内容表头写的是「收件箱」，两者不同名。
  */
 
 import { esc } from './html.ts'
@@ -33,7 +37,6 @@ export function renderWriteMsg(vm: WriteMsgVm): string {
   return `<FORM id=writemsgform>
 <INPUT type=hidden name=remsg value=${vm.replyTo ?? ''}>
 <TABLE class=tablebg cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
-<TR class="titlebg middlebold" align=middle><TD colSpan=2>写消息</TD></TR>
 <TR class="trbg middle"><TD class=middlebold width=80>收件人：</TD>
 <TD><INPUT class=middle id=msgreceiver size=20 name=receiver value="${esc(vm.receiver)}"></TD></TR>
 <TR class="trbg middle"><TD class=middlebold>主题：</TD>

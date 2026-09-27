@@ -227,6 +227,26 @@ a.help, .help {
 #loading { z-index: 140; position: absolute; }
 
 .dlgclosebtn { position: absolute; right: 4px; top: 4px; }
+
+/* 浮窗标题条。
+   壳子里它排在内容**之后**（原版 DOM 就是这个顺序，逐字照抄），所以必须靠定位
+   把它提到顶部 —— 否则内容越高它掉得越低，最后吊在窗口外面。
+   落点照 `04 §8.2` 实测：#3 里标题 at (270,11)，窗框 x=260 / y=1 ⇒ 距窗内左上角各 ~10px，
+   与关闭钮同一行（关闭钮 bbox=487,11 距右内缘 8px）。
+   空标题的窗不挂 `hastitle`，也就不占那一行 —— 免得 playerinfo 这类没标题的窗
+   平白多出 26px 空白。 */
+#lwindowtitle, #rwindowtitle, #bwindowtitle, #mwindowtitle, #mwindow2title {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  /* 给关闭钮让出右边，标题过长时截断而不是顶到 × 上 */
+  right: 26px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* 有标题才给内容让出顶部那一行（14px 粗体 + 上下留白 ≈ 26px）。 */
+.hastitle > div > [id$=windowcontent] { padding-top: 26px; }
 .title3 { font-size: var(--fs-big); line-height: var(--lh-big); font-weight: bold; }
 
 .mwindowok, .mwindow2ok, .mwindow2cancel { display: inline-block; margin: 6px; }
@@ -340,6 +360,8 @@ a.help, .help {
    **别再把 #mapbg 并进上面那条 #mapdiv 规则**：以前两处都声明，宽高互相覆盖，很难查。 */
 #mapbg { position: relative; width: 480px; height: 460px; overflow: hidden; }
 #mapbg .maparrow { position: absolute; z-index: 2; }
+/* 墨框裁自 #106，视口外扩 8px 的一圈（464×261），内区透明；摆在 mapdiv (16,170) 的外侧 */
+#mapbg .mapframe { position: absolute; left: 8px; top: 162px; pointer-events: none; }
 .mapdiv {
   position: absolute; left: 16px; top: 170px;
   width: 448px; height: 245px;
@@ -349,6 +371,13 @@ a.help, .help {
 }
 .mapdiv .tile { position: absolute; width: 64px; height: 120px; }
 .mapdiv .tilemark { position: absolute; }
+/* 120px 高的地块透明区与人物只负责绘制，选格命中底部 64×35 的菱形。 */
+.mapdiv img { pointer-events: none; }
+.mapdiv .mapcell {
+  position: absolute; width: 64px; height: 35px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.mapdiv .mapcell:focus-visible { background: rgb(100 140 40 / 30%); }
 #smallinfo { display: inline-block; vertical-align: top; }
 #sceneimg { display: inline-block; vertical-align: top; }
 #mapmenu { position: absolute; z-index: 50; }

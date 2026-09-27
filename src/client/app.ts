@@ -1203,7 +1203,9 @@ export function installGameActions(): void {
     try {
       bytes = (localStorage.getItem(SAVE_KEYS.main) ?? '').length
     } catch { /* 存储不可用 */ }
-    openWindow('lwindow', '怀旧版设置', renderSettings({
+    // 标题传空：设置页自己那张表的表头就是「怀旧版设置」，
+    // 壳子再写一遍就重复了（原版壳子标题与内容表头从不同名）。
+    openWindow('lwindow', '', renderSettings({
       rate: state.clock.rate,
       dayOfServer: dayOfServer(state.clock),
       saveBytes: bytes,
@@ -1436,9 +1438,7 @@ export function installGameActions(): void {
 
   g['openGm'] = () => {
     if (!state) return
-    // 标题传空：面板自己有大标题，而浮窗的 `#lwindowtitle` 现在会掉到窗口最底下
-    // （壳子里它排在 #lwindowcontent **之后**，见 UNCERTAIN.md §9）。
-    openWindow('lwindow', '', resolvePage('gm.jsp'))
+    openWindow('lwindow', 'GM 面板', resolvePage('gm.jsp'))
   }
 
   /** 召唤三尸：即时动作，不跟「应用修改」走，所以不读表单。 */

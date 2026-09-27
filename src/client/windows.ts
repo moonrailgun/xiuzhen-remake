@@ -16,9 +16,24 @@ const contentOf = (key: WindowKey): HTMLElement | null =>
 
 const boxOf = (key: WindowKey): HTMLElement | null => document.getElementById(key)
 
+/**
+ * 写浮窗标题。
+ *
+ * 壳子里 `#Xwindowtitle` 排在 `#Xwindowcontent` **之后**（`04 §2` 的 DOM 树，
+ * 以及 `guides/54385-p1.html` 那份整页实捕都是这个顺序），但原版**视觉上它在顶部**：
+ *  - 玩家把渲染后的 R 窗整段贴进论坛（`threads-unknown/57243-p1.html`），
+ *    复制是按视觉顺序序列化的，标题排在内容前面；
+ *  - `04 §8.2` 实测：标题 `span.title3` 在 #3 里 at (270,11)，窗框 x=260/y=1，
+ *    也就是距窗内左上角各 ~10px，**和关闭钮同一行**。
+ * 所以原版是靠 CSS 把它定位到顶部的（那份样式表没有存档，`09 §2.5` 明记）。
+ *
+ * 空标题的窗（`openLWindow('', 'playerinfo.jsp')` 这种）不能白占那一行，
+ * 所以这里挂一个 `hastitle`，由 CSS 决定要不要给内容让出顶部空间。
+ */
 function setTitle(key: WindowKey, title: string): void {
   const el = document.getElementById(`${key}text`)
   if (el) el.textContent = title
+  document.getElementById(key)?.classList.toggle('hastitle', title !== '')
 }
 
 export function openWindow(key: WindowKey, title: string, html: string): void {

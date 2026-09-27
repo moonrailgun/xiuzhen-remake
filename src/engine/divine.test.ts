@@ -12,7 +12,7 @@ const target = npcAt(world, world.bases[0]!, 60 * DAY, SEED)
 const opts = (over = {}) => ({
   at: 1000,
   byName: '173小鱼',
-  skills: { 九宫飞星法: 1, 太乙神数: 1, 紫微斗数: 1, 水镜玄光: 1, 梅花易数: 1, 六壬神定: 1, 诰命真经: 1 },
+  skills: { 先天神数: 1, 九宫飞星法: 1, 太乙神数: 1, 紫微斗数: 1, 水镜玄光: 1, 梅花易数: 1, 六壬神定: 1, 诰命真经: 1 },
   myYijing: 10,
   theirYijing: 5,
   inSight: true,
@@ -20,8 +20,8 @@ const opts = (over = {}) => ({
   ...over,
 })
 
-test('七种术数，含三派独门（官方一句话表）', () => {
-  assert.equal(Object.keys(DIVINATIONS).length, 7)
+test('八种术数，包括1月4日开放的先天神数', () => {
+  assert.equal(Object.keys(DIVINATIONS).length, 8)
   assert.equal(DIVINATIONS['太乙神数'].school, '通天')
   assert.equal(DIVINATIONS['梅花易数'].school, '蜀山')
   assert.equal(DIVINATIONS['九宫飞星'].school, null, '九宫飞星不是独门')
@@ -174,11 +174,23 @@ test('推算结果是可入收件箱的信件', () => {
 
 test('未学术数不能推算，九宫技能名映射九宫飞星法', () => {
   assert.equal(divine('九宫飞星', target, { ...opts(), skills: {} }).ok, false)
-  assert.equal(divine('九宫飞星', target, { ...opts(), skills: { 九宫飞星法: 1 } }).ok, true)
+  assert.equal(divine('九宫飞星', target, { ...opts(), skills: { 先天神数: 1, 九宫飞星法: 1 } }).ok, true)
 })
 
 
 test('九宫飞星要求易经严格高于目标，相同等级也不能推算', () => {
   assert.equal(divineSucceeds(5, 5), false)
   assert.equal(divine('九宫飞星', target, opts({ myYijing: 5, theirYijing: 5 })).ok, false)
+})
+
+test('先天神数学习后可看法宝，满级显示状态', () => {
+  assert.equal(divine('先天神数', target, opts({ skills: {} })).ok, false)
+  for (const level of [1, 20]) {
+    const r = divine('先天神数', { ...target, swords: 2 }, opts({ skills: { 先天神数: level } }))
+    assert.ok(r.ok)
+    assert.equal(r.mail.body.kind, '先天神数')
+    const rows = r.mail.body.rows as { status?: string }[]
+    assert.equal(rows.length, 2)
+    assert.equal(rows[0]!.status, level === 20 ? '空闲' : undefined)
+  }
 })

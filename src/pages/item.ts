@@ -38,7 +38,7 @@ export type ItemTab = 'list' | 'sword' | 'guard' | 'pill' | 'refine'
  * （09 §1.5 另记过一个 `使用中...`，与「修理中」同属操作进行态，这里按任务给的 9 种登记。）
  */
 export const ITEM_STATUSES = [
-  '空闲', '损坏', '斩杀中', '绞杀中', '返回中', '淬炼中', '炼制中', '注入中', '修理中',
+  '空闲', '损坏', '斩杀中', '绞杀中', '返回中', '淬炼中', '炼制中', '注入中', '修理中', '御剑飞行中',
 ] as const
 export type ItemStatus = (typeof ITEM_STATUSES)[number]
 

@@ -34,6 +34,8 @@ import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
 export const MIGRATIONS: readonly Migration[] = [
+  // v7 → v8：可选寻宝任务、移动掉落快照及御剑飞行载荷。旧档没有寻宝进度。
+  { from: 7, migrate: (old) => ({ ...(old as object) }) },
   {
     // v1 → v2：加入 NPC 生态。老存档按它自己的世界种子补一批 NPC，
     // 这样进度不丢、世界也和新档同一套生成规则。
@@ -349,7 +351,10 @@ export function validateGameState(value: unknown): asserts value is GameState {
           : ['meridian', 'body'].includes(data.system as string) && number(data.index) && Number.isInteger(data.index) && data.index < (data.system === 'body' ? 8 : 12))
       case 'move':
         if (data.op === 'escort') return numeric(data, ['x', 'y', 'fee'])
+        if (data.op === 'flight') return numeric(data, ['x', 'y']) && string(data.swordId) &&
+          [data.x, data.y].every(v => Number.isInteger(v) && (v as number) < WORLD_SIZE)
         return number(data.index) && Number.isInteger(data.index) &&
+          (data.treasureDrop === undefined || typeof data.treasureDrop === 'boolean') &&
           arrayOf(data.legs, leg => numeric(leg, ['x', 'y', 'seconds']) && string(leg.terrain)) &&
           data.index < (data.legs as unknown[]).length
       case 'battle':
@@ -378,6 +383,9 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const s = value as Record<string, unknown>
   const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
   if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+      (s.treasure !== undefined && (!object(s.treasure) || !['藏宝图', '天宫秘箓'].includes(s.treasure.source as string) ||
+        !numeric(s.treasure, ['x', 'y']) || ![s.treasure.x, s.treasure.y].every(v => Number.isInteger(v) && (v as number) < WORLD_SIZE) ||
+        !object(s.treasure.reward) || !artifact(s.treasure.reward) || s.treasure.reward.count !== 1)) ||
       // rate 必须落在 (0, MAX_RATE]：上限缺失时，一份 rate=1e9 的存档会让首次 tick 冻死标签页
       !object(c) || !numeric(c, ['gameT', 'wallT', 'rate']) ||
       !((c.rate as number) > 0) || (c.rate as number) > MAX_RATE ||

@@ -47,7 +47,9 @@ import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
 import { newGame, tick, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
-import { startMove, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
+import { startMove, startFlight, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
+import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox } from '../engine/treasure.ts'
+import { SECRET_MATERIALS, isSecretBook } from '../data/secrets.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, terrainScene, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
@@ -61,7 +63,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { usePill as consumePill, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { usePill as consumePill, craftQuality, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
@@ -75,7 +77,7 @@ import { purchase } from '../engine/payment.ts'
 import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, capacityOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
-import { roll, type RngState } from '../engine/rng.ts'
+import { type RngState } from '../engine/rng.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
@@ -233,6 +235,7 @@ function mapVm(s: GameState): MapVm {
     selected,
     goByDistance: 3,
     playerGender: s.player.gender,
+    canFly: s.player.realm === '元婴期',
   }
 }
 
@@ -363,6 +366,8 @@ function rightVm(s: GameState) {
       abandonable: q.category !== 'realm',
     }
   })
+  if (s.treasure) quests.push({ id: 'treasure', title: '机缘遇宝',
+    detail: `目标地点：(${s.treasure.x},${s.treasure.y})`, abandonable: false })
   return { quests, guardingMe: 0, guardingOthers: 0, guardCap: 7 }
 }
 
@@ -683,6 +688,23 @@ export function installGameActions(): void {
       return
     }
     state = r.state
+    step()
+  }
+
+  g['mapMenuFly'] = () => {
+    if (!state || !mapSelected) return
+    if (!(state.player.skills['御剑飞行']! > 0)) return tell('御剑飞行', '请先学习御剑飞行秘笈。')
+    const { x, y } = mapSelected
+    const swords = state.player.artifacts.filter(a => a.kind === 'sword' && a.status === '空闲')
+    openWindow('mwindow', '御剑飞行', `<DIV class=middle style="padding:10px">选择飞剑前往(${x},${y})：<BR>${swords.map(a =>
+      `<A class=skillup href="#" onclick="flyTo(${x},${y},'${js(a.id)}')">${esc(artifactLabel(a))}</A><BR>`).join('') || '没有空闲飞剑。'}</DIV>`)
+  }
+  g['flyTo'] = (x: number, y: number, id: string) => {
+    if (!state) return
+    const r = startFlight(state, x, y, id)
+    if (!r.ok) return tell('御剑飞行', r.reason)
+    state = r.state
+    closeWindow('mwindow')
     step()
   }
 
@@ -1066,16 +1088,39 @@ export function installGameActions(): void {
     step()
   }
   g['sendUseItem2'] = () => usePill()
-  g['sendUseItem3'] = () => tell('秘笈', '秘笈的效果没有存档，本地版暂不开放学习。')
+  g['sendUseItem3'] = (id?: string) => {
+    if (!state) return
+    const r = learnSecret(state, id ?? state.player.artifacts[selected(3) - 1]?.id ?? '')
+    if (!r.ok) return tell('秘笈', r.reason)
+    state = r.state
+    step()
+    tell('秘笈', '已学会秘笈记载的法门。')
+  }
   g['sendUseItem5'] = () => {
     if (!state) return
     const item = state.player.artifacts[selected(5) - 1]
     if (!item) return tell('使用', '请先选中一件物品。')
-    if (!BANK_NOTES.some(note => note.name === item.name)) return tell('任务物品', '任务物品在对应任务完成时自动消耗。')
-    const r = redeemNote(state, item.name)
+    const treasure = ['藏宝图', '天宫秘箓'].includes(item.name)
+    const material = SECRET_MATERIALS.some(n => n === item.name)
+    const box = item.name === '新手玄武玉匣'
+    if (!treasure && !material && !box && !BANK_NOTES.some(note => note.name === item.name)) return tell('任务物品', '任务物品在对应任务完成时自动消耗。')
+    const r = treasure ? startTreasure(state, item.id) : material ? combineSecret(state) : box ? openNoviceBox(state, item.id) : redeemNote(state, item.name)
     if (!r.ok) return tell('使用', r.reason)
     state = r.state
     step()
+    if (treasure) openWindow('lwindow', '机缘遇宝', questWindow(state, 'treasure'))
+    if (material) tell('天宫秘箓', '四件材料已合成天宫秘箓，可在法宝栏使用。')
+    if (box) tell('新手玄武玉匣', `获得${artifactLabel(state.player.artifacts.at(-1)!)}。`)
+  }
+  g['claimTreasure'] = () => {
+    if (!state) return
+    const name = state.treasure?.reward.name
+    const r = claimTreasure(state)
+    if (!r.ok) return tell('机缘遇宝', r.reason)
+    state = r.state
+    closeWindow('lwindow')
+    step()
+    tell('机缘遇宝', `获得${name}。`)
   }
   g['sendRepairItem'] = () => {
     if (!state) return
@@ -2146,21 +2191,6 @@ function craftOrderFor(
   return null
 }
 
-/**
- * 出品品质。原版由「炼器总纲」（昆仑专属，上品率 50%→70%）与「物理通明」秘笈决定；
- * 没有总纲时的基础上品率零存档，这里按 50% 起步 [重建]。
- *
- * **掷骰走存档里的 rng**（和淬炼 `refineArtifact` 同一套），不用 `Math.random()` ——
- * 全项目的约定是「同一个存档重放得到同一结果」，用墙钟随机会把这条打破，
- * 而且结果不可复现、没法写测试。掷完要把推进后的 rng 写回存档。
- */
-function craftQuality(s: GameState): { readonly quality: Quality; readonly rng: RngState } {
-  const zonggang = s.player.skills['炼器总纲'] ?? 0
-  const rate = 0.5 + 0.05 * zonggang
-  const r = roll(s.rng, rate)
-  return { quality: r.hit ? '上品' : '凡品', rng: r.state }
-}
-
 // —— 市场 ——
 
 /**
@@ -2456,6 +2486,10 @@ function mailParagraphs(raw: Readonly<Record<string, unknown>>): readonly string
 /** 物品窗。飞剑走 `swords.ts` 的原版数值表，护身走 `artifacts.ts`。 */
 function itemWindow(s: GameState, itemId: number, itemsn: string | null): string {
   const owned = itemsn === null ? undefined : s.player.artifacts[Number(itemsn) - 1]
+  if (owned && owned.kind !== 'sword') return `<DIV class=middle style="padding:12px"><B>${esc(owned.name)}</B><BR>${
+    isSecretBook(owned.name) ? '学习后获得秘笈上记载的法门，秘笈消失。' : owned.name === '藏宝图' || owned.name === '天宫秘箓'
+      ? '使用后领取机缘遇宝任务，前往指定地点开启宝藏。' : SECRET_MATERIALS.some(n => n === owned.name)
+        ? `集齐${SECRET_MATERIALS.join('、')}各一件，使用任意一件即可合成天宫秘箓。` : esc(owned.status)}</DIV>`
   const idx = Math.floor((itemId - 50100) / 100)
   const sw = owned ? swordByName(owned.name) : SWORDS[idx]
   if (!sw) return '<DIV class=middle style="padding:12px">没有这件法宝的记载。</DIV>'
@@ -2506,6 +2540,9 @@ function skillWindow(s: GameState, id: number): string {
 }
 
 function questWindow(s: GameState, id: string): string {
+  if (id === 'treasure' && s.treasure) return `<DIV data-live-quest=treasure class=middle style="padding:12px"><B>机缘遇宝</B><BR>
+循着${esc(s.treasure.source)}的指引，前往(${s.treasure.x},${s.treasure.y})寻找宝藏。<BR>
+<A class=skillup href="#" onclick="claimTreasure()">开启宝藏</A></DIV>`
   const q = activeQuests(s.quests).find((x) => x.id === id)
   if (!q) return '<DIV class=middle style="padding:12px">没有这个任务。</DIV>'
   const entry = s.quests.entries.find((e) => e.id === id)

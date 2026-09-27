@@ -287,6 +287,22 @@ test('没有时间和事件变化时 tick 保留原状态引用', () => {
   assert.equal(tick(s, 0).state, s)
 })
 
+test('v7 原存档可迁移到 v8，寻宝与御剑载荷拒绝越界和损坏数据', () => {
+  const s = quiet()
+  const old = { ...s, v: 7 }
+  assert.deepEqual(importGame(JSON.stringify({ v: 7, savedAt: 0, state: old })), s)
+  const reward = { id: 'reward', kind: 'book', name: '御剑飞行', quality: '凡品', refine: 0, status: '空闲', count: 1 }
+  const treasure = { source: '藏宝图', x: 100, y: 100, reward }
+  for (const bad of [{ ...treasure, x: 200 }, { ...treasure, y: -1 }, { ...treasure, x: 0.5 },
+    { ...treasure, reward: { ...reward, count: 2 } }, { ...treasure, source: '任意' }]) {
+    assert.throws(() => importGame(JSON.stringify({ ...s, treasure: bad })))
+  }
+  for (const payload of [{ op: 'flight', x: 200, y: 0, swordId: 'sword' },
+    { op: 'flight', x: 1, y: 0 }, { legs: [{ x: 1, y: 0, seconds: 120, terrain: '平原' }], index: 0, treasureDrop: 'yes' }]) {
+    assert.throws(() => importGame(JSON.stringify({ ...s, timeline: { events: [{ id: 'move:current', kind: 'move', finishAt: 100, payload }] } })))
+  }
+})
+
 test('主循环结算全部产业收入，在线小步与离线一致', () => {
   const s = quiet()
   const town: Town = { id: 'town:100,100', name: '长安', kind: '小镇', x: 100, y: 100, investments: [{ owner: s.player.name, silver: 1_000_000 }] }

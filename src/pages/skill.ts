@@ -32,6 +32,11 @@ export type BookRow = {
   readonly name: string
   readonly itemId: number
   readonly count: number
+  readonly artifactId?: string
+  readonly itemsn?: number
+  readonly learned?: boolean
+  readonly level?: number
+  readonly skillId?: number
 }
 
 export type SkillVm = {
@@ -119,9 +124,9 @@ ${when(
     () => `<TR class="trbg middle" align=middle><TD colSpan=3><SPAN class=smallgray>目前没有任何秘笈</SPAN></TD></TR>`,
     () => each(rows, (b) =>
       `<TR class="trbg middle" align=middle>` +
-      `<TD align=left><A class=skillup href="#" onclick="openRWindow('${js(b.name)}','itemmid.jsp?item=${b.itemId}')">${esc(b.name)}</A></TD>` +
+      `<TD align=left>${b.learned && !b.count ? esc(b.name) : `<A class=skillup href="#" onclick="openRWindow('${js(b.name)}','itemmid.jsp?item=${b.itemId}${b.itemsn ? `&itemsn=${b.itemsn}` : ''}')">${esc(b.name)}</A>`}</TD>` +
       `<TD>${num(b.count)}</TD>` +
-      `<TD><A class=skillup href="#" onclick="sendUseItem3()">学习</A></TD></TR>`),
+      `<TD>${b.learned ? b.skillId ? `<A class=skillup href="#" onclick="openRWindow('${js(b.name)}','skillmid.jsp?skill=${b.skillId}')">修炼 Lv.${num(b.level ?? 1)}</A>` : '已学会' : `<A class=skillup href="#" onclick="sendUseItem3(${b.artifactId ? `'${js(b.artifactId)}'` : ''})">学习</A>`}</TD></TR>`),
   )}
 </TBODY></TABLE>`
 }

@@ -50,6 +50,7 @@ export type MapVm = {
   readonly goByDistance: number
   /** 自己的性别：小人图 player1（男）/ player2（女，[推断]）。缺省按男 */
   readonly playerGender?: 'm' | 'f'
+  readonly canFly?: boolean
 }
 
 // —— 几何常量（全部来自原版 DOM）——
@@ -125,6 +126,7 @@ function sceneInfo(vm: MapVm): string {
 <TR><TD vAlign=top align=right>
 <A class=skillup href="#" onclick="spyScene()"><IMG src="img/event/mark.gif">&nbsp;对选中场景进行推算</A><BR>
 <A class=skillup href="#" onclick="mapMenuMove()"><IMG src="img/event/mark.gif">&nbsp;向选中场景步行移动</A>
+${vm.canFly ? '<BR><A class=skillup href="#" onclick="mapMenuFly()"><IMG src="img/event/mark.gif">&nbsp;向选中场景御剑飞行</A>' : ''}
 </TD></TR>
 </TBODY></TABLE></DIV>`
 }

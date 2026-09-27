@@ -9,6 +9,7 @@
  */
 
 import { SKILL_TREES, type SkillTab, type SkillVm, type SkillNode } from '../pages/skill.ts'
+import { SECRET_BOOKS, SECRET_SKILLS } from '../data/secrets.ts'
 import {
   pillRows,
   type ItemTab,
@@ -48,12 +49,12 @@ export function skillLevels(s: GameState): Record<number, number> {
 }
 
 /** 按 id 反查节点（升级弹窗要拿名字与上限）。 */
-export function skillNodeById(id: number): SkillNode | undefined {
+export function skillNodeById(id: number): Pick<SkillNode, 'id' | 'name' | 'cap'> | undefined {
   for (const nodes of Object.values(SKILL_TREES)) {
     const hit = nodes.find((n) => n.id === id)
     if (hit) return hit
   }
-  return undefined
+  return SECRET_SKILLS.find(n => n.id === id)
 }
 
 export function skillVm(s: GameState, tab: SkillTab): SkillVm {
@@ -61,9 +62,14 @@ export function skillVm(s: GameState, tab: SkillTab): SkillVm {
     tab,
     school: s.player.school,
     levels: skillLevels(s),
-    books: s.player.artifacts
-      .filter((a) => a.kind === 'book')
-      .map((a, i) => ({ name: a.name, itemId: 900 + i, count: a.count })),
+    books: SECRET_BOOKS.flatMap(name => {
+      const i = s.player.artifacts.findIndex(a => a.kind === 'book' && a.name === name && a.status === '空闲')
+      const a = s.player.artifacts[i]
+      const learned = (s.player.skills[name] ?? 0) > 0
+      return !a && !learned ? [] : [{ name, itemId: 90000, count: a?.count ?? 0, learned, level: s.player.skills[name] ?? 0,
+        skillId: SECRET_SKILLS.find(n => n.name === name)?.id,
+        ...(a ? { artifactId: a.id, itemsn: i + 1 } : {}) }]
+    }),
   }
 }
 

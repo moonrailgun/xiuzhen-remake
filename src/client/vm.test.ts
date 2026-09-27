@@ -69,6 +69,17 @@ test('法术页三棵树的节点全部有等级条目', () => {
 
 // —— 法宝页 ——
 
+test('秘笈页排除普通书，绑定真实物品，消费后保留已学会状态', () => {
+  const s = withItems(base(), [item({ kind: 'book', name: '三国演义' }), item({ id: "secret'id", kind: 'book', name: '御剑飞行' })])
+  const rows = skillVm(s, 'book').books!
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0]!.artifactId, "secret'id")
+  assert.equal(rows[0]!.itemsn, 2)
+  const learned = skillVm({ ...s, player: { ...s.player, artifacts: [], skills: { 御剑飞行: 1 } } }, 'book').books!
+  assert.equal(learned[0]!.learned, true)
+  assert.equal(learned[0]!.count, 0)
+})
+
 test('法宝一览按种类分组，忙碌的物品不给 itemsn（radio 会变 value=0）', () => {
   const s = withItems(base(), [
     item({ id: 'a1' }),
@@ -341,4 +352,12 @@ test('损坏法宝可选中修理，修理中显示剩余时间且不可再次�
   assert.equal(rows[0]!.itemsn, 1)
   assert.equal(rows[1]!.itemsn, undefined)
   assert.equal(rows[1]!.seconds, 90)
+})
+
+test('已学会的新秘笈有独立修炼入口，并保留真实等级', () => {
+  const s = base()
+  const row = skillVm({ ...s, player: { ...s.player, skills: { 剑心通明: 3 } } }, 'book').books![0]!
+  assert.equal(row.level, 3)
+  assert.equal(row.skillId, 403)
+  assert.equal(skillNodeById(row.skillId!)!.name, '剑心通明')
 })

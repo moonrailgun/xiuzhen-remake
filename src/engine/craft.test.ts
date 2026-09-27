@@ -2,10 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   startCraft,
+  usePill,
+  craftQuality,
   startRepair,
   repairPlan,
   artifactSpaceUsed,
-  usePill,
   resolveCraft,
   craftSeconds,
   refineArtifact,
@@ -35,6 +36,15 @@ test('服丹只消费一颗，单行丹与五行丹按炼数恢复，并受丹�
   assert.equal(usePill(unknown, 'pill').ok, false)
   assert.equal(unknown.player.artifacts[0]?.count, 2)
   assert.deepEqual(s.player.qi, qi(0, 0, 0, 0, 0))
+})
+
+test('学习物理通明后才有极品概率，品质随机数可重放', () => {
+  const s = { ...state(), rng: [0, 0, 0, 0] as const }
+  assert.equal(craftQuality(s).quality, '上品')
+  const learned = { ...s, player: { ...s.player, skills: { ...s.player.skills, 物理通明: 1 } } }
+  assert.equal(craftQuality(learned).quality, '极品')
+  assert.deepEqual(craftQuality(learned), craftQuality(learned))
+  assert.notDeepEqual(craftQuality(learned).rng, s.rng)
 })
 
 const state = (over: Partial<GameState['player']> = {}): GameState => {

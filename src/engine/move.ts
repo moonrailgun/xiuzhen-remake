@@ -15,6 +15,11 @@
 import { schedule, cancel, countByKind, type GameEvent, type Timeline } from './timeline.ts'
 import type { GameState } from './state.ts'
 import { MOVE_SECONDS, terrainAt, inWorld, distance, type Terrain } from '../data/world.ts'
+import { walkingReduction } from '../data/secrets.ts'
+import { swordByName } from '../data/swords.ts'
+import { flightSeconds, launchedSwordStats } from './battle.ts'
+import { roll } from './rng.ts'
+import { treasureItem } from './treasure.ts'
 
 /** 本体「行万里路」的序号。 */
 export const BODY_WALK = 7
@@ -113,22 +118,49 @@ export function startMove(
     toX,
     toY,
     opts.weeksOpen ?? 99,
-  )
+  ).map(leg => ({ ...leg, seconds: Math.max(1, leg.seconds - walkingReduction(leg.terrain, state.player.skills)) }))
   if (legs.length === 0) return { ok: false, reason: '没有可走的路径' }
 
+  // 原文：逐格走更易得图，满包仍可拾取。每次指令 10% 为重建，在出发时入档。
+  const drop = roll(state.rng, 0.1)
   const first = legs[0]!
   const event: GameEvent = {
     id: MOVE_EVENT_ID,
     kind: 'move',
     finishAt: state.clock.gameT + first.seconds,
-    payload: { legs, index: 0 },
+    payload: { legs, index: 0, treasureDrop: drop.hit },
   }
-  return { ok: true, state: { ...state, timeline: schedule(state.timeline, event) } }
+  return { ok: true, state: { ...state, rng: drop.state, timeline: schedule(state.timeline, event) } }
 }
+
+/** 元婴、习得秘笈、飞剑：forum162/article-4587-p1.txt。时间沿用直线距离/速度。 */
+export function startFlight(state: GameState, x: number, y: number, swordId: string): MoveResult {
+  if (state.player.realm !== '元婴期' || !(state.player.skills['御剑飞行']! > 0))
+    return { ok: false, reason: '御剑飞行需要元婴期，并学习御剑飞行秘笈。' }
+  if (!Number.isInteger(x) || !Number.isInteger(y) || !inWorld(x, y)) return { ok: false, reason: '目标坐标无效。' }
+  if (state.player.x === x && state.player.y === y) return { ok: false, reason: '你已经在这里了。' }
+  if (countByKind(state.timeline, 'move')) return { ok: false, reason: '你正在移动中。' }
+  const a = state.player.artifacts.find(a => a.id === swordId && a.kind === 'sword' && a.status === '空闲' && a.count > 0)
+  const sw = a && swordByName(a.name)
+  if (!a || !sw || sw.speed === null) return { ok: false, reason: '请选择可以飞行的空闲飞剑。' }
+  if (sw.wieldLevel > (state.player.skills['御剑术'] ?? 0)) return { ok: false, reason: `需要御剑术${sw.wieldLevel}级。` }
+  const speed = launchedSwordStats({ ...sw, id: a.id, quality: a.quality, refine: a.refine,
+    speed: sw.speed, agility: sw.agility ?? 0, element: sw.element }, state.player.skills).speed
+  const event: GameEvent = { id: MOVE_EVENT_ID, kind: 'move',
+    finishAt: state.clock.gameT + flightSeconds(Math.hypot(x - state.player.x, y - state.player.y), speed),
+    payload: { op: 'flight', x, y, swordId } }
+  return { ok: true, state: { ...state, timeline: schedule(state.timeline, event), player: { ...state.player,
+    artifacts: state.player.artifacts.map(item => item.id === swordId ? { ...item, status: '御剑飞行中' } : item) } } }
+}
+
+const releaseFlight = (state: GameState, event?: GameEvent): GameState => event?.payload['op'] !== 'flight' ? state : ({
+  ...state, player: { ...state.player, artifacts: state.player.artifacts.map(a =>
+    a.id === event.payload['swordId'] && a.status === '御剑飞行中' ? { ...a, status: '空闲' } : a) },
+})
 
 /** 取消移动（事件栏那个红 ×）。人停在当前格，不回退。 */
 export const cancelMove = (state: GameState): GameState => ({
-  ...state,
+  ...releaseFlight(state, state.timeline.events.find(e => e.id === MOVE_EVENT_ID)),
   timeline: cancel(state.timeline, MOVE_EVENT_ID),
 })
 
@@ -139,6 +171,10 @@ export function resolveMove(
   state: GameState,
   event: GameEvent,
 ): { state: GameState; follow?: GameEvent[] } {
+  if (event.payload['op'] === 'flight') {
+    const released = releaseFlight(state, event)
+    return { state: { ...released, player: { ...released.player, x: Number(event.payload['x']), y: Number(event.payload['y']) } } }
+  }
   const legs = event.payload['legs'] as MoveLeg[]
   const index = event.payload['index'] as number
   const leg = legs[index]
@@ -152,7 +188,9 @@ export function resolveMove(
 
   const nextIndex = index + 1
   const next = legs[nextIndex]
-  if (!next) return { state: moved }
+  if (!next) return { state: !event.payload['treasureDrop'] ? moved : { ...moved, player: { ...moved.player,
+    artifacts: [...moved.player.artifacts, treasureItem('藏宝图', `map:${event.finishAt}`)],
+  } } }
 
   return {
     state: moved,
@@ -161,7 +199,7 @@ export function resolveMove(
         id: MOVE_EVENT_ID,
         kind: 'move',
         finishAt: event.finishAt + next.seconds,
-        payload: { legs, index: nextIndex },
+        payload: { ...event.payload, index: nextIndex },
       },
     ],
   }
@@ -173,7 +211,7 @@ export function moveDisplay(
 ): { current: { x: number; y: number; seconds: number }; next?: { x: number; y: number; seconds: number } } | null {
   const ev = state.timeline.events.find((e) => e.id === MOVE_EVENT_ID || (e.kind === 'move' && e.payload['op'] === 'escort'))
   if (!ev) return null
-  if (ev.payload['op'] === 'escort') {
+  if (ev.payload['op'] === 'escort' || ev.payload['op'] === 'flight') {
     return { current: { x: Number(ev.payload['x']), y: Number(ev.payload['y']), seconds: Math.max(0, Math.round(ev.finishAt - state.clock.gameT)) } }
   }
   const legs = ev.payload['legs'] as MoveLeg[]

@@ -15,6 +15,7 @@ import type { NpcWorld } from './npc.ts'
 import type { QuestLog } from './quest.ts'
 import type { Market } from './market.ts'
 import type { Town } from './town.ts'
+import type { Treasure } from './treasure.ts'
 
 export type School = '蜀山' | '昆仑' | '通天'
 
@@ -88,6 +89,8 @@ export type GameState = {
   readonly npc: NpcWorld
   /** 任务进度 */
   readonly quests: QuestLog
+  /** 使用藏宝图或天宫秘箓时生成，领取后清除。 */
+  readonly treasure?: Treasure
   /** 市场挂单：自己的 + NPC 的（`market.ts` 负责补货与结算） */
   readonly market: Market
   /** 去过的城镇（按 `x,y` 索引）。没去过的城镇不入档，踩上去才生成 */

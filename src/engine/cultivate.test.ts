@@ -298,3 +298,15 @@ test('★结丹压缩不占修炼队列（原文只点名排除炼器，结丹�
   assert.equal(r2.ok, false)
   assert.match((r2 as { reason: string }).reason, /队列已满/)
 })
+
+test('五本新秘笈必须先学习，随后走正常修炼队列，最高20级', () => {
+  for (const id of ['先天剑气', '先天罡气', '剑心通明', '剑心通灵', '先天神数']) {
+    const target = { system: 'skill' as const, id }
+    assert.equal(startCultivate(state(), target).ok, false)
+    const r = startCultivate(state({ skills: { [id]: 1 } }), target)
+    assert.ok(r.ok, id)
+    const event = r.state.timeline.events[0]!
+    assert.equal(resolveCultivate(r.state, event).player.skills[id], 2)
+    assert.equal(startCultivate(state({ skills: { [id]: 20 } }), target).ok, false)
+  }
+})

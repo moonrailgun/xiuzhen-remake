@@ -19,8 +19,9 @@ import { MERIDIANS, multiplier, groupElement, type Element } from '../data/merid
 import type { NpcState } from './npc.ts'
 import type { MailItem, FiveQi } from './state.ts'
 
-/** 七种术数。名称与效果出自官方一句话表与技能弹窗原文。 */
+/** 八种术数。名称与效果出自官方一句话表与技能弹窗原文。 */
 export const DIVINATIONS = {
+  先天神数: { effect: '推算法宝情况，修炼纯熟后可见法宝状态', school: null },
   九宫飞星: { effect: '根据玩家姓名推算他的位置，以及他的真气', school: null },
   太乙神数: { effect: '推算玩家拥有的法宝情况', school: '通天' },
   紫微斗数: { effect: '推算目标的经脉等级', school: null },
@@ -78,22 +79,22 @@ export function flyingStar(
 }
 
 /** 太乙神数：法宝列表（名称/类型/数量/状态）。 */
-export function taiyi(target: NpcState, at: number, byName: string): MailItem {
+export function taiyi(target: NpcState, at: number, byName: string, kind: '太乙神数' | '先天神数' = '太乙神数', showStatus = true): MailItem {
   const rows = Array.from({ length: target.swords }, (_, i) => ({
     name: `凡品青龙伏魔剑${i > 0 ? `+${i}` : ''}`,
     type: '【飞剑】',
     count: 1,
-    status: '空闲',
+    ...(showStatus ? { status: '空闲' } : {}),
   }))
   return {
-    id: `divine:${at}:${target.base.id}:taiyi`,
+    id: `divine:${at}:${target.base.id}:${kind}`,
     subject: `${byName}推算${target.base.name}`,
     from: '系统',
     at,
     read: false,
     kind: 'divine',
     // 标题原文：`{玩家}拥有的法宝`
-    body: { kind: '太乙神数', title: `${target.base.name}拥有的法宝`, rows },
+    body: { kind, title: `${target.base.name}拥有的法宝`, rows },
   }
 }
 
@@ -310,6 +311,9 @@ export function divine(
   switch (kind) {
     case '九宫飞星':
       return { ok: true, mail: flyingStar(target, opts.at, opts.byName) }
+    case '先天神数':
+      // 纯熟阈值原文未留存，以满级20重建；NPC法宝列表沿用现有太乙模型。
+      return { ok: true, mail: taiyi(target, opts.at, opts.byName, kind, (opts.skills[kind] ?? 0) >= 20) }
     case '太乙神数':
       return { ok: true, mail: taiyi(target, opts.at, opts.byName) }
     case '紫微斗数':

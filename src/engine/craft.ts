@@ -16,7 +16,7 @@
 import { schedule, countByKind, type GameEvent } from './timeline.ts'
 import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact } from './state.ts'
 import { refineSuccessRate, refinePieces, DEFENSIVE_ARTIFACTS, type Quality } from '../data/artifacts.ts'
-import { roll } from './rng.ts'
+import { roll, next, type RngState } from './rng.ts'
 import { capacityOf } from './cultivate.ts'
 import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
 import { canForge, swordByName, craftCostFor } from '../data/swords.ts'
@@ -60,6 +60,14 @@ export type CraftOrder = {
 export type CraftResult =
   | { readonly ok: true; readonly state: GameState }
   | { readonly ok: false; readonly reason: string }
+
+/** 基础上品率 50%、物理通明极品率 1% 为重建；极品占用上品区间，不重复掷骰。 */
+export function craftQuality(state: GameState): { quality: Quality; rng: RngState } {
+  const r = next(state.rng)
+  const quality = (state.player.skills['物理通明'] ?? 0) > 0 && r.value < 0.01 ? '极品'
+    : r.value < 0.5 + 0.05 * (state.player.skills['炼器总纲'] ?? 0) ? '上品' : '凡品'
+  return { quality, rng: r.state }
+}
 
 export function usePill(state: GameState, id: string): CraftResult {
   const item = state.player.artifacts.find(a => a.id === id)

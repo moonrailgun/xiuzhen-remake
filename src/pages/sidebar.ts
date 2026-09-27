@@ -170,8 +170,11 @@ function eventRows(rows: readonly EventRow[]): string {
     const cell = r.openUrl
       ? `<A style="COLOR:black" href="#" onclick="openBWindow('', '${js(r.openUrl)}')">${label}</A>`
       : label
+    const cancel = r.cancelId
+      ? `<A href="#" onclick="cancelmove('${js(r.cancelId)}')"><IMG src="img/event/cancel.gif" title="取消"></A>`
+      : '&nbsp;'
     return `<TR class=middle><TD class=small width=140>${cell}</TD>` +
-      `${time(r.seconds)}<TD>&nbsp;</TD></TR>`
+      `${time(r.seconds)}<TD width=16 align=center>${cancel}</TD></TR>`
   })
 }
 

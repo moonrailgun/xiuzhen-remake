@@ -19,6 +19,7 @@ import {
   MAX_LEVEL_BEFORE_XINDONG as MERIDIAN_MAX_BEFORE_XINDONG,
   type Element,
 } from '../data/meridian.ts'
+import { SECRET_SKILLS } from '../data/secrets.ts'
 import { SKILL_TREES } from '../data/skills.ts'
 
 export type CultivateTarget =
@@ -107,6 +108,11 @@ export function planUpgrade(state: GameState, target: CultivateTarget): Cultivat
 
 /** 前置与等级上限共用法术页的规则；未知法术不能凭字符串获得。 */
 export function skillUpgradeBlockReason(state: GameState, id: string): string | undefined {
+  const secret = SECRET_SKILLS.find(n => n.name === id)
+  if (secret) {
+    const level = state.player.skills[id] ?? 0
+    return level < 1 ? '需要先学习这本秘笈' : level >= secret.cap ? '该法术已修炼至上限' : undefined
+  }
   const nodes = Object.values(SKILL_TREES).flat()
   const node = nodes.find((n) => n.name === id)
   if (!node) return '没有这门法术'

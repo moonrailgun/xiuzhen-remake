@@ -332,3 +332,13 @@ test('淬炼行号与炼制物品号不会互相误认', () => {
   const refineIds = refineRows(s).map((r) => r.itemId)
   for (const id of refineIds) assert.ok(!swordIds.includes(id), `${id} 与炼制页撞号`)
 })
+
+
+test('损坏法宝可选中修理，修理中显示剩余时间且不可再次选中', () => {
+  const s = withItems(base(), [item({ id: 'broken', status: '损坏' }), item({ id: 'repairing', status: '修理中' })])
+  const withEvent = { ...s, timeline: { events: [{ id: 'craft:sword', kind: 'craft' as const, finishAt: s.clock.gameT + 90, payload: { op: 'repair', artifactId: 'repairing', kind: 'sword' } }] } }
+  const rows = itemListGroups(withEvent)[0]!.items
+  assert.equal(rows[0]!.itemsn, 1)
+  assert.equal(rows[1]!.itemsn, undefined)
+  assert.equal(rows[1]!.seconds, 90)
+})

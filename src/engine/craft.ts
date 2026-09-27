@@ -15,11 +15,11 @@
 
 import { schedule, countByKind, type GameEvent } from './timeline.ts'
 import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact } from './state.ts'
-import { refineSuccessRate, refinePieces, type Quality } from '../data/artifacts.ts'
+import { refineSuccessRate, refinePieces, DEFENSIVE_ARTIFACTS, type Quality } from '../data/artifacts.ts'
 import { roll } from './rng.ts'
 import { capacityOf } from './cultivate.ts'
 import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
-import { canForge, swordByName } from '../data/swords.ts'
+import { canForge, swordByName, craftCostFor } from '../data/swords.ts'
 
 export type CraftKind = 'sword' | 'guard' | 'pill'
 
@@ -123,8 +123,45 @@ export function startCraft(state: GameState, order: CraftOrder): CraftResult {
   }
 }
 
+/** 修理消耗为重炼的 2/3、耗时同炼制（47102-p1.txt）；淬炼按 2^N 折算为重建。 */
+export function repairPlan(state: GameState, artifactId: string): { cost: FiveQi; seconds: number } | null {
+  const item = state.player.artifacts.find(a => a.id === artifactId)
+  if (!item || (item.kind !== 'sword' && item.kind !== 'guard')) return null
+  const recipe = item.kind === 'sword' ? swordByName(item.name) : DEFENSIVE_ARTIFACTS.find(g => g.name === item.name)
+  if (!recipe?.craftCost || !recipe.craftSeconds) return null
+  const cost = craftCostFor(recipe.craftCost, state.player.element)!
+  const pieces = refinePieces(item.refine)
+  return {
+    cost: cost.map(v => Math.ceil(v * pieces * 2 / 3)) as unknown as FiveQi,
+    seconds: craftSeconds(recipe.craftSeconds * pieces, item.kind, state.player.body[BODY_HAND] ?? 0),
+  }
+}
+
+export function startRepair(state: GameState, artifactId: string): CraftResult {
+  const item = state.player.artifacts.find(a => a.id === artifactId)
+  const plan = repairPlan(state, artifactId)
+  if (!item || !plan || (item.kind !== 'sword' && item.kind !== 'guard')) return { ok: false, reason: '这件法宝无法修理' }
+  if (item.status !== '损坏') return { ok: false, reason: '只能修理损坏的法宝' }
+  const id = CRAFT_QUEUE_ID[item.kind]
+  if (state.timeline.events.some(e => e.id === id)) return { ok: false, reason: '该类法宝正在炼制或修理中' }
+  if (!canAfford(state.player.qi, plan.cost)) return { ok: false, reason: '修理所需真气不足' }
+  return { ok: true, state: {
+    ...state,
+    player: { ...state.player, qi: subQi(state.player.qi, plan.cost),
+      daoxing: state.player.daoxing + totalQi(plan.cost),
+      artifacts: state.player.artifacts.map(a => a.id === artifactId ? { ...a, status: '修理中' } : a),
+    },
+    timeline: schedule(state.timeline, { id, kind: 'craft', finishAt: state.clock.gameT + plan.seconds,
+      payload: { op: 'repair', artifactId, kind: item.kind, name: item.name, quality: item.quality, count: 0 },
+    }),
+  } }
+}
+
 /** 炼制完成：成品进背包。 */
 export function resolveCraft(state: GameState, event: GameEvent): GameState {
+  if (event.payload['op'] === 'repair') return { ...state, player: { ...state.player,
+    artifacts: state.player.artifacts.map(a => a.id === event.payload['artifactId'] && a.status === '修理中' ? { ...a, status: '空闲' } : a),
+  } }
   const kind = event.payload['kind'] as CraftKind
   const name = event.payload['name'] as string
   const count = event.payload['count'] as number

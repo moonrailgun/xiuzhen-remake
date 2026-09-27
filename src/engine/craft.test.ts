@@ -2,6 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   startCraft,
+  startRepair,
+  repairPlan,
+  artifactSpaceUsed,
   usePill,
   resolveCraft,
   craftSeconds,
@@ -256,4 +259,29 @@ test('炼器预留法宝位，不得超过携带上限或抢占另一炉位', ()
 
 test('炼器拒绝小数和非有限数量', () => {
   for (const count of [0.5, NaN, Infinity]) assert.equal(startCraft(state(), swordOrder(count)).ok, false)
+})
+
+
+test('损坏法宝修理扣气、占同类炼器队列，满包原位恢复并保留属性', () => {
+  const broken: Artifact = { id: 'broken', name: '玉虚桃木剑', kind: 'sword', quality: '极品', refine: 1, status: '损坏', count: 1 }
+  const before = state({ artifacts: Array.from({ length: 5 }, (_, i) => ({ ...broken, id: i ? `other${i}` : broken.id })) })
+  const plan = repairPlan(before, broken.id)!
+  assert.deepEqual(plan.cost, [64, 187, 127, 127, 160])
+  assert.equal(plan.seconds, 1334)
+  const r = startRepair(before, broken.id)
+  assert.ok(r.ok)
+  assert.equal(r.state.player.artifacts[0]!.status, '修理中')
+  assert.equal(artifactSpaceUsed(r.state), 5)
+  assert.deepEqual(r.state.player.qi, before.player.qi.map((q, i) => q - plan.cost[i]!))
+  assert.equal(startRepair(r.state, 'other1').ok, false)
+  assert.equal(startCraft(r.state, swordOrder()).ok, false)
+  const event = r.state.timeline.events.find(e => e.id === CRAFT_QUEUE_ID.sword)!
+  const after = resolveCraft(r.state, event)
+  assert.equal(after.player.artifacts.length, 5)
+  assert.deepEqual(after.player.artifacts[0], { ...broken, status: '空闲' })
+  assert.equal(startRepair(after, broken.id).ok, false)
+  const poor = state({ artifacts: [broken], qi: qi(0, 0, 0, 0, 0) })
+  assert.equal(startRepair(poor, broken.id).ok, false)
+  assert.equal(poor.player.artifacts[0]!.status, '损坏')
+  assert.equal(startRepair(before, 'missing').ok, false)
 })

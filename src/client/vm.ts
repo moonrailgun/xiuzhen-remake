@@ -82,13 +82,15 @@ export function itemListGroups(s: GameState): readonly ItemGroup[] {
   const buckets = new Map<ItemGroupId, ItemRow[]>()
   s.player.artifacts.forEach((a, i) => {
     const gid = GROUP_OF[a.kind]
-    const idle = a.status === '空闲'
+    const idle = a.status === '空闲' || a.status === '损坏'
+    const repair = s.timeline.events.find(e => e.kind === 'craft' && e.payload['op'] === 'repair' && e.payload['artifactId'] === a.id)
     const row: ItemRow = {
       name: artifactLabel(a),
       itemId: artifactItemId(a),
       ...(idle ? { itemsn: i + 1 } : {}),
       ...(a.count > 1 ? { count: a.count } : {}),
       status: a.status as ItemStatus,
+      ...(repair ? { seconds: Math.max(0, Math.round(repair.finishAt - s.clock.gameT)) } : {}),
     }
     const list = buckets.get(gid) ?? []
     list.push(row)

@@ -61,7 +61,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { usePill as consumePill, startCraft, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { usePill as consumePill, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
@@ -333,7 +333,7 @@ function labelOf(s: GameState, kind: string, payload: Readonly<Record<string, un
   }
   if (kind === 'craft') {
     const n = payload['count'] as number
-    return `${String(payload['name'] ?? '法宝')}${n > 1 ? `×${n}` : ''}`
+    return `${payload['op'] === 'repair' ? '修理' : ''}${String(payload['name'] ?? '法宝')}${n > 1 ? `×${n}` : ''}`
   }
 
   if (payload['op'] === 'goldenCore') return '压缩真元'
@@ -1077,7 +1077,22 @@ export function installGameActions(): void {
     state = r.state
     step()
   }
-  g['sendRepairItem'] = () => tell('修理', '损坏的法宝会在返回后自动修理。')
+  g['sendRepairItem'] = () => {
+    if (!state) return
+    const item = state.player.artifacts[selected(1) - 1]
+    if (!item || item.status !== '损坏') return tell('修理', '请先选中一件损坏的法宝。')
+    const plan = repairPlan(state, item.id)
+    if (!plan) return tell('修理', '这件法宝缺少修理资料，暂不能修理。')
+    ;(globalThis as unknown as Record<string, (t: string, h: string, ok?: () => void) => void>)
+      ['MDialogOkCancel']!('修理', `<DIV class=middle style="padding:10px">修理 ${esc(artifactLabel(item))}<BR>
+金、木、水、火、土真气：${plan.cost.join(' / ')}<BR>需要时间 ${formatDuration(plan.seconds)}</DIV>`, () => {
+        if (!state) return
+        const result = startRepair(state, item.id)
+        if (!result.ok) return tell('修理', result.reason)
+        state = result.state
+        step()
+      })
+  }
   g['sendUpgradeItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
   g['sendUpgradeAllItem'] = () => tell('提升品质', '提升品质要用仙石，付费功能未接入。')
 

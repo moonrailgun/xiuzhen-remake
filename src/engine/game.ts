@@ -363,7 +363,8 @@ export function validateGameState(value: unknown): asserts value is GameState {
           (data.loot === undefined || numbers(data.loot, 5)) &&
           (data.targetQi === undefined || numbers(data.targetQi, 5)) && optionalNumber(data.targetRootLevel)
       case 'craft':
-        return ['sword', 'guard', 'pill'].includes(data.kind as string) && strings(data, ['name', 'quality']) && number(data.count)
+        return ['sword', 'guard', 'pill'].includes(data.kind as string) && strings(data, ['name', 'quality']) && number(data.count) &&
+          (data.op !== 'repair' || string(data.artifactId) && data.count === 0 && data.kind !== 'pill')
       case 'market':
         return data.op === 'list' ? string(data.orderId) : data.op === 'inject' && element(data.element) && number(data.amount)
       case 'raid':

@@ -31,7 +31,6 @@ import {
 import { dantianCapacity } from '../data/upgrade.ts'
 import { qiRewardFor, type QiReward } from '../data/quests.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
-
 import { findBook } from '../data/town.ts'
 import { isSecretBook } from '../data/secrets.ts'
 import { sanctuaryQi } from './sanctuary.ts'
@@ -46,7 +45,6 @@ export const MIGRATIONS: readonly Migration[] = [
     if (!s || !Array.isArray(s.npc?.bases) || !s.npc.bases.every(n => n && typeof n.id === 'number')) return old
     return { ...s, social: s.social ?? socialOf(s) }
   } },
-
   // v7 → v8：可选寻宝任务、移动掉落快照及御剑飞行载荷。旧档没有寻宝进度。
   { from: 7, migrate: (old) => ({ ...(old as object) }) },
   {
@@ -189,7 +187,6 @@ export function currentQiPerHour(
   const terrainQi = terrain(state.player.x, state.player.y)
 
   const upkeep = state.player.artifacts.map(a => artifactUpkeepPerHour(a, self))
-
   const sharingPlayers = isOutOfProtection(state.player, state.clock.gameT, DAY) &&
     sanctuaryQi(state, state.player.x, state.player.y) === null
     ? 1 + allNpcsAt(state.npc, state.clock.gameT, state.worldSeed).filter(n =>
@@ -420,8 +417,8 @@ export function validateGameState(value: unknown): asserts value is GameState {
           (data.loot === undefined || numbers(data.loot, 5)) &&
           (data.targetQi === undefined || numbers(data.targetQi, 5)) && optionalNumber(data.targetRootLevel)
       case 'craft':
-        return ['sword', 'guard', 'pill'].includes(data.kind as string) && strings(data, ['name', 'quality']) && number(data.count) &&
-          (data.qualities === undefined || Array.isArray(data.qualities) && data.qualities.length === data.count && data.qualities.every(q => ['废品', '凡品', '上品', '极品'].includes(q))) &&
+        return ['sword', 'guard', 'pill'].includes(data.kind as string) && string(data.name) && quality(data.quality) && integer(data.count) &&
+          (data.qualities === undefined || Array.isArray(data.qualities) && data.qualities.length === data.count && data.qualities.every(quality)) &&
           (data.op !== 'repair' || string(data.artifactId) && data.count === 0 && data.kind !== 'pill')
       case 'market':
         return data.op === 'list' ? string(data.orderId) : data.op === 'inject' && element(data.element) && number(data.amount)
@@ -443,7 +440,8 @@ export function validateGameState(value: unknown): asserts value is GameState {
   if (!object(value)) fail()
   const s = value as Record<string, unknown>
   const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
-  if (!optionalNumber(s.peaceUntil) || !number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+  if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+      !optionalNumber(s.peaceUntil) ||
       (s.social !== undefined && (!object(s.social) || !ids(s.social.guardians) || !idMap(s.social.npcGuardians, ids) ||
         !Array.isArray(s.social.blacklist) || !s.social.blacklist.every(string) ||
         !arrayOf(s.social.guilds, g => integer(g.id) && string(g.name) && integer(g.founder) && integer(g.leader) && number(g.createdAt) &&
@@ -471,7 +469,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
         (patch.artifacts === undefined || arrayOf(patch.artifacts, artifact))) ||
       !object(quests) || !['qi', 'sword'].includes(quests.line as string) || !number(quests.dantianBonus) ||
       !arrayOf(quests.entries, (q) => string(q.id) && number(q.acceptedAt) && typeof q.done === 'boolean' &&
-        (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
+        (q.at === undefined || point(q.at)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
         (q.coreQiByElement === undefined || numbers(q.coreQiByElement, 5)) &&
         (q.coreElement === undefined || element(q.coreElement)) &&
         (q.coreElements === undefined || Array.isArray(q.coreElements) && q.coreElements.length <= 10 && q.coreElements.every(element)) &&

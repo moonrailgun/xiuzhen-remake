@@ -12,6 +12,26 @@ const born = () => newGame({ name: '测试', gender: 'f', element: '木', school
 const item = { id: 'sword', kind: 'sword', name: '青龙伏魔剑', quality: '凡品', refine: 1, count: 2, status: '空闲' } as const
 const combat = { id: 'npc:1:sword', name: '青龙伏魔剑', element: '木', attack: 20, durability: 50, agility: 10, absorb: 80, speed: 100, noReturn: false }
 const launch = { ...combat, quality: '凡品', refine: 0, attack: [10, 30], durability: [20, 60], launchedStats: { attack: 20, durability: 50, agility: 10, speed: 100, absorb: 80, noReturn: true } }
+const aid = { npcId: 1, swords: [combat], arriveAt: 100, returnSeconds: 60 }
+const baseRaid = { attacker: '道友', attackerId: 1, fromX: 100, fromY: 100, swordPower: 20, swords: 1, element: '木', attackers: [combat], returnSeconds: 60, aid: [aid] }
+const raid = (payload: object) => ({ id: 'raid', kind: 'raid', finishAt: 100, payload })
+
+test('v8迁移v9补持久关系并立即迁走旧押镖，坏旧档统一SaveError', () => {
+  const s = born()
+  assert.ok(s.social)
+  const old = { ...s, v: 8, social: undefined, timeline: { events: [{ id: 'move:escort', kind: 'move', finishAt: DAY, payload: { op: 'escort', x: 101, y: 100, fee: 66 } }] } }
+  const migrated = importGame(JSON.stringify({ v: 8, savedAt: 0, state: old }))
+  assert.equal(migrated.v, 9)
+  assert.deepEqual(migrated.social, socialOf(s))
+  assert.equal(migrated.timeline.events.length, 0)
+  assert.deepEqual(migrated.quests.escort?.to, [101, 100])
+  assert.equal(migrated.player.silver, s.player.silver)
+  assert.equal(migrated.player.x, 100)
+  assert.deepEqual(importGame(serialize(migrated, 0)), migrated)
+  for (const npc of [null, {}, { bases: [null] }, { bases: '坏', patches: {} }]) {
+    assert.throws(() => importGame(JSON.stringify({ v: 8, savedAt: 0, state: { ...old, npc } })), SaveError)
+  }
+})
 
 test('出保才与当地出保NPC平分，保护期从各自建号计时；法宝按真实五气耗费扣除', () => {
   const s = born(), npc = { ...s.npc.bases[0]!, profile: '羊' as const, homeX: 100, homeY: 100, bornAt: 0 }
@@ -45,6 +65,31 @@ test('保护期边界、三尸跨日和福地占领接入主循环', () => {
   assert.deepEqual(terrainOf(owned)(...at), [5, 5, 5, 5, 5])
 })
 
+const validNew = () => {
+  const s = born()
+  return { ...s, social: socialOf(s), divination: { located: { 1: { x: 1, y: 2 } }, scenes: [{ x: 2, y: 3, expiresAt: 60 }] }, peaceUntil: 100,
+    npc: { ...s.npc, patches: { 1: { artifacts: [item], qiGained: 12 } } },
+    quests: { ...s.quests, entries: [{ id: 'realm:jindan:1', acceptedAt: 0, done: false, coreQi: 20, coreQiByElement: [0, 10, 10, 0, 0], coreElement: '水', coreElements: ['水', '木'], count: 2, corePurity: 0.5 }],
+      escort: { from: [1, 2], to: [3, 4], acceptedAt: 0, fee: 66 }, sanctuaries: [{ x: 5, y: 6, kind: '福地', occupiedAt: 0 }],
+      wenchang: { usedWeek: 0, expiresAt: 3600, at: [2, 3], book: '西游记', reward: '御剑飞行' } } }
+}
+test('新关系/术数/任务/NPC实体和四阶段战斗快照可往返', () => {
+  for (const payload of [{ ...baseRaid, phase: 'outbound' }, { ...baseRaid, phase: 'guard', guards: [combat], defending: [launch] },
+    { ...baseRaid, phase: 'fighting', defenders: [combat] }, { phase: 'returning', npcId: 1, swordIds: ['sword'], loot: 20 }]) {
+    const s = { ...validNew(), timeline: { events: [raid(payload)] } }
+    assert.deepEqual(importGame(serialize(s, 0)), s)
+  }
+  const target = { kind: 'monster', name: '侠客', x: 1, y: 2, attack: 1, agility: 1, hp: 1, element: null, trainingSeconds: 7200, questId: 'training:2' }
+  for (const phase of ['outbound', 'fighting', 'returning']) {
+    const s = { ...validNew(), timeline: { events: [{ id: 'battle', kind: 'battle', finishAt: 100,
+      payload: { phase, target, swords: [launch], swordIds: ['sword'], defenders: [combat], aid: [aid], loot: [1, 2, 3, 4, 5] } }] } }
+    assert.deepEqual(importGame(serialize(s, 0)), s)
+  }
+  const crafting = { ...validNew(), timeline: { events: [{ id: 'craft', kind: 'craft', finishAt: 10,
+    payload: { kind: 'sword', name: item.name, quality: '凡品', count: 2, qualities: ['凡品', '上品'] } }] } }
+  assert.deepEqual(importGame(serialize(crafting, 0)), crafting)
+})
+
 test('主循环处理败劫碎丹并保留其他任务', () => {
   const s = born()
   const state: GameState = { ...s, player: { ...s.player, artifacts: [item] },
@@ -63,19 +108,19 @@ test('主循环处理败劫碎丹并保留其他任务', () => {
   assert.deepEqual(importGame(serialize(result, 0)), result)
 })
 
-test('v8迁移v9补持久关系并立即迁走旧押镖，坏旧档统一SaveError', () => {
-  const s = born()
-  assert.ok(s.social)
-  const old = { ...s, v: 8, social: undefined, timeline: { events: [{ id: 'move:escort', kind: 'move', finishAt: DAY, payload: { op: 'escort', x: 101, y: 100, fee: 66 } }] } }
-  const migrated = importGame(JSON.stringify({ v: 8, savedAt: 0, state: old }))
-  assert.equal(migrated.v, 9)
-  assert.deepEqual(migrated.social, socialOf(s))
-  assert.equal(migrated.timeline.events.length, 0)
-  assert.deepEqual(migrated.quests.escort?.to, [101, 100])
-  assert.equal(migrated.player.silver, s.player.silver)
-  assert.equal(migrated.player.x, 100)
-  assert.deepEqual(importGame(serialize(migrated, 0)), migrated)
-  for (const npc of [null, {}, { bases: [null] }, { bases: '坏', patches: {} }]) {
-    assert.throws(() => importGame(JSON.stringify({ v: 8, savedAt: 0, state: { ...old, npc } })), SaveError)
-  }
+test('拒绝损坏的新字段与战斗载荷，不等到结算才崩溃', () => {
+  const s = validNew()
+  const bad = [
+    { social: { ...s.social, guardians: ['坏'] } }, { social: { ...s.social, npcGuardians: { 1: [null] } } },
+    { social: { ...s.social, guilds: [{ ...s.social.guilds[0], jobs: { 1: 5 } }] } }, { social: { ...s.social, blacklist: [4] } },
+    { divination: { located: { 1: { x: 200, y: 0 } }, scenes: [] } }, { divination: { located: {}, scenes: [{ x: 0, y: 0, expiresAt: '坏' }] } },
+    { peaceUntil: '坏' }, { npc: { ...s.npc, patches: { 1: { artifacts: [null] } } } }, { npc: { ...s.npc, patches: { 1: { qiGained: -1 } } } },
+    { quests: { ...s.quests, escort: { ...s.quests.escort, to: [200, 0] } } }, { quests: { ...s.quests, sanctuaries: [{ x: 1, y: 1, kind: '平原', occupiedAt: 0 }] } },
+    { quests: { ...s.quests, wenchang: { ...s.quests.wenchang, reward: '无效秘笈' } } },
+    ...[{ coreQiByElement: [1] }, { coreElement: '风' }, { coreElements: ['风'] }, { corePurity: 2 }].map(fields => ({ quests: { ...s.quests, entries: [{ ...s.quests.entries[0], ...fields }] } })),
+    ...[{ phase: 'returning', npcId: 1, swordIds: [1] }, { ...baseRaid, phase: 'guard', guards: [null] },
+      { ...baseRaid, phase: 'fighting', defenders: [{ ...combat, noReturn: 'yes' }] }, { ...baseRaid, phase: 'outbound', aid: [{ ...aid, swords: [null] }] }].map(payload => ({ timeline: { events: [raid(payload)] } })),
+    { timeline: { events: [{ id: 'craft', kind: 'craft', finishAt: 10, payload: { kind: 'sword', name: item.name, quality: '凡品', count: 2, qualities: ['凡品'] } }] } },
+  ]
+  for (const fields of bad) assert.throws(() => importGame(serialize({ ...s, ...fields }, 0)), SaveError, JSON.stringify(fields))
 })

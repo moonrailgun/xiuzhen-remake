@@ -13,7 +13,7 @@ import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { artifactUpkeepPerHour, resolveCraft } from './craft.ts'
 import { generateNpcs } from './npc.ts'
-import { applyQuestProgress, emptyQuestLog, resolveQuestBattle } from './quest.ts'
+import { applyQuestProgress, emptyQuestLog, expireDailyQuests, resolveQuestBattle } from './quest.ts'
 import { resolveEscort, settleTownIncome } from './town.ts'
 import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, settleNpcPurchases, ctxOf, applyCtx } from './market.ts'
 import { scheduleRaid, resolveRaidEvent } from './raid.ts'
@@ -231,6 +231,9 @@ export function tick(
       if (weeks > 0) current = { ...current, player: { ...current.player, bonusCoin: current.player.bonusCoin + 20 * weeks } }
     }
 
+    const quests = expireDailyQuests(current.quests, at)
+    if (quests !== current.quests) current = { ...current, quests }
+
     // 先从真实时间线取走当前事件，取消挂单等副作用就不会被旧的事件数组覆盖。
     // 同时刻事件按 id 稳定排序，事件追加的同刻后续也在离开这个时刻前结算。
     if (event && event.finishAt <= at) {
@@ -332,7 +335,7 @@ export function importGame(text: string): GameState {
 function settleLoaded(state: GameState): GameState {
   // **读档不补货。** 补货只在整点边界做（见 `tick` 末尾那段注释），在这里补会让
   // 存档往返不是恒等 —— 存盘时 0 张、读回来 12 张。老存档的播种交给 v3→v4 迁移。
-  return { ...state, v: SAVE_VERSION }
+  return { ...state, quests: expireDailyQuests(state.quests, state.clock.gameT), v: SAVE_VERSION }
 }
 
 /** 校验会参与计算的必需字段，合法 JSON 也不能直接被断言成游戏状态。 */

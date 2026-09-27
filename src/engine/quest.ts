@@ -129,6 +129,17 @@ function findChain(log: QuestLog, id: string): { chain: readonly Quest[]; index:
 export const isSpawnDayQuest = (q: Quest): boolean =>
   q.series === '斩却三尸' && q.goal.kind === 'slay'
 
+/** 三尸当日未领奖即失效；已领奖步骤不回退。GM召唤也只保留至当天结束。 */
+function dailyQuestExpired(log: QuestLog, entry: QuestEntry, gameT: number): boolean {
+  const q = questOf(log, entry.id)
+  return !entry.done && !!q && isSpawnDayQuest(q) && Math.floor(entry.acceptedAt / DAY) !== Math.floor(gameT / DAY)
+}
+
+export function expireDailyQuests(log: QuestLog, gameT: number): QuestLog {
+  const entries = log.entries.filter(e => !dailyQuestExpired(log, e, gameT))
+  return entries.length === log.entries.length ? log : { ...log, entries }
+}
+
 /**
  * 领取门槛。返回 `null` 表示可以领。
  * 三尸的「只在周六」写在这里而不是数据表里 —— 它是规则不是数值。
@@ -160,7 +171,7 @@ export function statusOf(log: QuestLog, state: GameState, id: string): QuestStat
   const found = findChain(log, id)
   if (!found) return 'locked'
   const q = found.chain[found.index]!
-  if (entry) return goalMet(q, entry, state) ? 'ready' : 'active'
+  if (entry && !dailyQuestExpired(log, entry, state.clock.gameT)) return goalMet(q, entry, state) ? 'ready' : 'active'
   if (!chainUnlocked(log, found.chain, found.index)) return 'locked'
   return acceptBlocker(q, state) === null ? 'available' : 'locked'
 }
@@ -171,7 +182,8 @@ export function availableQuests(log: QuestLog, state: GameState): readonly Quest
   for (const chain of chainsFor(log.line)) {
     for (let i = 0; i < chain.length; i++) {
       const q = chain[i]!
-      if (entryOf(log, q.id)) continue
+      const entry = entryOf(log, q.id)
+      if (entry && !dailyQuestExpired(log, entry, state.clock.gameT)) continue
       if (!chainUnlocked(log, chain, i)) break
       if (acceptBlocker(q, state) === null) out.push(q)
       // 一条链一次只开放一个任务
@@ -197,6 +209,7 @@ const meridianElements = (state: GameState) =>
   MERIDIANS.map((m) => groupElement(state.player.element, m.group))
 
 export function goalMet(q: Quest, entry: QuestEntry, state: GameState): boolean {
+  if (dailyQuestExpired(state.quests, entry, state.clock.gameT)) return false
   const g = q.goal
   const p = state.player
   switch (g.kind) {
@@ -265,6 +278,7 @@ export function accept(
   id: string,
   opts: { readonly ignoreSpawnDay?: boolean } = {},
 ): QuestResult<QuestLog> {
+  log = expireDailyQuests(log, state.clock.gameT)
   if (entryOf(log, id)) return fail('该任务已经领取过了')
   const found = findChain(log, id)
   if (!found) return fail('没有这个任务')
@@ -461,10 +475,10 @@ export const targetOfMonster = (
 })
 
 /** 已领取的斩妖任务的出击目标；不是斩妖任务或没领取时返回 null。 */
-export function questTarget(log: QuestLog, id: string): QuestBattleTarget | null {
+export function questTarget(log: QuestLog, id: string, gameT?: number): QuestBattleTarget | null {
   const entry = entryOf(log, id)
   const goal = questOf(log, id)?.goal
-  if (!entry || entry.done || goal?.kind !== 'slay' || !entry.at) return null
+  if (!entry || entry.done || entry.cleared || goal?.kind !== 'slay' || !entry.at || (gameT !== undefined && dailyQuestExpired(log, entry, gameT))) return null
   return targetOfMonster(goal.monster, entry.at)
 }
 
@@ -474,6 +488,7 @@ export function questTarget(log: QuestLog, id: string): QuestBattleTarget | null
  */
 export function resolveQuestBattle(log: QuestLog, event: GameEvent, won: boolean): QuestLog {
   if (event.kind !== 'battle' || !won) return log
+  log = expireDailyQuests(log, event.finishAt)
   const target = event.payload['target'] as { readonly name?: unknown } | undefined
   return typeof target?.name === 'string' ? recordSlain(log, target.name) : log
 }
@@ -499,6 +514,7 @@ export function claim(
   const q = questOf(log, id)
   if (!entry || !q) return fail('没有这个任务')
   if (entry.done) return fail('奖励已经领过了')
+  if (dailyQuestExpired(log, entry, state.clock.gameT)) return fail('三尸已经消失，请下周六重新领取')
   if (!goalMet(q, entry, state)) return fail('任务尚未完成')
   // 炼制、购买都查袖里乾坤上限，发奖这条路以前没查 —— 满背包领奖会把占用顶到 6/5，
   // 之后任何炼制/购买都被拒，玩家还不知道为什么。挡在领取这一步，奖励留着不丢。

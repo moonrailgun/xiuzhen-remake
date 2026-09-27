@@ -508,3 +508,11 @@ test('★三尸仍然每周换一处（只在周六现身，所以按周变是�
   const week1 = { ...s, clock: { ...s.clock, gameT: 7 * DAY } }
   assert.notDeepEqual(questLocation(week1, q), questLocation(s, q))
 })
+
+test('三尸跨日失效，包括已斩但未领奖；已完成步骤保留', async () => {
+  const { expireDailyQuests } = await import('./quest.ts')
+  const s = makeState({ realm: '辟谷期' }, 4 * DAY)
+  const log = { ...s.quests, entries: [{ id: 'realm:sanshi:1', acceptedAt: 4 * DAY, done: true }, { id: 'realm:sanshi:2', acceptedAt: 4 * DAY, done: false, cleared: true }] }
+  assert.equal(statusOf(log, { ...s, clock: { ...s.clock, gameT: 5 * DAY } }, 'realm:sanshi:2'), 'locked')
+  assert.equal(expireDailyQuests(log, 5 * DAY).entries.length, 1)
+})

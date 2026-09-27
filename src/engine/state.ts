@@ -16,6 +16,7 @@ import type { QuestLog } from './quest.ts'
 import type { Market } from './market.ts'
 import type { Town } from './town.ts'
 import type { Treasure } from './treasure.ts'
+import type { SocialState } from './social.ts'
 
 export type School = '蜀山' | '昆仑' | '通天'
 
@@ -77,6 +78,7 @@ export type Player = {
 }
 
 export type GameState = {
+  readonly social?: SocialState
   /** 存档格式版本，与 `save.ts` 的 SAVE_VERSION 对应 */
   readonly v: number
   readonly clock: Clock

@@ -55,6 +55,7 @@ import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, npcsInSight, allNpcsAt, type NpcState } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
+import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation } from '../engine/social.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { renderGm, type GmVm } from '../pages/gm.ts'
 import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
@@ -367,7 +368,7 @@ function rightVm(s: GameState) {
   })
   if (s.treasure) quests.push({ id: 'treasure', title: '机缘遇宝',
     detail: `目标地点：(${s.treasure.x},${s.treasure.y})`, abandonable: false })
-  return { quests, guardingMe: 0, guardingOthers: 0, guardCap: 7 }
+  return { quests, guardingMe: socialOf(s).guardians.length, guardingOthers: socialOf(s).guardians.length, guardCap: 7 }
 }
 
 /** 左栏：按主标签选页面。七个标签全部接真实状态。 */
@@ -949,10 +950,27 @@ export function installGameActions(): void {
     return r.ok ? r.state : { error: r.reason }
   })
 
-  /** 加为护法。 */
-  g['addpal'] = (name: string) => {
-    openWindow('mwindow', '护法',
-      `<DIV class=middle style="padding:10px">已向 ${esc(name)} 发出护法邀请。</DIV>`)
+  const applySocial = (r: ReturnType<typeof changeGuardian>) => {
+    if (!r.ok) return openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
+    state = r.state
+    closeWindow('lwindow')
+    step()
+  }
+  g['addpal'] = (name: string | number) => {
+    if (!state) return
+    const npc = state.npc.bases.find(n => typeof name === 'number' ? n.id === name : n.name === name)
+    applySocial(changeGuardian(state, npc?.id ?? -1, true))
+  }
+  g['removeGuardian'] = (id: number) => { if (state) applySocial(changeGuardian(state, id, false)) }
+  g['guildAction'] = (action: string) => {
+    if (!state) return
+    const val = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? ''
+    const r = action === 'create' ? createGuild(state, val('guildname'))
+      : action === 'join' ? joinGuild(state, Number(val('guildtarget')))
+      : action === 'leave' ? leaveGuild(state)
+      : action === 'recruit' ? recruitGuildMember(state, Number(val('guildnpc')), val('guildjob'))
+      : setGuildRelation(state, Number(val('guildtarget')), action as 'ally' | 'enemy' | 'neutral')
+    applySocial(r)
   }
 
   /** 原版的通用 ajax 提交入口。本地版没有服务端，按 action 分发。 */
@@ -1002,11 +1020,7 @@ export function installGameActions(): void {
     if (action === 'addpal') {
       const id = Number(new URLSearchParams(params ?? '').get('playerid') ?? 0)
       if (!state) return
-      const who = allNpcsAt(state!.npc, state!.clock.gameT, state!.worldSeed)
-        .find((n2) => n2.base.id === id)
-      ;(globalThis as unknown as Record<string, (n: string) => void>)['addpal']!(
-        who?.base.name ?? '对方',
-      )
+      ;(globalThis as unknown as Record<string, (n: number) => void>)['addpal']!(id)
       return
     }
     openWindow('mwindow', '提示', `<DIV class=middle style="padding:10px">（${esc(action)} 尚未接入）</DIV>`)
@@ -1743,13 +1757,13 @@ function resolvePage(url: string): string {
       return playerListWindow(s)
 
     case 'guard':
-      return guardWindow(Number(q.get('tab') ?? 1))
+      return guardWindow(s, Number(q.get('tab') ?? 1))
 
     case 'npc':
       return npcWindow(s, q.get('name') ?? '')
 
     case 'allyinfo':
-      return renderAlly(allyVm(s, 'overview', 1))
+      return renderAlly(allyVm(s, 'overview', 1, Number(q.get('ally') ?? 0) || undefined))
 
     case 'rank': {
       // 原版子标签传的是数字（rank.ts：门派 3 / 产业 4 / 阅历 5），不是内部枚举名。
@@ -2011,13 +2025,14 @@ function estateVm(s: GameState) {
  *
  * 单机版没有真人可护，所以这里只如实说明，不编一套假的护法名单。
  */
-function guardWindow(tab: number): string {
-  const which = tab === 2 ? '为他护法' : '为我护法'
-  return `<DIV class=middle style="padding:12px">
-<SPAN class=bigbold>${esc(which)}</SPAN><BR><BR>
-<SPAN class=smallgray>护法是原版的真人互助玩法：把飞剑留在道友身边替他挡刀。<BR>
-单机版没有别的真人，这一页只保留入口。<BR>
-（原版护法页既无截图也无 DOM，正文结构本就没有存档。）</SPAN></DIV>`
+function guardWindow(s: GameState, tab: number): string {
+  const social = socialOf(s)
+  const rows = social.guardians.map(id => {
+    const npc = s.npc.bases.find(n => n.id === id)
+    return `<DIV>${esc(npc?.name ?? '')}　<A href="#" onclick="removeGuardian(${id})">解除护法</A></DIV>`
+  }).join('')
+  return `<DIV class=middle style="padding:12px"><B>${tab === 2 ? '为他护法' : '为我护法'}（${social.guardians.length}/7）</B><BR><BR>${rows || '暂无护法。'}<BR>
+  <SPAN class=smallgray>通过道友资料结为护法后，交战时可按姓名求援，援军需飞行抵达。</SPAN></DIV>`
 }
 
 /** 「点击此处查看更多玩家」：视野内的人，按道行排。 */
@@ -2541,7 +2556,13 @@ function questWindow(s: GameState, id: string): string {
 }
 
 function rankVm(s: GameState, tab: RankTab) {
-  // 门派榜在单机下没有真人门派，按道源（蜀山/昆仑/通天）排，与门派页同一套口径
+  if (tab === 'ally') {
+    const all = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
+    return { tab, rows: socialOf(s).guilds.map(g => ({ g,
+      total: g.members.reduce((sum, id) => sum + (id === 0 ? s.player.daoxing : all.find(n => n.base.id === id)?.daoxing ?? 0), 0),
+    })).sort((a, b) => b.total - a.total).map(({ g, total }) => ({ id: g.id, name: g.name,
+      leader: { id: g.leader, name: g.leader === 0 ? s.player.name : all.find(n => n.base.id === g.leader)?.base.name ?? '' }, value: daoxingText(total) })) }
+  }
   const kind = tab === 'estate' ? 'estate' : tab === 'exp' ? 'experience' : 'daoxing'
   const rows = ranking(s.npc, s.clock.gameT, s.worldSeed, kind, 20).map((n) => ({
     id: n.base.id,
@@ -2571,7 +2592,7 @@ function playerInfoWindow(s: GameState, id: number): string {
       : 1,
     dao: npc?.daoxingText ?? daoxingText(s.player.daoxing),
     origin: school,
-    ally: { id: 0, name: `${school}派` },
+    ally: guildOf(s, id) ? { id: guildOf(s, id)!.id, name: guildOf(s, id)!.name } : null,
     age: '-',
     gender: gender === 'f' ? '女' : '男',
     location: '-',

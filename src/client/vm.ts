@@ -36,6 +36,8 @@ import { weekOfServer } from '../engine/clock.ts'
 import type { Town } from '../engine/town.ts'
 import { formatGameDate, formatGameDateShort } from '../engine/clock.ts'
 import type { FiveQi, GameState, Artifact } from '../engine/state.ts'
+import { daoxingText } from '../engine/state.ts'
+import { socialOf, guildOf } from '../engine/social.ts'
 
 // —— 法术页 ——
 
@@ -342,81 +344,36 @@ export function tradeVm(
 
 export const ALLY_PAGE_SIZE = 10
 
-/**
- * 单机版没有真人门派，用**道源**（蜀山/昆仑/通天）当门派：
- * 成员 = 同道源的 NPC，掌门 = 其中道行最高的那个。
- * 这一整页是【重建】—— 原版门派是玩家自建的组织，单机下无从还原。
- */
-export function allyVm(s: GameState, tab: AllyTab, page: number): AllyVm {
+/** 门派名单独立于道源，并以持久关系为准。 */
+export function allyVm(s: GameState, tab: AllyTab, page: number, guildId?: number): AllyVm {
+  const social = socialOf(s), own = guildOf(s)
+  const guild = guildId === undefined ? own : social.guilds.find(g => g.id === guildId)
   const all = allNpcsAt(s.npc, s.clock.gameT, s.worldSeed)
-  const fellows = all
-    .filter((n) => n.base.school === s.player.school)
-    .sort((a, b) => b.daoxing - a.daoxing)
-
-  const head = fellows[0]
-  const toMember = (n: NpcState, rank: number): AllyMember => ({
-    playerId: n.base.id,
-    name: n.base.name,
-    job: rank === 0 ? '掌门' : n.base.profile === '大狼' ? '杀手' : '弟子',
-    realm: n.realm,
-    dao: n.daoxingText,
+  const nameOf = (id: number) => id === 0 ? s.player.name : s.npc.bases.find(n => n.id === id)?.name ?? '—'
+  const roster: AllyMember[] = (guild?.members ?? []).flatMap(id => {
+    const npc = all.find(n => n.base.id === id)
+    if (id !== 0 && !npc) return []
+    return [{ playerId: id, name: nameOf(id), job: guild!.leader === id ? '掌门' : guild!.jobs[id] ?? '弟子',
+      realm: npc?.realm ?? s.player.realm, dao: npc?.daoxingText ?? daoxingText(s.player.daoxing) }]
   })
-
-  // 自己排进名册：按道行插到该在的位置
-  const me: AllyMember = {
-    playerId: 0,
-    name: s.player.name,
-    job: '弟子',
-    realm: s.player.realm,
-    dao: `${Math.floor(s.player.daoxing / 4380)}年`,
+  const pages = Math.max(1, Math.ceil(roster.length / ALLY_PAGE_SIZE)), p = Math.min(Math.max(1, page), pages)
+  const news: AllyNews[] = own?.id === guild?.id && guild ? s.mail.map((m, i) => ({ m, i }))
+    .filter(({ m }) => m.kind === 'battle' || m.kind === 'divine' || m.body.guildId === guild.id).slice(0, 20)
+    .map(({ m, i }) => ({ msgId: i + 1, kind: m.kind === 'divine' ? '算' : m.kind === 'system' ? '盟' : m.from === s.player.name ? '攻' : '防',
+      text: m.subject, fromAlly: m.from === s.player.name ? guild.name : '', toAlly: guild.name, date: formatGameDateShort(m.at) })) : []
+  return { tab, name: guild?.name ?? '尚未加入门派', allyId: guild?.id ?? 0,
+    founder: { id: guild?.founder ?? 0, name: guild ? nameOf(guild.founder) : '—' },
+    leader: { id: guild?.leader ?? 0, name: guild ? nameOf(guild.leader) : '—' },
+    createdAt: formatGameDateShort(guild?.createdAt ?? 0).slice(0, 8), size: roster.length,
+    nature: '-', imLabel: '-', im: '-', forum: null,
+    allies: social.guilds.filter(g => guild?.allies.includes(g.id)).map(g => ({ id: g.id, name: g.name })),
+    enemies: social.guilds.filter(g => guild?.enemies.includes(g.id)).map(g => ({ id: g.id, name: g.name })),
+    intro: guild ? '同道相聚，守望相助。' : '可以自行立派，或加入已有门派。',
+    members: roster.slice((p - 1) * ALLY_PAGE_SIZE, p * ALLY_PAGE_SIZE), news, page: p, pages,
+    management: { joined: !!own, leader: own?.leader === 0, own: own?.id === guild?.id,
+      guilds: social.guilds.filter(g => g.id !== own?.id).map(g => ({ id: g.id, name: g.name })),
+      recruits: all.filter(n => !guildOf(s, n.base.id) || guildOf(s, n.base.id)?.id === own?.id).map(n => ({ id: n.base.id, name: n.base.name })) },
   }
-  const roster = [...fellows.map(toMember), me]
-  const pages = Math.max(1, Math.ceil(roster.length / ALLY_PAGE_SIZE))
-  const p = Math.min(Math.max(1, page), pages)
-
-  const news: readonly AllyNews[] = s.mail
-    .filter((m) => m.kind === 'battle' || m.kind === 'divine')
-    .slice(0, 20)
-    .map((m, i) => ({
-      msgId: i + 1,
-      kind: m.kind === 'divine' ? '算' : m.from === s.player.name ? '攻' : '防',
-      text: m.subject,
-      fromAlly: m.from === s.player.name ? s.player.school : '',
-      toAlly: s.player.school,
-      date: formatGameDateShort(m.at),
-    }))
-
-  return {
-    tab,
-    name: `${s.player.school}派`,
-    allyId: ELEMENTS.indexOf(s.player.element) + 1,
-    founder: { id: head?.base.id ?? 0, name: head?.base.name ?? '—' },
-    leader: { id: head?.base.id ?? 0, name: head?.base.name ?? '—' },
-    createdAt: formatGameDateShort(0).slice(0, 8),
-    size: roster.length,
-    nature: '-',
-    imLabel: '-',
-    im: '-',
-    forum: null,
-    allies: [],
-    enemies: [],
-    intro: SCHOOL_INTRO[s.player.school],
-    members: roster.slice((p - 1) * ALLY_PAGE_SIZE, p * ALLY_PAGE_SIZE),
-    news,
-    page: p,
-    pages,
-  }
-}
-
-/**
- * 三家道源的简介。**逐字取自建号页的原版文案**（`createplayer.ts` 第 117 行那句
- * 「蜀山以剑仙著称…而通天则信奉弱肉强食的自由思想，最具掠夺性。」按道源拆开），
- * 没有另外编写 —— 原版门派简介是玩家自填的，没有存档可依。
- */
-const SCHOOL_INTRO: Record<GameState['player']['school'], string> = {
-  蜀山: '蜀山以剑仙著称，拥有最为刚猛的攻击。',
-  昆仑: '昆仑以炼器著称，在炼制法宝上有所专长。',
-  通天: '通天则信奉弱肉强食的自由思想，最具掠夺性。',
 }
 
 // —— 城镇 ——

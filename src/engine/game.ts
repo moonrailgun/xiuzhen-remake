@@ -32,8 +32,18 @@ import { dantianCapacity } from '../data/upgrade.ts'
 import { qiRewardFor, type QiReward } from '../data/quests.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
+import { socialOf } from './social.ts'
+
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
 export const MIGRATIONS: readonly Migration[] = [
+  // v8 → v9：本地关系持久化。
+  { from: 8, migrate: (old) => {
+    const s = old as GameState | null
+    // 校验前只读取最小安全形状；坏旧档交给 validateGameState 统一报 SaveError。
+    if (!s || !Array.isArray(s.npc?.bases) || !s.npc.bases.every(n => n && typeof n.id === 'number')) return old
+    return { ...s, social: s.social ?? socialOf(s) }
+  } },
+
   // v7 → v8：可选寻宝任务、移动掉落快照及御剑飞行载荷。旧档没有寻宝进度。
   { from: 7, migrate: (old) => ({ ...(old as object) }) },
   {
@@ -116,7 +126,7 @@ export const INITIAL_QI: QiReward = { base: 1000, overcomeBy: 500 }
 
 export function newGame(opts: NewGameOptions, nowWall: number): GameState {
   const startT = opts.startGameT ?? 0
-  return refillNpcOrders({
+  const state: GameState = {
     v: SAVE_VERSION,
     clock: { gameT: startT, wallT: nowWall, rate: 1 },
     timeline: emptyTimeline(),
@@ -151,7 +161,8 @@ export function newGame(opts: NewGameOptions, nowWall: number): GameState {
       vip: false,
       createdAt: startT,
     },
-  })
+  }
+  return refillNpcOrders({ ...state, social: socialOf(state) })
 }
 
 /** 所在地块的天地元气。 */
@@ -335,6 +346,10 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const arrayOf = (v: unknown, valid: (item: Record<string, unknown>) => boolean): boolean =>
     Array.isArray(v) && v.every((item: unknown) => object(item) && valid(item))
   const optionalNumber = (v: unknown) => v === undefined || number(v)
+  const integer = (v: unknown) => number(v) && Number.isSafeInteger(v)
+  const ids = (v: unknown) => Array.isArray(v) && v.every(integer)
+  const idMap = (v: unknown, valid: (item: unknown) => boolean) => object(v) &&
+    Object.entries(v).every(([key, item]) => /^(0|[1-9][0-9]*)$/.test(key) && valid(item))
   const element = (v: unknown) => ELEMENTS.includes(v as Element)
   const combatElement = (v: unknown) => v === null || element(v)
   const artifact = (a: Record<string, unknown>) => strings(a, ['id', 'name', 'status']) &&
@@ -383,6 +398,10 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const s = value as Record<string, unknown>
   const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
   if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+      (s.social !== undefined && (!object(s.social) || !ids(s.social.guardians) || !idMap(s.social.npcGuardians, ids) ||
+        !Array.isArray(s.social.blacklist) || !s.social.blacklist.every(string) ||
+        !arrayOf(s.social.guilds, g => integer(g.id) && string(g.name) && integer(g.founder) && integer(g.leader) && number(g.createdAt) &&
+          ids(g.members) && ids(g.allies) && ids(g.enemies) && idMap(g.jobs, string)))) ||
       (s.treasure !== undefined && (!object(s.treasure) || !['藏宝图', '天宫秘箓'].includes(s.treasure.source as string) ||
         !numeric(s.treasure, ['x', 'y']) || ![s.treasure.x, s.treasure.y].every(v => Number.isInteger(v) && (v as number) < WORLD_SIZE) ||
         !object(s.treasure.reward) || !artifact(s.treasure.reward) || s.treasure.reward.count !== 1)) ||

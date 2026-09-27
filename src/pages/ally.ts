@@ -56,7 +56,7 @@ export type AllyMember = {
 export type AllyNews = {
   readonly msgId: number
   /** 首格单字标签 */
-  readonly kind: '攻' | '防' | '算'
+  readonly kind: '攻' | '防' | '算' | '盟'
   /** 「{A}攻击{B}」；被推算时是「有人推算{B}」（不暴露推算者） */
   readonly text: string
   /** 攻方门派，无门派时为空串（原版写成「〓劍閣〓 - 」） */
@@ -68,6 +68,8 @@ export type AllyNews = {
 }
 
 export type AllyVm = {
+  readonly management?: { readonly joined: boolean; readonly leader: boolean; readonly own: boolean;
+    readonly guilds: readonly AllyLink[]; readonly recruits: readonly AllyLink[] }
   readonly tab: AllyTab
   readonly name: string
   readonly allyId: number
@@ -191,21 +193,22 @@ ${
 
 /**
  * 功能页。基准版把功德 / 门派功法 / 阵法全部排除（都是 2009-06-30 之后的系统），
- * 剩下的「其余内容」**零证据**（PAGE-INDEX §18 原话）。所以这里只出一张空表，
- * 结构沿用同页其它表的通式，等挖到证据再填。
+ * 基准期已有自建、加入、任命与外交；操作表单按同页通式重建，NPC 自动接受。
  */
 function feature(vm: AllyVm): string {
-  return `<TABLE class="middle tablebg" cellSpacing=1 cellPadding=3 width=460 border=0><TBODY>
-<TR class="titlebg middlebold" align=middle><TD>功能</TD></TR>
-<TR class="trbg middle"><TD class=smallgray>目前没有可用的门派功能</TD></TR>
-<TR class="trbg middle"><TD><IMG src="img/event/mark.gif">&nbsp;<A class=skillup onclick="openLWindow('','allyinfo.jsp?ally=${vm.allyId}')" href="#">查看门派资料</A></TD></TR>
-</TBODY></TABLE>`
+  const m = vm.management
+  if (!m) return '<DIV class=middle>目前没有可用的门派功能</DIV>'
+  const options = (items: readonly AllyLink[]) => items.map(n => `<OPTION value="${n.id}">${esc(n.name)}</OPTION>`).join('')
+  return `<DIV class=middle style="width:440px;padding:10px">${!m.joined
+    ? `<INPUT id=guildname maxlength=20 aria-label="门派名"><BUTTON onclick="guildAction('create')">自行立派</BUTTON><BR><BR><SELECT id=guildtarget aria-label="门派">${options(m.guilds)}</SELECT><BUTTON onclick="guildAction('join')">加入门派</BUTTON>`
+    : `<BUTTON onclick="guildAction('leave')">退出门派</BUTTON>${m.leader
+      ? `<BR><BR><SELECT id=guildnpc aria-label="成员">${options(m.recruits)}</SELECT><SELECT id=guildjob aria-label="职位"><OPTION>弟子</OPTION><OPTION>杀手</OPTION><OPTION>护法</OPTION><OPTION>长老</OPTION></SELECT><BUTTON onclick="guildAction('recruit')">招收或任命</BUTTON><BR><BR><SELECT id=guildtarget aria-label="门派">${options(m.guilds)}</SELECT><BUTTON onclick="guildAction('ally')">结盟</BUTTON><BUTTON onclick="guildAction('enemy')">敌对</BUTTON><BUTTON onclick="guildAction('neutral')">中立</BUTTON>` : ''}`}</DIV>`
 }
 
 /** 渲染门派页左栏。 */
 export function renderAlly(vm: AllyVm): string {
   const body =
-    vm.tab === 'member'
+    vm.management && !vm.allyId ? feature(vm) : vm.tab === 'member'
       ? members(vm)
       : vm.tab === 'attack' || vm.tab === 'news'
         ? newsList(vm)

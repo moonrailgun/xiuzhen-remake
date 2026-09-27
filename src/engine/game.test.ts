@@ -287,7 +287,7 @@ test('没有时间和事件变化时 tick 保留原状态引用', () => {
   assert.equal(tick(s, 0).state, s)
 })
 
-test('v7 原存档可迁移到 v8，寻宝与御剑载荷拒绝越界和损坏数据', () => {
+test('v7 原存档可迁移到 v9，寻宝与御剑载荷拒绝越界和损坏数据', () => {
   const s = quiet()
   const old = { ...s, v: 7 }
   assert.deepEqual(importGame(JSON.stringify({ v: 7, savedAt: 0, state: old })), s)

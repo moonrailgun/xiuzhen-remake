@@ -244,14 +244,14 @@ test('只有空闲的极品法宝能挂到出售法宝页', () => {
 
 // —— 门派页 / 收件箱 ——
 
-test('门派 = 道源，成员只收同道源的人，掌门是道行最高的那个', () => {
-  const s = base() // 昆仑
-  const vm = allyVm(s, 'member', 1)
-  assert.equal(vm.name, '昆仑派')
-  assert.ok(vm.members.length > 0)
+test('门派名单独立于道源，按持久成员与掌门投影', () => {
+  const s = base()
+  assert.equal(allyVm(s, 'member', 1).members.length, 0)
+  const vm = allyVm(s, 'member', 1, 1)
+  assert.equal(vm.name, '青云会')
+  assert.equal(vm.members.length, 10)
   assert.equal(vm.members[0]!.job, '掌门')
   assert.equal(vm.leader.name, vm.members[0]!.name)
-  assert.ok(vm.intro.includes('昆仑'))
 })
 
 test('收件箱分页，未读标记跟着存档走', () => {

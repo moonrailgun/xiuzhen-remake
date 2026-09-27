@@ -127,7 +127,6 @@ const ownedCount = (s: GameState, name: string): number =>
 /** 炼制飞剑页：14 把剑全列，等级不够的显示「(未满足)」（照原版，不隐藏）。 */
 export function swordCraftRows(s: GameState): readonly CraftRow[] {
   const forge = s.player.skills['铸剑之术'] ?? 0
-  const wield = s.player.skills['御剑术'] ?? 0
   const hand = s.player.body[BODY_HAND] ?? 0
   return SWORDS.map((sw, i) => {
     const cost = craftCostFor(sw.craftCost, s.player.element)
@@ -139,7 +138,7 @@ export function swordCraftRows(s: GameState): readonly CraftRow[] {
       craftSeconds: craftSeconds(sw.craftSeconds ?? 0, 'sword', hand),
       // 转录不全的剑（缺消耗或耗时）列出来但不可炼，不编数值
       craftable: cost && isComplete(sw)
-        ? craftableCount(s.player.qi, cost, canForge(sw, forge, wield))
+        ? craftableCount(s.player.qi, cost, canForge(sw, forge))
         : null,
     }
   })

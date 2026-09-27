@@ -84,6 +84,17 @@ test('真气不足时拒绝', () => {
   assert.match((r as { reason: string }).reason, /炼制所需真气不足/)
 })
 
+test('炼剑检查铸剑等级，拒绝时不扣费；无需提前学习御剑', () => {
+  const order = { ...swordOrder(), name: '青龙伏魔剑' }
+  const before = state()
+  const snapshot = structuredClone(before)
+  const blocked = startCraft(before, order)
+  assert.equal(blocked.ok, false)
+  if (!blocked.ok) assert.match(blocked.reason, /铸剑之术1级/)
+  assert.deepEqual(before, snapshot)
+  assert.equal(startCraft(state({ skills: { 铸剑之术: 1 } }), order).ok, true)
+})
+
 test('炼制扣真气并计入道行', () => {
   const s = state()
   const after = (startCraft(s, swordOrder(2)) as { state: GameState }).state

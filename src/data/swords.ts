@@ -125,6 +125,5 @@ export function craftCostFor(measured: FiveQi | null, self: Element): FiveQi | n
   return ELEMENTS.map((e) => byRelation[relationOf(self, e)] ?? 0) as unknown as FiveQi
 }
 
-/** 能不能炼：铸剑之术与御剑术都要够级。 */
-export const canForge = (s: Sword, forge: number, wield: number): boolean =>
-  forge >= s.forgeLevel && wield >= s.wieldLevel
+/** 原版物品窗把炼制与使用分开：炼制只要求铸剑之术，御剑术是使用条件。 */
+export const canForge = (s: Sword, forge: number): boolean => forge >= s.forgeLevel

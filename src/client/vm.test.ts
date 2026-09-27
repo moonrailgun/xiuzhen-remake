@@ -124,6 +124,13 @@ test('★14 把剑全部可炼（两处缺口已按各自的依据补上）', ()
   }
 })
 
+test('青龙伏魔先炼制再学御剑：炼制条件只检查铸剑之术', () => {
+  const rich = withQi(base(), 1000)
+  const rows = swordCraftRows({ ...rich, player: { ...rich.player, skills: { 铸剑之术: 1 } } })
+  assert.ok(rows.find((row) => row.name === '青龙伏魔剑')!.craftable! > 0)
+  assert.equal(swordCraftRows(rich).find((row) => row.name === '青龙伏魔剑')!.craftable, null)
+})
+
 test('★补上的两处各自记了理由（一处是原文、一处是重建）', () => {
   // 冰魄寒光的击退是对照表原文（那一行效果列为空），不是猜的
   assert.match(SWORD_PATCH_NOTES['冰魄寒光剑']!, /原文/)

@@ -17,6 +17,7 @@ import { schedule, countByKind, type GameEvent } from './timeline.ts'
 import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact } from './state.ts'
 import { refineSuccessRate, refinePieces, type Quality } from '../data/artifacts.ts'
 import { roll } from './rng.ts'
+import { canForge, swordByName } from '../data/swords.ts'
 
 export type CraftKind = 'sword' | 'guard' | 'pill'
 
@@ -63,6 +64,11 @@ export type CraftResult =
  */
 export function startCraft(state: GameState, order: CraftOrder): CraftResult {
   if (!Number.isSafeInteger(order.count) || order.count <= 0) return { ok: false, reason: '请填写炼制数量' }
+
+  const sword = order.kind === 'sword' ? swordByName(order.name) : undefined
+  if (sword && !canForge(sword, state.player.skills['铸剑之术'] ?? 0)) {
+    return { ok: false, reason: `炼制${sword.name}需要铸剑之术${sword.forgeLevel}级` }
+  }
 
   const queueId = CRAFT_QUEUE_ID[order.kind]
   if (state.timeline.events.some((e) => e.id === queueId)) {

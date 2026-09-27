@@ -61,11 +61,15 @@ export type CraftResult =
   | { readonly ok: true; readonly state: GameState }
   | { readonly ok: false; readonly reason: string }
 
-/** 基础上品率 50%、物理通明极品率 1% 为重建；极品占用上品区间，不重复掷骰。 */
-export function craftQuality(state: GameState): { quality: Quality; rng: RngState } {
+/** 满级上品率普通50%、昆仑炼器总纲4级70%为原文；中间概率、废品率与极品1%为重建。 */
+export function craftQuality(state: GameState, kind: 'sword' | 'guard' = 'sword'): { quality: Quality; rng: RngState } {
   const r = next(state.rng)
-  const quality = (state.player.skills['物理通明'] ?? 0) > 0 && r.value < 0.01 ? '极品'
-    : r.value < 0.5 + 0.05 * (state.player.skills['炼器总纲'] ?? 0) ? '上品' : '凡品'
+  const mastery = Math.max(0, Math.min(20, state.player.skills[kind === 'sword' ? '铸剑之术' : '灵宝真经'] ?? 0)) / 20
+  const kunlun = state.player.school === '昆仑' ? Math.max(0, Math.min(4, state.player.skills['炼器总纲'] ?? 0)) * .05 : 0
+  const upper = .05 + .45 * mastery + kunlun
+  const waste = .65 * (1 - mastery)
+  const quality = (state.player.skills['物理通明'] ?? 0) > 0 && r.value < .01 ? '极品'
+    : r.value < upper ? '上品' : r.value < 1 - waste ? '凡品' : '废品'
   return { quality, rng: r.state }
 }
 
@@ -126,11 +130,18 @@ export function startCraft(state: GameState, order: CraftOrder): CraftResult {
   }
 
   const per = craftSeconds(recipe.baseSeconds, order.kind, state.player.body[BODY_HAND] ?? 0)
+  let rng = state.rng
+  const qualities: Quality[] = Array.from({ length: order.count }, () => {
+    if (order.kind === 'pill') return '凡品'
+    const result = craftQuality({ ...state, rng }, order.kind)
+    rng = result.rng
+    return result.quality
+  })
   const event: GameEvent = {
     id: queueId,
     kind: 'craft',
     finishAt: state.clock.gameT + per * order.count,
-    payload: { ...order, ...recipe, perSeconds: per },
+    payload: { ...order, ...recipe, quality: qualities[0]!, qualities, perSeconds: per },
   }
 
   return {
@@ -143,6 +154,7 @@ export function startCraft(state: GameState, order: CraftOrder): CraftResult {
         // 炼制消耗的真气同样计入道行
         daoxing: state.player.daoxing + totalQi(total),
       },
+      rng,
       timeline: schedule(state.timeline, event),
     },
   }
@@ -191,12 +203,13 @@ export function resolveCraft(state: GameState, event: GameEvent): GameState {
   const name = event.payload['name'] as string
   const count = event.payload['count'] as number
   const quality = event.payload['quality'] as Quality
+  const qualities = event.payload['qualities'] as readonly Quality[] | undefined
 
   const made: Artifact[] = Array.from({ length: count }, (_, i) => ({
     id: `${kind}:${event.finishAt}:${i}`,
     kind: kind === 'pill' ? 'pill' : kind === 'guard' ? 'guard' : 'sword',
     name,
-    quality,
+    quality: qualities?.[i] ?? quality,
     refine: 0,
     status: '空闲',
     count: 1,

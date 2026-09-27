@@ -312,3 +312,33 @@ test('F01：炼丹和护身配方校验对应技能，未知物品不可伪造',
   assert.equal(startCraft(state(), { ...swordOrder(), kind: 'guard', name: '指玄道藏碑' }).ok, false)
   assert.equal(startCraft(state(), { ...swordOrder(), name: '伪造飞剑' }).ok, false)
 })
+
+test('F08：初学铸剑会出废品，满级上品率按门派封顶', () => {
+  let s = state()
+  const seen = new Set<string>()
+  for (let i = 0; i < 500; i++) {
+    const q = craftQuality(s)
+    seen.add(q.quality)
+    s = { ...s, rng: q.rng }
+  }
+  assert.ok(seen.has('废品'))
+  assert.ok(seen.has('凡品'))
+  assert.ok(seen.has('上品'))
+  const forged = { ...s, player: { ...s.player, school: '蜀山' as const, skills: { 铸剑之术: 20, 炼器总纲: 4 } } }
+  assert.deepEqual(craftQuality(forged), craftQuality({ ...forged, player: { ...forged.player, skills: { 铸剑之术: 20 } } }))
+})
+
+test('F08：一炉逐件抽取品质且创建时固定，旧事件仍可结算', () => {
+  const s = state()
+  const r = startCraft(s, swordOrder(5))
+  assert.ok(r.ok)
+  const event = r.state.timeline.events.find(e => e.kind === 'craft')!
+  const qualities = event.payload['qualities']
+  assert.ok(Array.isArray(qualities))
+  assert.equal(qualities.length, 5)
+  assert.deepEqual(resolveCraft(r.state, event).player.artifacts.map(a => a.quality), qualities)
+  assert.deepEqual(startCraft(s, swordOrder(5)), r)
+  assert.notDeepEqual(r.state.rng, s.rng)
+  const { qualities: _qualities, ...legacy } = event.payload
+  assert.deepEqual(resolveCraft(r.state, { ...event, payload: { ...legacy, quality: '凡品' } }).player.artifacts.map(a => a.quality), Array(5).fill('凡品'))
+})

@@ -63,8 +63,8 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget,
 } from '../engine/battle.ts'
-import { usePill as consumePill, craftQuality, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
-import { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS, ITEM_STATUSES } from '../pages/item.ts'
+import { usePill as consumePill, craftRecipe, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
+import { PILL_NAMES, PILL_TIERS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
 import {
   ctxOf, applyCtx, buyQi, buyArtifact, listQi, listArtifact, cancelQiOrders, cancelArtifactOrders,
@@ -77,7 +77,6 @@ import { purchase } from '../engine/payment.ts'
 import { startCultivate, planUpgrade, skillUpgradeBlockReason, spendCoin, levelOf, capacityOf, BODY_PARTS } from '../engine/cultivate.ts'
 import { formatServerTime, formatDuration, DAY } from '../engine/clock.ts'
 import { sorted, type GameEvent } from '../engine/timeline.ts'
-import { type RngState } from '../engine/rng.ts'
 import type { GameState } from '../engine/state.ts'
 import type { Element } from '../data/meridian.ts'
 import { MERIDIANS } from '../data/meridian.ts'
@@ -1026,8 +1025,7 @@ export function installGameActions(): void {
         '<DIV class=middle style="padding:10px">这件法宝没有留下炼制配方。</DIV>')
       return
     }
-    // 掷过品质骰之后 rng 已经推进，写回存档再开炉
-    const r = startCraft({ ...state, rng: made.rng }, made.order)
+    const r = startCraft(state, made)
     if (!r.ok) {
       openWindow('mwindow', '无法炼制', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
       return
@@ -2141,54 +2139,19 @@ function townNpcWindow(s: GameState, town: Town, def: TownNpc): string {
 // —— 炼制配方 ——
 
 /** 按炼制页的 itemId 反查配方。飞剑 501xx、护身 601xx、丹药三位数。 */
-function craftOrderFor(
-  s: GameState,
-  itemId: number,
-  count: number,
-): { readonly order: CraftOrder; readonly rng: RngState } | null {
+function craftOrderFor(s: GameState, itemId: number, count: number): CraftOrder | null {
+  let kind: CraftOrder['kind'], name: string | undefined
   if (itemId >= 50100 && itemId < 60000) {
-    const sw = SWORDS[Math.floor((itemId - 50100) / 100)]
-    const cost = sw ? craftCostFor(sw.craftCost, s.player.element) : null
-    // 转录不全的剑没有配方，宁可不给炼
-    if (!sw || !cost || sw.craftSeconds === null) return null
-    const q = craftQuality(s)
-    return {
-      order: { kind: 'sword', name: sw.name, count, cost, baseSeconds: sw.craftSeconds, quality: q.quality },
-      rng: q.rng,
-    }
+    kind = 'sword'; name = SWORDS[Math.floor((itemId - 50100) / 100)]?.name
+  } else if (itemId >= 60100 && itemId < 60900) {
+    kind = 'guard'; name = DEFENSIVE_ARTIFACTS[Math.floor((itemId - 60100) / 100)]?.name
+  } else {
+    kind = 'pill'
+    const pill = PILL_NAMES[Math.floor(itemId / 100) - 1], tier = PILL_TIERS[(itemId % 100) - 1]
+    if (pill && tier) name = `${tier}${pill}`
   }
-  if (itemId >= 60100 && itemId < 60900) {
-    const g = DEFENSIVE_ARTIFACTS[Math.floor((itemId - 60100) / 100)]
-    const gcost = g?.craftCost ? craftCostFor(g.craftCost, s.player.element) : null
-    if (!g || !gcost) return null
-    const q = craftQuality(s)
-    return {
-      order: { kind: 'guard', name: g.name, count, cost: gcost, baseSeconds: g.craftSeconds, quality: q.quality },
-      rng: q.rng,
-    }
-  }
-  // 丹药：百位 = 丹种，末两位 = 炼数（09 §1.16 的 id 规律）
-  if (itemId >= 100 && itemId <= 620) {
-    const kindIdx = Math.floor(itemId / 100) - 1
-    const tierIdx = (itemId % 100) - 1
-    const kind = PILL_NAMES[kindIdx]
-    const tier = PILL_TIERS[tierIdx]
-    if (!kind || !tier) return null
-    // 丹药不分品质，不用掷骰，rng 原样带回
-    return {
-      order: {
-        kind: 'pill',
-        name: `${tier}${kind}`,
-        count,
-        // 13903-p1.txt：炼丹只消耗时间。
-        cost: [0, 0, 0, 0, 0],
-        baseSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
-        quality: '凡品',
-      },
-      rng: s.rng,
-    }
-  }
-  return null
+  const recipe = name ? craftRecipe(s, kind, name) : null
+  return recipe && name ? { kind, name, count, ...recipe, quality: '凡品' } : null
 }
 
 // —— 市场 ——

@@ -9,6 +9,7 @@
  * 怀旧 = 慢，但单机下不给倍速会劝退。默认仍是原速。
  */
 
+import { formatDuration } from '../engine/clock.ts'
 import { esc, each } from './html.ts'
 
 export type SettingsVm = {
@@ -25,6 +26,7 @@ export type SettingsVm = {
    * 单机版没有收费的意义，所以做成这里的一个开关，让那条队列摸得到。
    */
   readonly vip: boolean
+  readonly peaceRemaining?: number
 }
 
 /** 可选倍速。1× 是原版节奏。 */
@@ -58,6 +60,7 @@ ${row(
     '<SPAN class=smallgray>原版 VIP 是充值功能：多一个待修名额（顺序修炼）、多 5 个法宝格。' +
     '单机版不收费，做成开关。</SPAN>',
   )}
+${row('免战', `${(vm.peaceRemaining ?? 0) > 0 ? `剩余 ${formatDuration(vm.peaceRemaining!)}` : '未开启'}　<A href="#" onclick="buyPeace()">20 普通仙石 / 7 天</A>`)}
 ${row(
     '存档',
     vm.storageOk

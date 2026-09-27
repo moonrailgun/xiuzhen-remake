@@ -55,7 +55,7 @@ import { weekOfServer } from '../engine/clock.ts'
 import { npcsAtCell, allNpcsAt } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
-import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation, setBlocked, receiveLetter } from '../engine/social.ts'
+import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation, buyPeace, setBlocked, receiveLetter } from '../engine/social.ts'
 import { renderSettings } from '../pages/settings.ts'
 import { renderGm, type GmVm } from '../pages/gm.ts'
 import { applyGm, sanshiView, summonSanshi, bodyCapFor, meridianCapFor, skillCaps, SCHOOLS, type GmPatch } from '../engine/gm.ts'
@@ -923,6 +923,7 @@ export function installGameActions(): void {
     applySocial(changeGuardian(state, npc?.id ?? -1, true))
   }
   g['blockSender'] = (name: string, blocked: boolean) => { if (state) applySocial(setBlocked(state, name, blocked)) }
+  g['buyPeace'] = () => { if (state) applySocial(buyPeace(state)) }
   g['removeGuardian'] = (id: number) => { if (state) applySocial(changeGuardian(state, id, false)) }
   g['guildAction'] = (action: string) => {
     if (!state) return
@@ -1245,6 +1246,7 @@ export function installGameActions(): void {
       rate: state.clock.rate,
       dayOfServer: dayOfServer(state.clock),
       saveBytes: bytes,
+      peaceRemaining: Math.max(0, (state.peaceUntil ?? 0) - state.clock.gameT),
       storageOk: STORAGE_KEY_AVAILABLE,
       vip: state.player.vip,
     }))

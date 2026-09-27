@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { newGame, importGame } from './game.ts'
-import { socialOf, changeGuardian, canRequestAid, createGuild, joinGuild, setGuildRelation, setBlocked, receiveLetter } from './social.ts'
+import { socialOf, changeGuardian, canRequestAid, createGuild, joinGuild, setGuildRelation, buyPeace, setBlocked, receiveLetter } from './social.ts'
+import { DAY } from './clock.ts'
 
 const fresh = () => newGame({ name: '测试', gender: 'm', element: '金', school: '蜀山', x: 10, y: 10, seed: 1 }, 0)
 test('护法关系持久保存，陌生人不能应邀参战，解除后立即失去权限', () => {
@@ -30,6 +31,20 @@ test('玩家门派独立于道源，加入与外交均检查成员和掌门权�
   assert.ok(joined.ok)
   assert.equal(setGuildRelation(joined.state, 2, 'enemy').ok, false)
   assert.equal(joined.state.player.school, '蜀山')
+})
+test('免战只扣普通仙石，正在交战不能购买，续期按游戏时间累计', () => {
+  const s = fresh()
+  assert.equal(buyPeace(s).ok, false)
+  const paid = { ...s, player: { ...s.player, coin: 40 } }
+  const r = buyPeace(paid)
+  assert.ok(r.ok)
+  assert.equal(r.state.player.coin, 20)
+  assert.equal(r.state.player.bonusCoin, 100)
+  assert.equal(r.state.peaceUntil, 7 * DAY)
+  const again = buyPeace(r.state)
+  assert.ok(again.ok)
+  assert.equal(again.state.peaceUntil, 14 * DAY)
+  assert.equal(buyPeace({ ...paid, timeline: { events: [{ id: 'raid', kind: 'raid', finishAt: 20, payload: {} }] } }).ok, false)
 })
 test('黑名单过滤指定玩家来信，系统战报不被屏蔽', () => {
   const s = fresh(), name = s.npc.bases[0]!.name

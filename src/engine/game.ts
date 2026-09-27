@@ -417,7 +417,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
   if (!object(value)) fail()
   const s = value as Record<string, unknown>
   const p = s.player, c = s.clock, tl = s.timeline, npc = s.npc, quests = s.quests, market = s.market
-  if (!number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
+  if (!optionalNumber(s.peaceUntil) || !number(s.v) || !number(s.worldSeed) || !numbers(s.rng, 4) ||
       (s.social !== undefined && (!object(s.social) || !ids(s.social.guardians) || !idMap(s.social.npcGuardians, ids) ||
         !Array.isArray(s.social.blacklist) || !s.social.blacklist.every(string) ||
         !arrayOf(s.social.guilds, g => integer(g.id) && string(g.name) && integer(g.founder) && integer(g.leader) && number(g.createdAt) &&

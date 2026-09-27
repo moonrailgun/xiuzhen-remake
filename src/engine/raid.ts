@@ -56,6 +56,7 @@ export function defenders(state: GameState): readonly CombatSword[] {
  * 不会来袭的情况：还在保护期、身上已有来袭事件、附近没有狼。
  */
 export function scheduleRaid(state: GameState): GameState {
+  if ((state.peaceUntil ?? 0) > state.clock.gameT) return state
   if (!isOutOfProtection(state.player, state.clock.gameT, DAY)) return state
   if (state.timeline.events.some((e) => e.id === RAID_EVENT_ID)) return state
 
@@ -120,6 +121,7 @@ export function resolveRaidEvent(state: GameState, event: GameEvent): { state: G
       durability: power * 2, agility: Math.max(1, Math.round(power / 8)), absorb: power * 4,
     })))
   const aid = (event.payload['aid'] as NpcAid[] | undefined) ?? []
+  if ((state.peaceUntil ?? 0) > event.finishAt) return finishRaid(state, event, attackers, aid, [], null, '免战')
 
   if (!phase || phase === 'outbound') {
     let next = applyCtx(cancelAllMyOrders(ctxOf(state)))

@@ -2,6 +2,7 @@
  * 原版依据：news/gonggao-xz-2008-11-26-652、third-party/17173-webxz-system、threads-unknown/82051-p1。
  */
 import type { GameState, MailItem } from './state.ts'
+import { DAY } from './clock.ts'
 
 export type Guild = {
   readonly id: number; readonly name: string; readonly founder: number; readonly leader: number
@@ -90,6 +91,12 @@ export function setGuildRelation(s: GameState, id: number, relation: 'ally' | 'e
     return { ...g, allies: [...g.allies.filter(n => n !== other), ...(relation === 'ally' ? [other] : [])],
       enemies: [...g.enemies.filter(n => n !== other), ...(relation === 'enemy' ? [other] : [])] }
   }) }, `门派关系调整：${relation === 'ally' ? '同盟' : relation === 'enemy' ? '敌对' : '中立'}`)
+}
+/** 仙石购买免战有原文，价格/时长缺失；重建为普通仙石20枚/7日，禁止交战时临时购买。 */
+export function buyPeace(s: GameState): Result {
+  if (s.timeline.events.some(e => e.kind === 'raid' || e.kind === 'battle')) return fail('交战期间不能购买免战')
+  if (s.player.coin < 20) return fail('需要 20 枚普通仙石，附加仙石不能代付')
+  return { ok: true, state: { ...s, player: { ...s.player, coin: s.player.coin - 20 }, peaceUntil: Math.max(s.clock.gameT, s.peaceUntil ?? 0) + 7 * DAY } }
 }
 export function setBlocked(s: GameState, input: string, blocked: boolean): Result {
   const name = input.trim(), social = socialOf(s)

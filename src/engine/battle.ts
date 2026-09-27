@@ -107,6 +107,7 @@ export function launch(
 
   const dist = distance(state.player.x, state.player.y, target.x, target.y)
   // 玩家要在视野内才能打；怪物不限距离 [原文]
+  if (target.kind === 'player' && (state.peaceUntil ?? 0) > state.clock.gameT) return { ok: false, reason: '免战期间不能主动攻击道友' }
   const visible = target.npcId !== undefined && isDivinationVisible(state, { x: target.x, y: target.y, base: { id: target.npcId } })
   if (target.kind === 'player' && dist > (opts.sightRange ?? 4) && !visible) {
     return { ok: false, reason: '目标不在视野范围内，需要先用九宫飞星法推算其位置' }

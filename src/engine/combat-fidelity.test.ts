@@ -163,3 +163,16 @@ test('旧存档出击快照缺吸收时仍沿用同剑品质淬炼的搬运容�
   const old = { ...r.state, timeline: { events: [{ ...event, payload: { ...event.payload, swords: [{ ...stored[0]!, launchedStats: oldStats }] } }] } }
   assert.ok((finish(old).npc.patches[base.id]?.qiLost ?? 0) > 0)
 })
+
+test('护身拖延中开启免战，结束来袭会释放已祭剑与护身', () => {
+  const guard = artifact('guard', { kind: 'guard', name: '指玄道藏碑', quality: '上品', refine: 5 })
+  const a = artifact('a'), s = state([guard, a])
+  const event = { id: 'raid', kind: 'raid' as const, finishAt: s.clock.gameT, payload: { attacker: '敌人', swordPower: 100, swords: 1, element: '火' } }
+  const staged = resolveRaidEvent(s, event)
+  const raised = defendRaid({ ...staged.state, timeline: { events: staged.follow! } }, 'raid', [sword(a)])
+  assert.ok(raised.ok)
+  const waiting = raised.state.timeline.events[0]!
+  const ended = resolveRaidEvent({ ...raised.state, peaceUntil: waiting.finishAt + 1 }, waiting)
+  assert.deepEqual(ended.state.player.artifacts.map(a => a.status), ['空闲', '空闲'])
+  assert.ok(!ended.follow?.length)
+})

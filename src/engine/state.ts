@@ -80,6 +80,8 @@ export type Player = {
 export type GameState = {
   readonly divination?: import('./divine.ts').DivinationSight
   readonly social?: SocialState
+  /** 购买免战的到期游戏时间。 */
+  readonly peaceUntil?: number
   /** 存档格式版本，与 `save.ts` 的 SAVE_VERSION 对应 */
   readonly v: number
   readonly clock: Clock

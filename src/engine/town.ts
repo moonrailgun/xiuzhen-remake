@@ -14,8 +14,10 @@ import { cancel, type GameEvent } from './timeline.ts'
 import type { Artifact, GameState } from './state.ts'
 import { spendCoin, type StartResult } from './cultivate.ts'
 import { activeQuests, paySilver } from './quest.ts'
-import { canAcquireArtifacts } from './craft.ts'
+import { DAY } from './clock.ts'
+import { randInt } from './rng.ts'
 import { sanctuaryEntryBlocker } from './sanctuary.ts'
+import { canAcquireArtifacts } from './craft.ts'
 import { inWorld } from '../data/world.ts'
 import {
   BANK_NOTES,
@@ -123,13 +125,37 @@ export function withdrawInvestment(state: GameState, town: Town): InvestResult {
   }
 }
 
-/** clock 为区间终点；使用累计整数差，让在线小步与离线整段所得一致。 */
+/** guides/9947-p1 有投资被挤掉的记录；三席、每日挑战及全额退本金均为重建。 */
+export const MAX_TOWN_INVESTORS = 3
+
+function competeInvestments(state: GameState, day: number): GameState {
+  let refund = 0
+  const towns = Object.fromEntries(Object.entries(state.towns).map(([key, town]) => {
+    if (!town.investments.length) return [key, town]
+    const least = Math.min(...town.investments.map(i => i.silver))
+    const challenger = { owner: `商旅·${town.id}·${day}`, silver: Math.max(1, Math.ceil(least * (1.1 + randInt(41, state.worldSeed, 'investment', town.id, day) / 100))) }
+    const ranked = [...town.investments, challenger].sort((a, b) => b.silver - a.silver)
+    refund += ranked.slice(MAX_TOWN_INVESTORS).filter(i => i.owner === state.player.name).reduce((sum, i) => sum + i.silver, 0)
+    return [key, { ...town, investments: ranked.slice(0, MAX_TOWN_INVESTORS) }]
+  }))
+  return { ...state, towns, player: { ...state.player, silver: state.player.silver + refund } }
+}
+
+/** 按午夜切段再竞争，在线小步和长段离线得到同一收益、NPC份额与退款。 */
 export function settleTownIncome(state: GameState, elapsedSeconds: number): GameState {
   if (!(elapsedSeconds > 0)) return state
-  const rate = Object.values(state.towns).reduce((sum, t) => sum + hourlyIncomeOf(t, state.player.name), 0)
   const end = state.clock.gameT
-  const income = Math.floor(end * rate / 3600) - Math.floor(Math.max(0, end - elapsedSeconds) * rate / 3600)
-  return income ? { ...state, player: { ...state.player, silver: state.player.silver + income } } : state
+  let at = Math.max(0, end - elapsedSeconds), settled = state
+  while (at < end) {
+    const boundary = (Math.floor(at / DAY) + 1) * DAY
+    const until = Math.min(end, boundary)
+    const rate = Object.values(settled.towns).reduce((sum, t) => sum + hourlyIncomeOf(t, settled.player.name), 0)
+    const income = Math.floor(until * rate / 3600) - Math.floor(at * rate / 3600)
+    if (income) settled = { ...settled, player: { ...settled.player, silver: settled.player.silver + income } }
+    if (until === boundary) settled = competeInvestments(settled, Math.floor(boundary / DAY))
+    at = until
+  }
+  return settled
 }
 
 /**

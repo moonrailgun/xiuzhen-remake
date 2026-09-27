@@ -7,6 +7,7 @@ import {
   canReadFree,
   cancelEscort,
   completeEscort,
+  settleTownIncome,
   commerceLevel,
   exchangeNote,
   hourlyIncomeOf,
@@ -23,7 +24,7 @@ import {
   townIncome,
   type Town,
 } from './town.ts'
-import { createClock } from './clock.ts'
+import { createClock, DAY } from './clock.ts'
 import { advanceTo, emptyTimeline } from './timeline.ts'
 import { seedRng } from './rng.ts'
 import { ESCORT_SECONDS_PER_CELL, STATION_COST_COIN } from '../data/town.ts'
@@ -308,4 +309,18 @@ test('旧自动押镖事件迁入待交付合同，不传送或自动发钱', ()
   const migrated = resolveEscort(s, { id: ESCORT_EVENT_ID, kind: 'move', finishAt: 100, payload: { op: 'escort', x: 30, y: 106, fee: 66 } })
   assert.deepEqual([migrated.player.x, migrated.player.y, migrated.player.silver], [28, 106, 0])
   assert.deepEqual(migrated.quests.escort?.to, [30, 106])
+})
+
+test('NPC逐日竞争挤掉最低投资并退本金，分段/离线一致且可重新投资', () => {
+  const s = state()
+  const invested = { ...s, towns: { t1: town({ investments: [{ owner: s.player.name, silver: 100 }, { owner: '商人甲', silver: 200 }, { owner: '商人乙', silver: 300 }] }) } }
+  const one = settleTownIncome({ ...invested, clock: { ...s.clock, gameT: 3 * DAY } }, 3 * DAY)
+  let split: GameState = invested
+  for (let day = 1; day <= 3; day++) split = settleTownIncome({ ...split, clock: { ...s.clock, gameT: day * DAY } }, DAY)
+  assert.deepEqual(one, split)
+  assert.equal(one.towns.t1!.investments.some(i => i.owner === s.player.name), false)
+  const rate = hourlyIncomeOf(invested.towns.t1, s.player.name)
+  assert.equal(one.player.silver, rate * 24 + 100)
+  const reinvest = invest(one, one.towns.t1!, 100)
+  assert.ok(reinvest.ok)
 })

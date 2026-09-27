@@ -108,7 +108,8 @@ function nearWolf(): GameState {
   return {
     ...s,
     npc: { bases: [{ id: 1, name: '测试狼', profile: '小狼', school: '通天', element: '木', bornAt: 0, homeX: 100, homeY: 100 }], patches: { 1: { x: 100, y: 100 } } },
-    player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0], artifacts: [guard({ quality: '极品', refine: 10 })] },
+    // 调度回归用先天罡气即时驱退，避免高淬炼护身的真实拖延跨过整个测试窗口。
+    player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0], skills: { ...s.player.skills, 先天罡气: 20 }, artifacts: [] },
   }
 }
 
@@ -131,11 +132,16 @@ test('一次来袭结束后同一小时不会再次掷中同一只狼', () => {
   assert.equal(running.timeline.events.length, 0)
 })
 
-test('离线来袭只抢到达时刻的积蓄，之后的产出保留', () => {
+test('离线来袭在交战结束时抢气，之后的产出保留', () => {
   const s = outOfProtection(base())
   const start: GameState = { ...s, npc: { bases: [], patches: {} }, player: { ...s.player, body: [0, 0, 0, 0, 0, 29, 0, 0] }, timeline: { events: [{ ...raidEvent(s), finishAt: s.clock.gameT + 60 }] } }
+  const arrived = tick(start, 60_000, () => [4, 4, 4, 4, 4]).state
+  assert.equal(arrived.mail.length, 0, '到达时先进入交战，不能提前掠夺或发战报')
+  assert.equal(arrived.timeline.events[0]!.payload['phase'], 'fighting')
+  const fightEnd = arrived.timeline.events[0]!.finishAt
+  assert.ok(fightEnd > arrived.clock.gameT)
   const result = tick(start, DAY * 1000, () => [4, 4, 4, 4, 4]).state
-  assert.equal(result.mail[0]!.at, s.clock.gameT + 60)
+  assert.equal(result.mail[0]!.at, fightEnd)
   assert.ok(result.player.qi.some((v) => v > 280), '被抢后余下近24小时仍应正常产出')
 })
 

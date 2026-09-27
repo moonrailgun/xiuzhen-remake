@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// 独立浏览器存档；只导入装备、技能、容量和位置，任务进度与战斗事件全部由页面操作产生。
+// 独立浏览器存档；只导入玩家/护法装备、技能、容量和位置，任务进度与战斗事件全部由页面操作产生。
 import { chromium } from 'playwright'
 import { panelStat } from '../../src/data/artifacts.ts'
 import { swordByName } from '../../src/data/swords.ts'
+import { allNpcsAt, npcAt } from '../../src/engine/npc.ts'
+import { rand } from '../../src/engine/rng.ts'
 
 const browser = await chromium.launch()
-const page = await browser.newPage()
+const page = await browser.newPage({ viewport: { width: 1200, height: 950 }, deviceScaleFactor: 1 })
 page.setDefaultTimeout(5000)
 const failures = []
 const errors = []
@@ -22,6 +24,7 @@ const swordId = 'combat-regression-sword'
 const sword = state => state.player.artifacts.find(item => item.id === swordId)
 const detailAttack = () => page.locator('#rwindowcontent .itemmid > table').nth(1).locator('tr').nth(2).locator('td').first().textContent()
 const battle = state => state.timeline.events.find(event => event.kind === 'battle')
+const raid = state => state.timeline.events.find(event => event.id === 'raid')
 const importState = async state => {
   const payload = { ...await envelope(), state }
   const chooser = page.waitForEvent('filechooser')
@@ -44,9 +47,9 @@ const launchSelected = async () => {
   await page.locator('#lwindowcontent a[onclick^="sendFight"]').click()
   return saved()
 }
-const reachNextPhase = async () => {
+const reachNextPhase = async (select = battle) => {
   const state = await saved()
-  const remaining = battle(state).finishAt - state.clock.gameT
+  const remaining = select(state).finishAt - state.clock.gameT
   await page.clock.fastForward(Math.ceil(remaining * 1000))
   return saved()
 }
@@ -86,6 +89,7 @@ try {
     await page.locator(`#fightform input[value="${swordId}"]`).count() === 0 &&
     await page.locator('#fightform input[value="support-sword"]').count() === 1)
   prepared.player.skills['御剑术'] = 1
+  prepared.player.skills['小周天剑法'] = 1
   await importState(prepared)
   await openQuest()
   await page.locator('#lwindowcontent a[href*="fight.jsp"], #lwindowcontent a[onclick*="fight.jsp"]').click()
@@ -96,7 +100,10 @@ try {
     await page.locator('#rwindowcontent .itemmid').count() === 1 &&
     Number(await detailAttack()) === panelStat(swordByName('青龙伏魔剑').attack, '极品', 3))
   await page.evaluate(() => closeRWindow())
+  await page.selectOption('#fightswordart', '小周天剑法')
   const outbound = await launchSelected()
+  const circle = battle(outbound).payload.swords[0].launchedStats
+  check('页面选择小周天，出击攻击降至四分之一、敏捷加倍', circle.attack === panelStat(swordByName('青龙伏魔剑').attack, '极品', 3) / 4 && circle.agility === 48)
   const goldBefore = outbound.player.qi[0]
   check('选择飞剑出击后进入斩杀队列', battle(outbound)?.payload.phase === 'outbound' && sword(outbound)?.status === '斩杀中')
   check('出击阶段不提前完成任务', !outbound.quests.entries.find(entry => entry.id === 'beast:1').cleared)
@@ -132,11 +139,15 @@ try {
   check('任务可从页面领奖落盘', (await saved()).quests.entries.find(entry => entry.id === 'beast:1').done === true)
 
   // 选一个世界已生成、名字唯一的驻点 NPC。只推进真实游戏时间，不改 NPC 或战斗记录。
+  const grown = await saved()
+  grown.player.artifacts = grown.player.artifacts.map(a => a.id === swordId ? { ...a, refine: 8 } : a)
+  await importState(grown)
   const world = await saved()
   const npc = world.npc.bases.filter(base => base.profile === '羊' && world.npc.bases.filter(other => other.name === base.name).length === 1)
     .sort((a, b) => a.bornAt - b.bornAt)[0]
   if (!npc) throw new Error('当前世界没有可用于回归的唯一姓名驻点 NPC')
-  await page.clock.fastForward(Math.max(1000, (npc.bornAt + 86400 - world.clock.gameT) * 1000))
+  await page.clock.fastForward(Math.max(1000, (npc.bornAt + 20 * 86400 - world.clock.gameT) * 1000))
+  while (raid(await saved())) await reachNextPhase(raid)
   const visiting = await saved()
   visiting.player.x = npc.homeX
   visiting.player.y = npc.homeY
@@ -146,16 +157,82 @@ try {
   const second = await launchSelected()
   const npcGold = second.player.qi[0]
   const previousLost = second.npc.patches[npc.id]?.qiLost ?? 0
+  const npcBefore = npcAt(second.npc, npc, second.clock.gameT, second.worldSeed)
   check('同一把飞剑可再次出击且绑定正确 NPC', battle(second)?.payload.swordIds.includes(swordId) && battle(second)?.payload.target.npcId === npc.id)
   await reachNextPhase()
   const npcReturning = await reachNextPhase()
   const npcLoot = battle(npcReturning)?.payload.loot
   check('NPC 战胜后产生非零掠夺且扣除目标库存', npcLoot?.[0] > 0 && npcReturning.npc.patches[npc.id]?.qiLost === previousLost + npcLoot.reduce((sum, amount) => sum + amount, 0))
+  check('NPC 被抢后保留真实断剑与击退位置，不降低累计道行', npcReturning.npc.patches[npc.id]?.artifacts.some(a => a.status === '损坏') && npcAt(npcReturning.npc, npc, npcReturning.clock.gameT, npcReturning.worldSeed).daoxing === npcBefore.daoxing && (npcReturning.npc.patches[npc.id].x !== npcBefore.x || npcReturning.npc.patches[npc.id].y !== npcBefore.y))
+  check('NPC 掠夺五气总量不超过胜剑吸收', npcLoot.reduce((n, q) => n + q, 0) <= battle(second).payload.swords[0].launchedStats.absorb)
   check('NPC 战利品返航前不提前入账', npcReturning.player.qi[0] === npcGold)
   const npcReturned = await reachNextPhase()
   check('第二次返航再次恢复空闲并实际发放 NPC 战利品', sword(npcReturned)?.status === '空闲' && !battle(npcReturned) && npcReturned.player.qi[0] === npcGold + npcLoot[0])
   await page.clock.fastForward(2000)
   check('后续 tick 不会重复发放战利品', (await saved()).player.qi[0] === npcReturned.player.qi[0])
+  // 来袭事件仍由真实整点调度产生。仅准备装备和驻点，护法关系由页面建立。
+  const defenseSetup = await saved()
+  let hour = Math.floor(defenseSetup.clock.gameT / 3600) + 1
+  while (rand(defenseSetup.worldSeed, 'raid', hour) >= 0.06) hour++
+  const residents = allNpcsAt(defenseSetup.npc, hour * 3600, defenseSetup.worldSeed)
+  const guardian = residents.find(n => n.base.profile === '羊' && n.swords > 0 &&
+    defenseSetup.npc.bases.filter(b => b.name === n.base.name).length === 1 &&
+    residents.some(w => w.base.profile !== '羊' && w.swords > 0 && Math.abs(w.x - n.x) + Math.abs(w.y - n.y) <= 12))
+  if (!guardian) throw new Error('当前世界没有附近有来袭者的可用护法')
+  defenseSetup.player.x = guardian.x
+  defenseSetup.player.y = guardian.y
+  defenseSetup.player.artifacts = [
+    { ...sword(defenseSetup), refine: 8, status: '空闲' },
+    { id: 'combat-guard', kind: 'guard', name: '指玄道藏碑', quality: '上品', refine: 5, status: '空闲', count: 1 },
+  ]
+  // 此用例必须走幸存剑返航；随机新号的普通羊可能全军覆没，所以明确准备耐久足够的真实装备。
+  defenseSetup.npc.patches[guardian.base.id] = {
+    ...defenseSetup.npc.patches[guardian.base.id],
+    artifacts: [{ id: 'combat-guardian-sword', kind: 'sword', name: '玉虚桃木剑', quality: '极品', refine: 8, status: '空闲', count: 1 }],
+  }
+  await importState(defenseSetup)
+  await page.evaluate(id => openLWindow('道友资料', `playerinfo.jsp?playerid=${id}`), guardian.base.id)
+  await page.locator('#lwindowcontent a[onclick*=addpal]').click()
+  check('从道友资料结为护法并持久落盘', (await saved()).social.guardians.includes(guardian.base.id))
+  await page.evaluate(() => { closeLWindow(); closeMWindow() })
+  await page.clock.fastForward(Math.ceil((hour * 3600 - (await saved()).clock.gameT) * 1000))
+  const incoming = await saved()
+  check('真实整点派出 NPC 空闲飞剑，来袭途中实际占用', raid(incoming)?.payload.phase === 'outbound' &&
+    incoming.npc.patches[raid(incoming).payload.attackerId].artifacts.some(a => a.status === '斩杀中'))
+  const guardState = await reachNextPhase(raid)
+  check('护身法宝撑出真实 5760 秒的应对窗口', raid(guardState)?.payload.phase === 'guard' && raid(guardState).finishAt - guardState.clock.gameT === 5760)
+  await page.locator('#gmid a[onclick*="battleevent.jsp?tab=1"]').first().click()
+  check('护身期间战斗浮窗提供祭剑支援与护法求援', await page.locator('#bwindowcontent a').filter({ hasText: '支援' }).count() > 0 && await page.locator('#bwindowcontent a').filter({ hasText: '求援' }).count() > 0)
+  await page.locator('#bwindowcontent a').filter({ hasText: '支援' }).first().click()
+  const guardSummary = await page.locator('#lwindowcontent').textContent()
+  check('祭剑页概要显示真实护身阶段，不展示零值敌方面板', guardSummary.includes('护身抵挡中') && !guardSummary.includes('攻击:0'))
+  await page.selectOption('#fightswordart', '小周天剑法')
+  await page.screenshot({ path: 'tools/parity/shots/fidelity-combat-guard.png', fullPage: true })
+  await launchSelected()
+  const raised = await saved()
+  check('护身期间从页面祭剑，实际占用并采用所选剑术', sword(raised).status === '绞杀中' && raid(raised).payload.defending[0].launchedStats.agility === 1536)
+  const ask = async () => {
+    if (!await page.locator('#bwindow').isVisible()) await page.locator('#gmid a[onclick*="battleevent.jsp?tab=1"]').first().click()
+    await page.locator('#bwindowcontent a').filter({ hasText: '求援' }).first().click()
+    await page.fill('#gethelpname', guardian.base.name)
+    await page.locator('a[onclick="OnMDialogOK()"]').click()
+  }
+  await ask()
+  const aided = await saved(), assistance = raid(aided).payload.aid?.[0]
+  check('护法求援派出真实装备并按路程等待', assistance?.npcId === guardian.base.id && assistance.arriveAt > aided.clock.gameT &&
+    assistance.swords.some(s => s.id === 'combat-guardian-sword' && s.durability === panelStat(swordByName('玉虚桃木剑').durability, '极品', 8)) &&
+    aided.npc.patches[guardian.base.id].artifacts.some(a => a.id === 'combat-guardian-sword' && a.status === '斩杀中'))
+  await page.evaluate(() => closeMWindow())
+  await ask()
+  check('重复求援不会复制已派飞剑', raid(await saved()).payload.aid?.length === 1 && (await page.locator('#mwindowcontent').textContent()).includes('空闲'))
+  await page.evaluate(() => { closeMWindow(); closeBWindow() })
+  const guardedFight = await reachNextPhase(raid)
+  check('护身计时结束后才进入飞剑交战', raid(guardedFight)?.payload.phase === 'fighting')
+  const defended = await reachNextPhase(raid)
+  check('真实迎敌结算后清除来袭，护法幸存剑开始返航', !raid(defended) && defended.timeline.events.some(e => e.kind === 'raid' && e.payload.phase === 'returning' && e.payload.npcId === guardian.base.id))
+  const helperReturn = s => s.timeline.events.find(e => e.kind === 'raid' && e.payload.phase === 'returning' && e.payload.npcId === guardian.base.id)
+  const aidHome = await reachNextPhase(helperReturn)
+  check('援军返航到家才恢复可用，保留本场战损', aidHome.npc.patches[guardian.base.id].artifacts.every(a => ['空闲', '损坏'].includes(a.status)))
   check('全流程无浏览器异常', errors.length === 0)
   if (errors.length) console.error(errors.join('\n'))
 } catch (error) {

@@ -64,6 +64,7 @@ import {
   launch, reinforce, requestHelp, swordsOut, swordsOutLimit, flightSeconds,
   launchedSwordStats, type LaunchSword, type BattleTarget, type SwordArt,
 } from '../engine/battle.ts'
+import { defendRaid, requestRaidAid } from '../engine/raid.ts'
 import { usePill as consumePill, craftRecipe, upgradeArtifactQuality, upgradeAllArtifactQuality, startCraft, startRepair, repairPlan, refineArtifact, canAcquireArtifacts, artifactCapacity, artifactSpaceUsed, REFINE_FAIL_TEXT, type CraftOrder } from '../engine/craft.ts'
 import { PILL_NAMES, PILL_TIERS, ITEM_STATUSES } from '../pages/item.ts'
 import { DEFENSIVE_ARTIFACTS, DEFENSIVE_ARTIFACT_NAMES_KNOWN, PASSIVE_SWORD_ARTS, QUALITIES, type Quality } from '../data/artifacts.ts'
@@ -769,8 +770,9 @@ export function installGameActions(): void {
     }
     const swordArt = (document.getElementById('fightswordart') as HTMLSelectElement | null)?.value as SwordArt | undefined
     const opts = { wanjianLevel: state.player.skills['万剑诀'] ?? 0, ...(swordArt ? { swordArt } : {}) }
+    const raid = reinforceEventId && state.timeline.events.some(e => e.id === reinforceEventId && e.kind === 'raid')
     const r = reinforceEventId
-      ? reinforce(state, reinforceEventId, swords, opts)
+      ? raid ? defendRaid(state, reinforceEventId, swords, opts) : reinforce(state, reinforceEventId, swords, opts)
       : launch(state, fightTarget, swords, { ...opts, sightRange: sightRange(state.player.body[BODY_EYE] ?? 0) })
     if (!r.ok) {
       openWindow('mwindow', '无法出击', `<DIV class=middle style="padding:10px">${esc(r.reason)}</DIV>`)
@@ -781,15 +783,13 @@ export function installGameActions(): void {
     step()
   }
 
-  /**
-   * 求援。原版是「把事件通过消息发给指定的道友」，弹窗里那个输入框 id 是 `gethelpname`
-   * （`09 §1.7` 原文）。单机下没有真人可求，发出去的信留在自己的收件箱里作记录 ——
-   * 原版同一玩法里「自己支援自己」本来就是常规操作（见 `battle.ts`）。
-   */
+  /** 求援从真实护法或同门的空闲装备中出剑，并计算路程。 */
   g['sendEventMsg'] = (eventId: string) => {
     if (!state) return
     const who = (document.getElementById('gethelpname') as HTMLInputElement | null)?.value ?? ''
-    const r = requestHelp(state, eventId, who.trim())
+    const raid = state.timeline.events.some(e => e.id === eventId && e.kind === 'raid')
+    const npc = state.npc.bases.find(n => n.name === who.trim())
+    const r = raid ? requestRaidAid(state, eventId, npc?.id ?? -1) : requestHelp(state, eventId, who.trim())
     if (!r.ok) {
       openWindow('mwindow', '求援', `<DIV class=middle style="padding:10px">${esc(r.reason ?? '')}</DIV>`)
       return
@@ -1692,6 +1692,8 @@ function resolvePage(url: string): string {
 
     case 'fight':
       // type=3 支援 / type=2 还击都带 eventid；type=1（或只带 target）是主动出击
+      // 出剑页用 L 窗，先收起会覆盖它的战斗总览 B 窗。
+      closeWindow('bwindow')
       return q.has('eventid')
         ? reinforceWindow(s, q.get('eventid')!, q.get('type') === '2' ? 'counter' : 'reinforce')
         : fightWindow(s, q.get('target') ?? '')
@@ -1856,7 +1858,7 @@ function raidEventItem(s: GameState, e: GameEvent) {
   const seconds = Math.max(0, Math.round(e.finishAt - s.clock.gameT))
   return {
     eventId: e.id,
-    kind: 'incoming' as const,
+    kind: (e.payload['phase'] === 'guard' || e.payload['phase'] === 'fighting' ? 'fighting' : 'incoming') as 'fighting' | 'incoming',
     who,
     at: [s.player.x, s.player.y] as [number, number],
     seconds,
@@ -1876,7 +1878,7 @@ function raidEventItem(s: GameState, e: GameEvent) {
 /** 战斗事件总览（B 窗）。本地版会出现四种态里的三种：出击 / 缠斗 / 来袭。 */
 function battleEventVm(s: GameState, tab: number) {
   const all = sorted(s.timeline)
-  const raids = all.filter((e) => e.kind === 'raid').map((e) => raidEventItem(s, e))
+  const raids = all.filter((e) => e.kind === 'raid' && e.payload['phase'] !== 'returning').map((e) => raidEventItem(s, e))
   const events = all.filter((e) => e.kind === 'battle')
   return {
     tab,
@@ -1922,9 +1924,11 @@ function battleEventVm(s: GameState, tab: number) {
 
 /** 支援 / 还击页：与出击页同构，只是目标来自已有事件。 */
 function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'counter'): string {
-  const ev = s.timeline.events.find((e) => e.id === eventId && e.kind === 'battle')
+  const ev = s.timeline.events.find((e) => e.id === eventId && (e.kind === 'battle' || e.kind === 'raid') && e.payload['phase'] !== 'returning')
   if (!ev) return '<DIV class=middle style="padding:12px">这场战斗已经结束了。</DIV>'
-  const t = ev.payload['target'] as BattleTarget
+  const t: BattleTarget = ev.kind === 'raid'
+    ? { kind: 'player', npcId: Number(ev.payload['attackerId']), name: String(ev.payload['attacker']), x: s.player.x, y: s.player.y, attack: 0, agility: 0, hp: 0, element: null }
+    : ev.payload['target'] as BattleTarget
   fightTarget = t
   reinforceEventId = eventId
 
@@ -1946,7 +1950,9 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
     kind,
     targetName: t.name,
     at: [t.x, t.y],
-    summary: `${t.name}　攻击:${t.attack} 敏捷:${t.agility} 生命:${t.hp} 属性:${t.element ?? '无'}`,
+    summary: ev.kind === 'raid'
+      ? `${t.name}来袭，${ev.payload['phase'] === 'guard' ? '护身抵挡中' : ev.payload['phase'] === 'fighting' ? '正在交战' : '飞剑在途'}`
+      : `${t.name}　攻击:${t.attack} 敏捷:${t.agility} 生命:${t.hp} 属性:${t.element ?? '无'}`,
     swords: rows,
     limit: swordsOutLimit(s.player.skills['万剑诀'] ?? 0),
     out: swordsOut(s),
@@ -1963,7 +1969,9 @@ function reinforceWindow(s: GameState, eventId: string, kind: 'reinforce' | 'cou
 function battleMapWindow(s: GameState, eventId: string): string {
   const ev = s.timeline.events.find((e) => e.id === eventId)
   if (!ev) return '<DIV class=middle style="padding:12px">这场战斗已经结束了。</DIV>'
-  const t = ev.payload['target'] as BattleTarget
+  const t: BattleTarget = ev.kind === 'raid'
+    ? { kind: 'player', npcId: Number(ev.payload['attackerId']), name: String(ev.payload['attacker']), x: s.player.x, y: s.player.y, attack: 0, agility: 0, hp: 0, element: null }
+    : ev.payload['target'] as BattleTarget
   return `<DIV class=middle style="padding:10px">
 ${esc(s.player.name)} (${s.player.x},${s.player.y}) → ${esc(t.name)} (${t.x},${t.y})<BR>
 <SPAN class=smallgray>距离 ${Math.abs(t.x - s.player.x) + Math.abs(t.y - s.player.y)} 格</SPAN><BR>

@@ -18,6 +18,7 @@ import { WORLD_SIZE, inWorld } from '../data/world.ts'
 import { DAY } from './clock.ts'
 import { daoxingText, DAOXING_PER_YEAR, type FiveQi, type Artifact, type GameState } from './state.ts'
 import { artifactCombatSword, combatDamage, type SwordOutcome, type CombatSword } from './combat.ts'
+import type { GameEvent } from './timeline.ts'
 
 /** NPC 画像。取自玩家攻略里的说法：羊（只修炼不打人）、小狼、大狼。 */
 export type NpcProfile = '羊' | '小狼' | '大狼'
@@ -191,6 +192,12 @@ export function npcCombatDamage(state: GameState, id: number, outcomes: readonly
   const artifacts = combatDamage(npc.artifacts, outcomes, destroyBroken).map(a =>
     outcomes.some(o => o.id === a.id && !o.broken) ? { ...a, status } : a)
   return { ...state, npc: patchNpc(state.npc, id, { artifacts }) }
+}
+
+/** 援助与来袭都走同一返航事件，幸存剑到家后才能再次使用。 */
+export function npcReturnEvent(event: GameEvent, npcId: number, swordIds: readonly string[], seconds: number, loot = 0): GameEvent {
+  return { id: `raid:return:${event.id}:${npcId}`, kind: 'raid', finishAt: event.finishAt + seconds,
+    payload: { phase: 'returning', npcId, swordIds, ...(loot > 0 ? { loot } : {}) } }
 }
 
 /** 全部 NPC 在某一刻的状态（排行榜、地图都用它）。 */

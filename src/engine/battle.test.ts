@@ -17,6 +17,7 @@ import {
 } from './battle.ts'
 import { advanceTo, countByKind } from './timeline.ts'
 import { newGame } from './game.ts'
+import { patchNpc } from './npc.ts'
 import type { GameState } from './state.ts'
 
 const state = (over: Partial<GameState['player']> = {}): GameState => {
@@ -270,11 +271,14 @@ test('对方真气都在暗仓里时一点也抢不到', () => {
 
 // —— 求援与支援（《战斗扫盲》原文）——
 
-test('求援：把战斗事件通过消息发给朋友', () => {
-  const s = state()
+test('求援：把战斗事件通过消息发给护法并派出真实飞剑', () => {
+  const initial = state()
+  const friend = initial.npc.bases.find(n => initial.npc.bases.filter(b => b.name === n.name).length === 1)!
+  const s: GameState = { ...initial, social: { guardians: [friend.id], npcGuardians: {}, guilds: [], blacklist: [] },
+    npc: patchNpc(initial.npc, friend.id, { x: 101, y: 100, artifacts: [{ id: 'helper', kind: 'sword', name: '青龙伏魔剑', quality: '极品', refine: 0, status: '空闲', count: 1 }] }) }
   const started = (launch(s, skeleton(), [qinglong()]) as { state: GameState }).state
   const eventId = started.timeline.events[0]!.id
-  const r = requestHelp(started, eventId, '某友')
+  const r = requestHelp(started, eventId, friend.name)
   assert.equal(r.ok, true)
   const mail = r.state.mail[0]!
   assert.equal(mail.subject, '173小鱼请求援手')

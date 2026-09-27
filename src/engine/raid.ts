@@ -21,16 +21,15 @@
 
 import { schedule, type GameEvent } from './timeline.ts'
 import { rand, randInt } from './rng.ts'
-import { resolveBattle, defenseOrder, isCountering, COUNTER_MULTIPLIER, type CombatSword } from './combat.ts'
-import { lootFrom, knockback, woundedText, vaultCapacity } from './loot.ts'
-import { allNpcsAt } from './npc.ts'
+import { resolveBattle, defenseOrder, guardHoldSeconds, tangleDuration, artifactCombatSword, combatDamage, absorbedLoot, isCountering, COUNTER_MULTIPLIER, type CombatSword } from './combat.ts'
+import { knockback, woundedText, vaultCapacity } from './loot.ts'
+import { allNpcsAt, npcAt, npcCombatArtifacts, npcSwordStatus, npcCombatDamage, npcReturnEvent, patchNpc } from './npc.ts'
+import { prepareSwords, swordSelectionError, swordArtError, toCombat, swordsOut, swordsOutLimit, prepareNpcAid, flightSeconds, type NpcAid, type LaunchSword, type LaunchOptions, type LaunchResult } from './battle.ts'
 import { cancelAllMyOrders, ctxOf, applyCtx } from './market.ts'
-import { panelStat } from '../data/artifacts.ts'
-import { swordByName } from '../data/swords.ts'
-import { sceneName } from '../data/world.ts'
+import { sceneName, distance, terrainAt } from '../data/world.ts'
 import { formatGameDate, HOUR, DAY } from './clock.ts'
 import {
-  isOutOfProtection, subQi, type FiveQi, type GameState, type MailItem,
+  isOutOfProtection, subQi, totalQi, type FiveQi, type GameState, type MailItem,
 } from './state.ts'
 
 export const RAID_EVENT_ID = 'raid'
@@ -46,37 +45,9 @@ export const RAID_RANGE = 12
 
 /** 把玩家的法宝换算成迎敌单位：护身在前、飞剑在后。 */
 export function defenders(state: GameState): readonly CombatSword[] {
-  const items = state.player.artifacts
-    .filter((a) => (a.kind === 'sword' || a.kind === 'guard') && a.status === '空闲')
-    .map((a): CombatSword | null => {
-      const t = swordByName(a.name)
-      if (a.kind === 'guard') {
-        // 护身的攻/耐/敏同量级（03 §1.17），这里用面板值的近似
-        const base = 120
-        return {
-          id: a.id,
-          name: a.name,
-          element: null,
-          attack: panelStat([base, base * 10], a.quality, a.refine),
-          durability: panelStat([base, base * 10], a.quality, a.refine),
-          agility: panelStat([base, base * 10], a.quality, a.refine),
-          defensiveOnly: true,
-        }
-      }
-      if (!t || t.agility === null) return null
-      return {
-        id: a.id,
-        name: a.name,
-        element: t.element,
-        attack: panelStat(t.attack, a.quality, a.refine),
-        durability: panelStat(t.durability, a.quality, a.refine),
-        agility: panelStat([t.agility, t.agility], a.quality, a.refine),
-        // 同剑心通明按每级2%重建。
-        instantDefenseRatio: Math.max(0, Math.min(20, state.player.skills['剑心通灵'] ?? 0)) * 0.02,
-      }
-    })
-    .filter((x): x is CombatSword => x !== null)
-  return defenseOrder(items)
+  return defenseOrder(state.player.artifacts.filter(a => a.status === '空闲')
+    .map(artifactCombatSword).filter((s): s is CombatSword => s !== null)
+    .map(s => ({ ...s, instantDefenseRatio: !s.defensiveOnly ? Math.max(0, Math.min(20, state.player.skills['剑心通灵'] ?? 0)) * 0.02 : 0 })))
 }
 
 /**
@@ -100,14 +71,18 @@ export function scheduleRaid(state: GameState): GameState {
   if (wolves.length === 0) return state
 
   const who = wolves[randInt(wolves.length, state.worldSeed, 'raider', hour)]!
-  const dist = Math.abs(who.x - state.player.x) + Math.abs(who.y - state.player.y)
 
+  const attackers = npcCombatArtifacts(who).filter(s => !s.defensiveOnly &&
+    (s.name !== '天雷万磁剑' || terrainAt(state.worldSeed, who.x, who.y) === '青山'))
+  if (!attackers.length) return state
+  const seconds = flightSeconds(distance(who.x, who.y, state.player.x, state.player.y), Math.min(...attackers.map(s => s.speed ?? 1)))
   const event: GameEvent = {
     id: RAID_EVENT_ID,
     kind: 'raid',
     // 飞过来的时间：按一把中速剑折算（与出击同一套量级）
-    finishAt: state.clock.gameT + Math.max(60, dist * 120),
+    finishAt: state.clock.gameT + seconds,
     payload: {
+      phase: 'outbound', attackers, returnSeconds: seconds,
       attacker: who.base.name,
       attackerId: who.base.id,
       fromX: who.x,
@@ -117,7 +92,7 @@ export function scheduleRaid(state: GameState): GameState {
       element: who.base.element,
     },
   }
-  return { ...state, timeline: schedule(state.timeline, event) }
+  return { ...npcSwordStatus(state, who.base.id, attackers.map(s => s.id), '斩杀中'), timeline: schedule(state.timeline, event) }
 }
 
 /**
@@ -126,64 +101,129 @@ export function scheduleRaid(state: GameState): GameState {
  * 被打时**市场挂单自动取消**（原文），所以先把单撤回来 —— 撤回来的真气
  * 也就一并暴露在掠夺范围内，这正是原版的规则。
  */
-export function resolveRaid(state: GameState, event: GameEvent): GameState {
-  const attackerName = String(event.payload['attacker'] ?? '某人')
+/** 主游戏逐事件调用此入口：到达 → 护身拖延 → 交战 → NPC返航。 */
+export function resolveRaidEvent(state: GameState, event: GameEvent): { state: GameState; follow?: GameEvent[] } {
+  const phase = event.payload['phase'] as string | undefined
+  if (phase === 'returning') {
+    const npcId = Number(event.payload['npcId'])
+    const next = npcSwordStatus(state, npcId, event.payload['swordIds'] as string[], '空闲')
+    const loot = Number(event.payload['loot'] ?? 0)
+    return { state: loot > 0 ? { ...next, npc: patchNpc(next.npc, npcId, { qiGained: (next.npc.patches[npcId]?.qiGained ?? 0) + loot }) } : next }
+  }
+  const attackerId = Number(event.payload['attackerId'])
   const power = Number(event.payload['swordPower'] ?? 16)
-  const count = Math.max(1, Number(event.payload['swords'] ?? 1))
-  const element = event.payload['element'] as CombatSword['element']
+  // 旧档来袭缺实体快照时优先找到真实NPC；无ID的历史合成事件才使用兼容面板。
+  const base = state.npc.bases.find(n => n.id === attackerId)
+  let attackers: readonly CombatSword[] = event.payload['attackers'] as CombatSword[] | undefined ??
+    (base ? npcCombatArtifacts(npcAt(state.npc, base, event.finishAt, state.worldSeed)) : Array.from({ length: Math.max(1, Number(event.payload['swords'] ?? 1)) }, (_, i) => ({
+      id: `raid:${i}`, name: '飞剑', element: event.payload['element'] as CombatSword['element'], attack: power,
+      durability: power * 2, agility: Math.max(1, Math.round(power / 8)), absorb: power * 4,
+    })))
+  const aid = (event.payload['aid'] as NpcAid[] | undefined) ?? []
 
-  // 挂单先撤回来（原文：被打时挂在市场的单自动取消并可被掠夺）
-  const s0 = applyCtx(cancelAllMyOrders(ctxOf(state)))
-
-  const attackers: readonly CombatSword[] = Array.from({ length: count }, (_, i) => ({
-    id: `raid:${i}`,
-    name: '飞剑',
-    element,
-    attack: power,
-    durability: power * 2,
-    agility: Math.max(1, Math.round(power / 8)),
-  }))
-  // 先天先于法宝自动防御（2008-12-31 官方更新说明）。剑气20/级有后期旁证，罡气同量级重建。
-  const innate = (name: string) => Math.max(0, Math.min(20, s0.player.skills[name] ?? 0)) * 20
-  const cut = power * 2 < innate('先天剑气') * (isCountering(s0.player.element, element) ? COUNTER_MULTIPLIER : 1)
-  const repelled = power * (isCountering(element, s0.player.element) ? COUNTER_MULTIPLIER : 1) < innate('先天罡气')
-  if (cut || repelled) {
-    return { ...s0, mail: [raidMail(s0, attackerName, null, cut ? '先天剑气' : '先天罡气'), ...s0.mail].slice(0, 200) }
-  }
-  const myItems = defenders(s0)
-  const result = resolveBattle(attackers, myItems)
-
-  // 打坏的法宝标「损坏」
-  const brokenIds = result.defender.filter((o) => o.broken).map((o) => o.id)
-  const artifacts = s0.player.artifacts.map((a) =>
-    brokenIds.includes(a.id) ? { ...a, status: '损坏' } : a)
-
-  // 守住了 = 还有没被打断的法宝；一件都没有（或本来就没带）就算被打穿
-  const held = myItems.length > 0 && brokenIds.length < myItems.length
-  if (held) {
-    return {
-      ...s0,
-      player: { ...s0.player, artifacts },
-      mail: [raidMail(s0, attackerName, null), ...s0.mail].slice(0, 200),
+  if (!phase || phase === 'outbound') {
+    let next = applyCtx(cancelAllMyOrders(ctxOf(state)))
+    const innate = (name: string) => Math.max(0, Math.min(20, next.player.skills[name] ?? 0)) * 20
+    const cut = attackers.filter(s => s.durability < innate('先天剑气') * (isCountering(next.player.element, s.element) ? COUNTER_MULTIPLIER : 1))
+    next = npcCombatDamage(next, attackerId, cut.map(s => ({ id: s.id, damageTaken: s.durability, broken: true, attack: s.attack, durability: s.durability })))
+    attackers = attackers.filter(s => !cut.some(c => c.id === s.id))
+    const repelled = attackers.length > 0 && attackers.every(s => s.attack * (isCountering(s.element, next.player.element) ? COUNTER_MULTIPLIER : 1) < innate('先天罡气'))
+    if (!attackers.length || repelled) return finishRaid(next, event, attackers, aid, [], null, cut.length ? '先天剑气' : '先天罡气')
+    const items = defenders(next), guards = items.filter(s => s.defensiveOnly)
+    if (guards.length) {
+      next = playerStatus(next, guards.map(s => s.id), '绞杀中')
+      return { state: next, follow: [{ ...event, finishAt: event.finishAt + guardHoldSeconds(guards),
+        payload: { ...event.payload, phase: 'guard', attackers, guards } }] }
     }
+    return beginRaidFight(next, { ...event, payload: { ...event.payload, attackers } }, items)
+  }
+  if (phase === 'guard') {
+    const guards = event.payload['guards'] as CombatSword[] ?? []
+    const raised = (event.payload['defending'] as LaunchSword[] ?? []).map(s => toCombat(s, 'player'))
+    return beginRaidFight(state, event, [...guards, ...raised, ...defenders(state)])
   }
 
-  // 被打穿：只有超出固本暗仓的真气抢得走
-  const rootLevel = s0.player.body[4] ?? 0
-  const { taken } = lootFrom(s0.player.qi, rootLevel)
-  const hit = knockback(s0.player.x, s0.player.y, s0.worldSeed, event.finishAt)
+  const mine = event.payload['defenders'] as CombatSword[] ?? []
+  const timelyAid = aid.filter(a => a.arriveAt <= event.finishAt)
+  const result = resolveBattle(attackers, [...mine, ...timelyAid.flatMap(a => a.swords)])
+  const noReturn = new Set(mine.filter(s => s.noReturn).map(s => s.id))
+  const defendingOutcomes = result.defender.map(o => noReturn.has(o.id) ? { ...o, broken: true } : o)
+  const survivors = attackers.filter(s => !result.attacker.find(o => o.id === s.id)?.broken)
+  const held = survivors.length === 0 || defendingOutcomes.some(o => !o.broken)
+  let next: GameState = { ...state, player: { ...state.player, artifacts: combatDamage(state.player.artifacts, defendingOutcomes, survivors.some(s => s.name === '天雷万磁剑') && !held) } }
+  next = npcCombatDamage(next, attackerId, result.attacker, [...mine, ...timelyAid.flatMap(a => a.swords)].some(s => s.name === '天雷万磁剑') && held, '返回中')
+  for (const helper of timelyAid) next = npcCombatDamage(next, helper.npcId, defendingOutcomes, survivors.some(s => s.name === '天雷万磁剑') && !held, '返回中')
+  if (held) return finishRaid(next, event, survivors, aid, defendingOutcomes, null)
+  const taken = absorbedLoot(next.player.qi, next.player.body[4] ?? 0, survivors.reduce((n, s) => n + (s.absorb ?? 0), 0))
+  const hit = knockback(next.player.x, next.player.y, next.worldSeed, event.finishAt)
+  next = { ...next, player: { ...next.player, qi: subQi(next.player.qi, taken) as FiveQi, ...hit } }
+  return finishRaid(next, event, survivors, aid, defendingOutcomes, { taken, at: hit })
+}
 
-  return {
-    ...s0,
-    player: {
-      ...s0.player,
-      artifacts,
-      qi: subQi(s0.player.qi, taken) as FiveQi,
-      x: hit.x,
-      y: hit.y,
-    },
-    mail: [raidMail(s0, attackerName, { taken, at: hit }), ...s0.mail].slice(0, 200),
+function playerStatus(state: GameState, ids: readonly string[], status: string): GameState {
+  return { ...state, player: { ...state.player, artifacts: state.player.artifacts.map(a => ids.includes(a.id) ? { ...a, status } : a) } }
+}
+function beginRaidFight(state: GameState, event: GameEvent, mine: readonly CombatSword[]): { state: GameState; follow: GameEvent[] } {
+  const attackers = event.payload['attackers'] as CombatSword[]
+  const aid = event.payload['aid'] as NpcAid[] ?? []
+  // 护身敏捷已经在guard阶段付过时间；飞剑敏捷另计，援军必须实际赶到才参战。
+  const seconds = tangleDuration(attackers, [...mine.filter(s => !s.defensiveOnly), ...aid.filter(a => a.arriveAt <= event.finishAt).flatMap(a => a.swords)])
+  return { state: playerStatus(state, mine.map(s => s.id), '绞杀中'), follow: [{ ...event,
+    finishAt: event.finishAt + seconds, payload: { ...event.payload, phase: 'fighting', defenders: mine } }] }
+}
+function finishRaid(state: GameState, event: GameEvent, survivors: readonly CombatSword[], aid: readonly NpcAid[],
+  defendOutcomes: readonly { id: string; broken: boolean }[],
+  hurt: { taken: FiveQi; at: { x: number; y: number } } | null, defense = '法宝'): { state: GameState; follow: GameEvent[] } {
+  const attackerId = Number(event.payload['attackerId'])
+  const follow: GameEvent[] = []
+  const reserved = ['guards', 'defenders', 'defending'].flatMap(key => (event.payload[key] as { id: string }[] | undefined) ?? []).map(s => s.id)
+  const released = playerStatus(state, state.player.artifacts.filter(a => reserved.includes(a.id) && a.status === '绞杀中').map(a => a.id), '空闲')
+  let next = npcSwordStatus(released, attackerId, survivors.map(s => s.id), '返回中')
+  if (state.npc.bases.some(n => n.id === attackerId) && survivors.length) follow.push(npcReturnEvent(event, attackerId, survivors.map(s => s.id), Number(event.payload['returnSeconds'] ?? 60), hurt ? totalQi(hurt.taken) : 0))
+  for (const helper of aid) {
+    const ids = helper.swords.filter(s => !defendOutcomes.find(o => o.id === s.id)?.broken).map(s => s.id)
+    next = npcSwordStatus(next, helper.npcId, ids, '返回中')
+    if (ids.length) follow.push(npcReturnEvent(event, helper.npcId, ids, helper.returnSeconds))
   }
+  return { state: { ...next, mail: [raidMail(next, String(event.payload['attacker'] ?? '某人'), hurt, defense), ...next.mail].slice(0, 200) }, follow }
+}
+
+/** 保留直接结算API给旧调用方；生产时钟使用resolveRaidEvent逐阶段处理。 */
+export function resolveRaid(state: GameState, event: GameEvent): GameState {
+  let next = state, pending = [event]
+  while (pending.length) {
+    const ev = pending.shift()!, result = resolveRaidEvent(next, ev)
+    next = result.state
+    pending.push(...result.follow ?? [])
+  }
+  return next
+}
+
+/** 护身争取到的时间里主动祭剑，才获得出击被动与所选剑术。 */
+export function defendRaid(state: GameState, eventId: string, swords: readonly LaunchSword[], opts: LaunchOptions = {}): LaunchResult {
+  const event = state.timeline.events.find(e => e.id === eventId && e.kind === 'raid' && e.payload['phase'] !== 'returning')
+  if (!event || !['guard', 'fighting'].includes(String(event.payload['phase']))) return { ok: false, reason: '敌剑尚未接战或战斗已结束' }
+  if (!swords.length) return { ok: false, reason: '请选择迎敌飞剑' }
+  const error = swordSelectionError(state, swords) ?? swordArtError(state, opts.swordArt)
+  if (error) return { ok: false, reason: error }
+  if (swordsOut(state) + swords.length > swordsOutLimit(opts.wanjianLevel ?? state.player.skills['万剑诀'] ?? 0)) return { ok: false, reason: '超过同时控制飞剑的上限' }
+  const prepared = prepareSwords(state, swords, opts.swordArt)
+  const fighting = event.payload['phase'] === 'fighting'
+  const changed = { ...event, finishAt: event.finishAt + (fighting ? prepared.reduce((n, s) => n + s.launchedStats!.agility, 0) : 0),
+    payload: { ...event.payload, defending: [...(event.payload['defending'] as LaunchSword[] ?? []), ...prepared],
+      ...(fighting ? { defenders: [...(event.payload['defenders'] as CombatSword[] ?? []), ...prepared.map(s => toCombat(s, 'player'))] } : {}) } }
+  return { ok: true, state: { ...playerStatus(state, prepared.map(s => s.id), '绞杀中'), timeline: { events: state.timeline.events.map(e => e.id === eventId ? changed : e) } } }
+}
+export function requestRaidAid(state: GameState, eventId: string, npcId: number): LaunchResult {
+  const event = state.timeline.events.find(e => e.id === eventId && e.kind === 'raid' && e.payload['phase'] !== 'returning')
+  if (!event) return { ok: false, reason: '来袭已经结束' }
+  const prepared = prepareNpcAid(state, npcId, state.player.x, state.player.y)
+  if (!prepared.ok) return prepared
+  if (prepared.aid.arriveAt > event.finishAt) return { ok: false, reason: '援军来不及赶到这场战斗' }
+  const fighting = event.payload['phase'] === 'fighting'
+  return { ok: true, state: { ...prepared.state, timeline: { events: prepared.state.timeline.events.map(e => e.id === eventId ? { ...e,
+    finishAt: e.finishAt + (fighting ? prepared.aid.swords.reduce((n, s) => n + s.agility, 0) : 0),
+    payload: { ...e.payload, aid: [...(e.payload['aid'] as NpcAid[] ?? []), prepared.aid] } } : e) } } }
 }
 
 /** 受伤信。被打穿时用原版逐字文案；守住了则只报一句。 */

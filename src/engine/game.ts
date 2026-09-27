@@ -16,7 +16,7 @@ import { generateNpcs } from './npc.ts'
 import { applyQuestProgress, emptyQuestLog, resolveQuestBattle } from './quest.ts'
 import { resolveEscort, settleTownIncome } from './town.ts'
 import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, settleNpcPurchases, ctxOf, applyCtx } from './market.ts'
-import { scheduleRaid, resolveRaid } from './raid.ts'
+import { scheduleRaid, resolveRaidEvent } from './raid.ts'
 import { seedRng } from './rng.ts'
 import { save, load, importSave, SaveError, SAVE_VERSION, type Storage, type Migration } from './save.ts'
 import { floorQi, type GameState, type Player, type FiveQi } from './state.ts'
@@ -276,7 +276,7 @@ function resolveEvent(state: GameState, event: GameEvent): { state: GameState; f
   }
   if (event.kind === 'craft') return { state: resolveCraft(state, event) }
   if (event.kind === 'market') return { state: applyCtx(resolveMarketEvent(ctxOf(state), event)) }
-  if (event.kind === 'raid') return { state: resolveRaid(state, event) }
+  if (event.kind === 'raid') return resolveRaidEvent(state, event)
   return { state }
 }
 
@@ -352,11 +352,23 @@ export function validateGameState(value: unknown): asserts value is GameState {
   const ids = (v: unknown) => Array.isArray(v) && v.every(integer)
   const idMap = (v: unknown, valid: (item: unknown) => boolean) => object(v) &&
     Object.entries(v).every(([key, item]) => /^(0|[1-9][0-9]*)$/.test(key) && valid(item))
+  const optionalBool = (v: unknown) => v === undefined || typeof v === 'boolean'
+  const optionalRatio = (v: unknown) => v === undefined || number(v) && v <= 1
+  const quality = (v: unknown) => ['废品', '凡品', '上品', '极品'].includes(v as string)
   const element = (v: unknown) => ELEMENTS.includes(v as Element)
   const combatElement = (v: unknown) => v === null || element(v)
   const artifact = (a: Record<string, unknown>) => strings(a, ['id', 'name', 'status']) &&
     ['sword', 'guard', 'pill', 'book', 'misc'].includes(a.kind as string) &&
-    ['废品', '凡品', '上品', '极品'].includes(a.quality as string) && numeric(a, ['refine', 'count'])
+    quality(a.quality) && integer(a.refine) && integer(a.count)
+  const combatStats = (v: Record<string, unknown>) => numeric(v, ['attack', 'durability', 'agility']) &&
+    optionalNumber(v.absorb) && optionalNumber(v.speed) && optionalBool(v.noReturn) &&
+    optionalBool(v.defensiveOnly) && optionalRatio(v.instantAttackRatio) && optionalRatio(v.instantDefenseRatio)
+  const combatSword = (v: Record<string, unknown>) => strings(v, ['id', 'name']) && combatElement(v.element) && combatStats(v)
+  const launchSword = (v: Record<string, unknown>) => strings(v, ['id', 'name']) && quality(v.quality) && integer(v.refine) &&
+    numeric(v, ['speed', 'agility']) && numbers(v.attack, 2) && numbers(v.durability, 2) && combatElement(v.element) &&
+    (v.launchedStats === undefined || object(v.launchedStats) && combatStats(v.launchedStats) && number(v.launchedStats.speed))
+  const aid = (v: unknown) => v === undefined || arrayOf(v, a => integer(a.npcId) &&
+    numeric(a, ['arriveAt', 'returnSeconds']) && arrayOf(a.swords, combatSword))
   const eventPayload = (event: Record<string, unknown>): boolean => {
     const data = event.payload
     if (!object(data)) return false
@@ -376,11 +388,9 @@ export function validateGameState(value: unknown): asserts value is GameState {
       case 'battle':
         return ['outbound', 'fighting', 'returning'].includes(data.phase as string) &&
           object(data.target) && strings(data.target, ['name']) && ['monster', 'player'].includes(data.target.kind as string) &&
-          numeric(data.target, ['x', 'y', 'attack', 'agility', 'hp']) && combatElement(data.target.element) && optionalNumber(data.target.npcId) &&
-          Array.isArray(data.swordIds) && data.swordIds.every(string) &&
-          arrayOf(data.swords, sword => strings(sword, ['id', 'name', 'quality']) && numeric(sword, ['refine', 'speed', 'agility']) &&
-            numbers(sword.attack, 2) && numbers(sword.durability, 2) && combatElement(sword.element) &&
-            (sword.launchedStats === undefined || object(sword.launchedStats) && numeric(sword.launchedStats, ['attack', 'durability', 'speed', 'agility']) && optionalNumber(sword.launchedStats.instantAttackRatio) && optionalNumber(sword.launchedStats.absorb) && (sword.launchedStats.noReturn === undefined || typeof sword.launchedStats.noReturn === 'boolean'))) &&
+          xy(data.target) && numeric(data.target, ['attack', 'agility', 'hp']) && combatElement(data.target.element) && optionalNumber(data.target.npcId) &&
+          Array.isArray(data.swordIds) && data.swordIds.every(string) && arrayOf(data.swords, launchSword) &&
+          (data.defenders === undefined || arrayOf(data.defenders, combatSword)) && aid(data.aid) &&
           (data.loot === undefined || numbers(data.loot, 5)) &&
           (data.targetQi === undefined || numbers(data.targetQi, 5)) && optionalNumber(data.targetRootLevel)
       case 'craft':
@@ -390,7 +400,15 @@ export function validateGameState(value: unknown): asserts value is GameState {
       case 'market':
         return data.op === 'list' ? string(data.orderId) : data.op === 'inject' && element(data.element) && number(data.amount)
       case 'raid':
-        return string(data.attacker) && numeric(data, ['swordPower', 'swords']) && element(data.element)
+        if (data.phase === 'returning') return integer(data.npcId) && Array.isArray(data.swordIds) && data.swordIds.every(string) && optionalNumber(data.loot)
+        return (data.phase === undefined || ['outbound', 'guard', 'fighting'].includes(data.phase as string)) &&
+          string(data.attacker) && numeric(data, ['swordPower', 'swords']) && element(data.element) &&
+          optionalNumber(data.attackerId) && optionalNumber(data.returnSeconds) &&
+          (data.fromX === undefined || coordinate(data.fromX)) && (data.fromY === undefined || coordinate(data.fromY)) &&
+          (data.attackers === undefined || arrayOf(data.attackers, combatSword)) && aid(data.aid) &&
+          (data.guards === undefined ? data.phase !== 'guard' : arrayOf(data.guards, combatSword)) &&
+          (data.defenders === undefined ? data.phase !== 'fighting' : arrayOf(data.defenders, combatSword)) &&
+          (data.defending === undefined || arrayOf(data.defending, launchSword))
       default:
         return false
     }

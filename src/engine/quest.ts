@@ -35,6 +35,7 @@ import {
   type Realm,
 } from './state.ts'
 import { ELEMENTS, MERIDIANS, groupElement } from '../data/meridian.ts'
+import { sanctuaryEntryBlocker, sanctuaryKindAt } from './sanctuary.ts'
 import { WORLD_SIZE } from '../data/world.ts'
 import {
   SANSHI_SPAWN_WEEKDAY,
@@ -77,6 +78,7 @@ export type QuestLog = {
   readonly line: NewbieLine
   /** 已领的境界奖励累计的丹田上限加成（辟谷 +5000、心动 +10000、元婴 160000）。 */
   readonly dantianBonus: number
+  readonly sanctuaries?: readonly { readonly x: number; readonly y: number; readonly kind: '福地' | '洞天'; readonly occupiedAt: number }[]
 }
 
 export const emptyQuestLog = (line: NewbieLine = 'qi'): QuestLog => ({
@@ -153,6 +155,14 @@ export function acceptBlocker(
   state: GameState,
   opts: { readonly ignoreSpawnDay?: boolean } = {},
 ): string | null {
+  if (q.series === '祭炼石碑') {
+    const kind = q.id === 'sanctuary:blessing' ? '福地' : '洞天'
+    if (sanctuaryKindAt(state, state.player.x, state.player.y) !== kind) return `请到${kind}的石碑前领取`
+    if (state.timeline.events.some(e => e.kind === 'move')) return '移动途中无法祭炼石碑'
+    if (state.quests.sanctuaries?.some(s => s.x === state.player.x && s.y === state.player.y)) return '你已占领此处'
+    const blocked = sanctuaryEntryBlocker(state, state.player.x, state.player.y)
+    if (blocked) return blocked
+  }
   const req = q.require
   if (req?.realm && !realmReached(state.player, req.realm)) return `境界不足，需要${req.realm}`
   if (req?.outOfProtection && !isOutOfProtection(state.player, state.clock.gameT, DAY)) {
@@ -256,6 +266,7 @@ export function goalMet(q: Quest, entry: QuestEntry, state: GameState): boolean 
  */
 export function questLocation(state: GameState, q: Quest): readonly [number, number] {
   if (q.at) return q.at
+  if (q.series === '祭炼石碑') return [state.player.x, state.player.y]
   const seed = state.worldSeed
   // 三尸「只在周六现身」，所以它每周换一处；其余任务的落点只由 worldSeed + 任务 id 决定。
   const weekKey = q.series === '斩却三尸' ? Math.floor(state.clock.gameT / (7 * DAY)) : 0
@@ -515,6 +526,7 @@ export function claim(
   if (!entry || !q) return fail('没有这个任务')
   if (entry.done) return fail('奖励已经领过了')
   if (dailyQuestExpired(log, entry, state.clock.gameT)) return fail('三尸已经消失，请下周六重新领取')
+  if (q.series === '祭炼石碑' && (!entry.at || state.player.x !== entry.at[0] || state.player.y !== entry.at[1] || state.timeline.events.some(e => e.kind === 'move'))) return fail('请回到领取任务的石碑前祭炼')
   if (!goalMet(q, entry, state)) return fail('任务尚未完成')
   // 炼制、购买都查袖里乾坤上限，发奖这条路以前没查 —— 满背包领奖会把占用顶到 6/5，
   // 之后任何炼制/购买都被拒，玩家还不知道为什么。挡在领取这一步，奖励留着不丢。
@@ -526,7 +538,8 @@ export function claim(
   const nextLog: QuestLog = {
     ...log,
     dantianBonus: log.dantianBonus + (r.dantianBonus ?? 0),
-    entries: log.entries.map((e) => (e.id === id ? { ...e, done: true } : e)),
+    entries: q.repeatable ? log.entries.filter(e => e.id !== id) : log.entries.map((e) => (e.id === id ? { ...e, done: true } : e)),
+    ...(q.series === '祭炼石碑' && entry.at ? { sanctuaries: [...(log.sanctuaries ?? []), { x: entry.at[0], y: entry.at[1], kind: q.id === 'sanctuary:blessing' ? '福地' : '洞天', occupiedAt: state.clock.gameT }] } : {}),
   }
 
   const cap = questCapacity(state, nextLog)

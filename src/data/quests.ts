@@ -127,6 +127,7 @@ export type Quest = {
   readonly at?: readonly [number, number]
   /** 出处；无出处写 `reconstructed（…）` */
   readonly source: string
+  readonly repeatable?: boolean
 }
 
 /** 任务栏 / 标题条上的整串写法。 */
@@ -810,18 +811,33 @@ export const REALM_QUESTS: readonly Quest[] = [
   ...JINDAN_CHAIN,
 ]
 
+/** 门槛、石碑和神兽、独享5/6有原文；神兽面板重建为同境界任务可挑战的量级。 */
+export const SANCTUARY_QUESTS: readonly Quest[] = [
+  { id: 'sanctuary:blessing', category: 'realm', series: '祭炼石碑', name: '福地守护神兽', step: 1, total: 1,
+    summary: '击败福地守护神兽，回到石碑前祭炼，占领此处并独享五行元气各5。',
+    goal: { kind: 'slay', monster: { name: '福地守护神兽', attack: 1000, agility: 3600, life: 4000, element: null } },
+    reward: {}, require: { realm: '辟谷期' }, repeatable: true,
+    source: 'reference/text/guides/50102-p1.txt；reconstructed（神兽面板）' },
+  { id: 'sanctuary:cave', category: 'realm', series: '祭炼石碑', name: '洞天守护神兽', step: 1, total: 1,
+    summary: '击败洞天守护神兽，回到石碑前祭炼，占领此处并独享五行元气各6。',
+    goal: { kind: 'slay', monster: { name: '洞天守护神兽', attack: 4000, agility: 3600, life: 8000, element: null } },
+    reward: {}, require: { realm: '心动期' }, repeatable: true,
+    source: 'reference/text/guides/50102-p1.txt；reconstructed（神兽面板）' },
+]
+
 // ===========================================================================
 // 索引
 // ===========================================================================
 
 /**
- * 一条线下的全部任务定义：新手 22 + 百妖 100 + 境界 16 = 138。
+ * 一条线下的全部任务定义：新手22 + 百妖100 + 境界16 + 神兽2 = 140。
  * 新手任务的同一步在两条线里 `step` 不同但 `id` 相同，所以索引必须分线建。
  */
 export const questsFor = (line: NewbieLine): readonly Quest[] => [
   ...newbieChain(line),
   ...BEAST_QUESTS,
   ...REALM_QUESTS,
+  ...SANCTUARY_QUESTS,
 ]
 
 const BY_ID: Readonly<Record<NewbieLine, ReadonlyMap<string, Quest>>> = {
@@ -840,4 +856,5 @@ export const chainsFor = (line: NewbieLine): readonly (readonly Quest[])[] => [
   SANSHI_CHAIN,
   QIANJIN_CHAIN,
   JINDAN_CHAIN,
+  ...SANCTUARY_QUESTS.map(q => [q]),
 ]

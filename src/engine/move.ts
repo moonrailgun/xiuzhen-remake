@@ -20,6 +20,8 @@ import { swordByName } from '../data/swords.ts'
 import { flightSeconds, launchedSwordStats } from './battle.ts'
 import { roll } from './rng.ts'
 import { treasureItem } from './treasure.ts'
+import { sanctuaryEntryBlocker } from './sanctuary.ts'
+import { weekOfServer } from './clock.ts'
 
 /** 本体「行万里路」的序号。 */
 export const BODY_WALK = 7
@@ -117,9 +119,13 @@ export function startMove(
     state.player.y,
     toX,
     toY,
-    opts.weeksOpen ?? 99,
+    opts.weeksOpen ?? weekOfServer(state.clock),
   ).map(leg => ({ ...leg, seconds: Math.max(1, leg.seconds - walkingReduction(leg.terrain, state.player.skills)) }))
   if (legs.length === 0) return { ok: false, reason: '没有可走的路径' }
+  for (const leg of legs) {
+    const blocked = sanctuaryEntryBlocker(state, leg.x, leg.y)
+    if (blocked) return { ok: false, reason: blocked }
+  }
 
   // 原文：逐格走更易得图，满包仍可拾取。每次指令 10% 为重建，在出发时入档。
   const drop = roll(state.rng, 0.1)
@@ -138,6 +144,8 @@ export function startFlight(state: GameState, x: number, y: number, swordId: str
   if (state.player.realm !== '元婴期' || !(state.player.skills['御剑飞行']! > 0))
     return { ok: false, reason: '御剑飞行需要元婴期，并学习御剑飞行秘笈。' }
   if (!Number.isInteger(x) || !Number.isInteger(y) || !inWorld(x, y)) return { ok: false, reason: '目标坐标无效。' }
+  const blocked = sanctuaryEntryBlocker(state, x, y)
+  if (blocked) return { ok: false, reason: blocked }
   if (state.player.x === x && state.player.y === y) return { ok: false, reason: '你已经在这里了。' }
   if (countByKind(state.timeline, 'move')) return { ok: false, reason: '你正在移动中。' }
   const a = state.player.artifacts.find(a => a.id === swordId && a.kind === 'sword' && a.status === '空闲' && a.count > 0)
@@ -173,12 +181,13 @@ export function resolveMove(
 ): { state: GameState; follow?: GameEvent[] } {
   if (event.payload['op'] === 'flight') {
     const released = releaseFlight(state, event)
+    if (sanctuaryEntryBlocker(state, Number(event.payload['x']), Number(event.payload['y']))) return { state: released }
     return { state: { ...released, player: { ...released.player, x: Number(event.payload['x']), y: Number(event.payload['y']) } } }
   }
   const legs = event.payload['legs'] as MoveLeg[]
   const index = event.payload['index'] as number
   const leg = legs[index]
-  if (!leg) return { state }
+  if (!leg || sanctuaryEntryBlocker(state, leg.x, leg.y)) return { state }
 
   // 走路增长阅历有原文（15374.txt）；按完成路段的标准秒数给阅历为重建，见规则裁决 §41。
   const moved: GameState = { ...state, player: {

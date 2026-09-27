@@ -15,6 +15,7 @@ import type { Artifact, GameState } from './state.ts'
 import { spendCoin, type StartResult } from './cultivate.ts'
 import { activeQuests, paySilver } from './quest.ts'
 import { canAcquireArtifacts } from './craft.ts'
+import { sanctuaryEntryBlocker } from './sanctuary.ts'
 import { inWorld } from '../data/world.ts'
 import {
   BANK_NOTES,
@@ -327,6 +328,8 @@ export function teleport(
   opts: { readonly fromKind?: TownKind; readonly underAttack?: boolean } = {},
 ): StartResult {
   if (!Number.isInteger(to.x) || !Number.isInteger(to.y) || !inWorld(to.x, to.y)) return { ok: false, reason: '目的地坐标不正确' }
+  const blocked = sanctuaryEntryBlocker(state, to.x, to.y)
+  if (blocked) return { ok: false, reason: blocked }
   if (opts.underAttack || state.timeline.events.some(e => e.kind === 'raid')) return { ok: false, reason: '你正在被攻击，无法使用驿站' }
   if (state.timeline.events.some(e => e.kind === 'move')) return { ok: false, reason: '移动途中无法使用驿站' }
   if (opts.fromKind && opts.fromKind !== '城池') return { ok: false, reason: '只有城池才有驿站' }

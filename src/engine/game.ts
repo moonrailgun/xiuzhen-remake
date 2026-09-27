@@ -32,6 +32,7 @@ import { dantianCapacity } from '../data/upgrade.ts'
 import { qiRewardFor, type QiReward } from '../data/quests.ts'
 import { qiAt, terrainAt, WORLD_SIZE } from '../data/world.ts'
 
+import { sanctuaryQi } from './sanctuary.ts'
 import { socialOf } from './social.ts'
 
 /** 存档结构改动时在这里追加迁移。**每改一次 state 结构就必须加一条。** */
@@ -170,7 +171,7 @@ export type TerrainProvider = (x: number, y: number) => FiveQi
 
 /** 默认走真实世界生成（种子来自存档，所以离线重放也一致）。 */
 export const terrainOf = (state: GameState, weeksOpen = weekOfServer(state.clock)): TerrainProvider =>
-  (x, y) => qiAt(state.worldSeed, x, y, terrainAt(state.worldSeed, x, y, weeksOpen))
+  (x, y) => sanctuaryQi(state, x, y, weeksOpen) ?? qiAt(state.worldSeed, x, y, terrainAt(state.worldSeed, x, y, weeksOpen))
 
 /**
  * 当前每小时的五行产量（顶栏资源条显示它）。
@@ -450,6 +451,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
       !arrayOf(quests.entries, (q) => string(q.id) && number(q.acceptedAt) && typeof q.done === 'boolean' &&
         (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&
         (q.coreEventId === undefined || string(q.coreEventId)) && (q.cleared === undefined || typeof q.cleared === 'boolean')) ||
+      (quests.sanctuaries !== undefined && !arrayOf(quests.sanctuaries, place => xy(place) && ['福地', '洞天'].includes(place.kind as string) && number(place.occupiedAt))) ||
       !object(market) || !arrayOf(market.qi, (o) => strings(o, ['id', 'seller']) && typeof o.listed === 'boolean' &&
         optionalNumber(o.listedAt) &&
         [o.offer, o.want].every((a) => object(a) && ELEMENTS.includes(a.element as Element) && number(a.amount))) ||

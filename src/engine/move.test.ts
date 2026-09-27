@@ -197,3 +197,22 @@ test('仙石完成移动仍按所有已完成路段计阅历，不因后续路�
   assert.equal(out.state.player.x, 102)
   assert.equal(out.state.player.experience, planMove(SEED, 100, 100, 102, 100).reduce((n, leg) => n + MOVE_SECONDS[leg.terrain], 0))
 })
+
+test('福地、洞天的移动和传送入口执行境界门槛', async () => {
+  const { DAY } = await import('./clock.ts')
+  const { teleport } = await import('./town.ts')
+  for (const [kind, realm] of [['福地', '辟谷期'], ['洞天', '心动期']] as const) {
+    let at: readonly [number, number] | undefined
+    for (let x = 1; x < 200 && !at; x++) for (let y = 0; y < 200; y++) {
+      if (terrainAt(SEED, x, y, 4) === kind) { at = [x, y]; break }
+    }
+    assert.ok(at)
+    const base = state({ x: at[0] - 1, y: at[1], coin: 100 })
+    const s = { ...base, clock: { ...base.clock, gameT: 4 * 7 * DAY } }
+    assert.equal(startMove(s, ...at).ok, false)
+    assert.equal(teleport(s, { x: at[0], y: at[1] }, { fromKind: '城池' }).ok, false)
+    const qualified = { ...s, player: { ...s.player, realm } }
+    assert.equal(startMove(qualified, ...at).ok, true)
+    assert.equal(teleport(qualified, { x: at[0], y: at[1] }, { fromKind: '城池' }).ok, true)
+  }
+})

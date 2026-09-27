@@ -232,6 +232,7 @@ function mapVm(s: GameState): MapVm {
     cells,
     selected,
     goByDistance: 3,
+    playerGender: s.player.gender,
   }
 }
 

@@ -48,6 +48,8 @@ export type MapVm = {
   readonly selected: MapCell
   /** 滚屏距离，原版默认 3 */
   readonly goByDistance: number
+  /** 自己的性别：小人图 player1（男）/ player2（女，[推断]）。缺省按男 */
+  readonly playerGender?: 'm' | 'f'
 }
 
 // —— 几何常量（全部来自原版 DOM）——
@@ -92,16 +94,19 @@ function peopleIcon(playernum: number, distance: number, playerDis: number): str
   return `people${inSight}${many}.gif`
 }
 
-/** 8 个滚屏箭头。LEFT/TOP 与 goBy 参数照原版 DOM。 */
+/**
+ * 8 个滚屏箭头。goBy 参数照原版 DOM；LEFT/TOP 是 tools/assets/mapcrop.py 从 #106 实测的
+ * 三角包围盒（相对 mapdiv 原点 (16,170)），这样箭头就落在原版截图里的位置上。
+ */
 const ARROWS: readonly { readonly key: string; readonly left: number; readonly top: number; readonly dx: number; readonly dy: number }[] = [
-  { key: 'lt', left: 0, top: 154, dx: -1, dy: 0 },
-  { key: 'mt', left: 231, top: 154, dx: -1, dy: 1 },
-  { key: 'rt', left: 463, top: 154, dx: 0, dy: 1 },
-  { key: 'lm', left: 0, top: 284, dx: -1, dy: -1 },
-  { key: 'rm', left: 463, top: 284, dx: 1, dy: 1 },
-  { key: 'lb', left: 0, top: 414, dx: 0, dy: -1 },
-  { key: 'mb', left: 231, top: 414, dx: 1, dy: -1 },
-  { key: 'rb', left: 463, top: 414, dx: 1, dy: 0 },
+  { key: 'lt', left: 5, top: 159, dx: -1, dy: 0 },
+  { key: 'mt', left: 234, top: 158, dx: -1, dy: 1 },
+  { key: 'rt', left: 466, top: 158, dx: 0, dy: 1 },
+  { key: 'lm', left: 5, top: 288, dx: -1, dy: -1 },
+  { key: 'rm', left: 470, top: 286, dx: 1, dy: 1 },
+  { key: 'lb', left: 6, top: 417, dx: 0, dy: -1 },
+  { key: 'mb', left: 235, top: 420, dx: 1, dy: -1 },
+  { key: 'rb', left: 467, top: 416, dx: 1, dy: 0 },
 ]
 
 const RES_ICONS = ['gold', 'wood', 'water', 'fire', 'earth'] as const
@@ -149,15 +154,17 @@ function tiles(vm: MapVm): string {
         `onclick="onMapCellClick(${cell.posx},${cell.posy})">`,
     )
 
+    // 头像与小人和地块一样是 64×120、贴底的画布（原版 DOM：people/player 都是 64×120），同一套上移
     const people = peopleIcon(cell.playernum, dist, vm.playerDis)
     if (people) {
       out.push(
-        `<IMG class=tilemark src="img/${people}" style="left:${left}px;top:${top - 24}px;z-index:${z + 2}">`,
+        `<IMG class=tilemark src="img/${people}" style="left:${left}px;top:${imgTop}px;z-index:${z + 2}">`,
       )
     }
     if (cell.posx === vm.playerX && cell.posy === vm.playerY) {
+      const player = vm.playerGender === 'f' ? 'player2' : 'player1'
       out.push(
-        `<IMG class=tilemark id=playermark src="img/player1.gif" style="left:${left}px;top:${top - 34}px;z-index:${z + 4}">`,
+        `<IMG class=tilemark id=playermark src="img/${player}.gif" style="left:${left}px;top:${imgTop}px;z-index:${z + 4}">`,
       )
     }
   })
@@ -169,6 +176,7 @@ export function renderMap(vm: MapVm): string {
   return `${pageHeader('titlemap.gif')}
 ${sceneInfo(vm)}
 <DIV id=mapbg>
+<IMG class=mapframe src="img/map/mapbg.gif" alt="">
 ${each(ARROWS, (a) =>
     `<A href="#" onclick="goBy(${a.dx},${a.dy})"><IMG class=maparrow src="img/pos/${a.key}.gif" ` +
     `onmouseover="this.src='img/pos/${a.key}o.gif'" onmouseout="this.src='img/pos/${a.key}.gif'" ` +

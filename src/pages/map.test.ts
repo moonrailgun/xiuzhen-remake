@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   renderMap,
   cellToScreen,
@@ -133,8 +134,10 @@ test('8 个滚屏箭头，位置与 goBy 参数照原版', () => {
   const arrows = [...h.matchAll(/goBy\((-?\d+),(-?\d+)\)/g)].map((m) => `${m[1]},${m[2]}`)
   assert.equal(arrows.length, 8)
   assert.deepEqual(new Set(arrows), new Set(['-1,0', '-1,1', '0,1', '-1,-1', '1,1', '0,-1', '1,-1', '1,0']))
-  assert.ok(h.includes('left:0px;top:154px'), '左上箭头')
-  assert.ok(h.includes('left:463px;top:414px'), '右下箭头')
+  // 原版 DOM 的 left/top 是 0/231/463 与 154/284/414，那是带透明边的原图左上角；
+  // 现在的箭头是从 #106 裁的紧包围盒，坐标取实测值（比 DOM 值各多 3–5px 的透明边）
+  assert.ok(h.includes('left:5px;top:159px'), '左上箭头')
+  assert.ok(h.includes('left:467px;top:416px'), '右下箭头')
   assert.ok(h.includes("img/pos/lto.gif"), 'hover 换 *o.gif')
 })
 
@@ -153,7 +156,7 @@ test('地块图按视野染色：中心格是 green，远处无后缀', () => {
   assert.ok(h.includes('img/map/forest02blue.gif'), '感应范围用 blue')
 })
 
-test('有人的格子叠人物图标，自己那格叠 player1', () => {
+test('有人的格子叠人物图标，自己那格叠 player1；女角色用 player2', () => {
   const v = vm()
   const withPeople = {
     ...v,
@@ -163,6 +166,28 @@ test('有人的格子叠人物图标，自己那格叠 player1', () => {
   assert.ok(/img\/people\d\d\.gif/.test(h), '应有人物覆盖图标')
   assert.ok(h.includes('id=playermark'), '自己那格有 player1')
   assert.ok(h.includes('img/player1.gif'))
+  // 小人和头像都是 64×120 贴底画布，和地块一样上移 85：中心格菱形顶 y=105 → 图 top=20
+  assert.ok(h.includes('src="img/player1.gif" style="left:192px;top:20px'))
+  assert.ok(renderMap({ ...withPeople, playerGender: 'f' }).includes('img/player2.gif'))
+})
+
+test('墨框与箭头：墨框在 mapdiv 外侧，箭头坐标是 #106 实测值', () => {
+  const h = renderMap(vm())
+  assert.ok(h.includes('<IMG class=mapframe src="img/map/mapbg.gif"'))
+  assert.ok(h.includes('src="img/pos/lt.gif"'))
+  assert.ok(h.includes('style="left:5px;top:159px"'), '左上箭头')
+})
+
+test('裁出来的地图素材尺寸：地块/小人/头像 64×120，选框 64×35，且三档不是同一文件', () => {
+  const png = (rel: string) => readFileSync(new URL(`../../public/img/${rel}`, import.meta.url))
+  const dims = (b: Buffer) => [b.readUInt32BE(16), b.readUInt32BE(20)]
+  for (const rel of ['map/plain0.gif', 'map/forest0green.gif', 'map/mountain2blue.gif', 'player1.gif', 'player2.gif', 'people11.gif', 'people21.gif']) {
+    assert.deepEqual(dims(png(rel)), [64, 120], rel)
+  }
+  assert.deepEqual(dims(png('maptarget.gif')), [64, 35])
+  assert.deepEqual(dims(png('maptarget2.gif')), [64, 35])
+  assert.ok(!png('map/forest0green.gif').equals(png('map/forest0blue.gif')))
+  assert.ok(!png('map/forest0blue.gif').equals(png('map/forest0.gif')))
 })
 
 test('地块图上移 85px：菱形在 120 高图的底部', () => {

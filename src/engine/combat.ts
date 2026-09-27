@@ -15,6 +15,9 @@
 
 import type { Element } from '../data/meridian.ts'
 import { generates, overcomes } from '../data/meridian.ts'
+import { DEFENSIVE_ARTIFACTS, panelStat } from '../data/artifacts.ts'
+import { swordByName } from '../data/swords.ts'
+import type { Artifact } from './state.ts'
 
 /** 参战的一把法宝（飞剑或护身）。数值已是面板值（含品质、淬炼、人物加成）。 */
 export type CombatSword = {
@@ -28,6 +31,35 @@ export type CombatSword = {
   readonly defensiveOnly?: boolean
   readonly instantAttackRatio?: number
   readonly instantDefenseRatio?: number
+  readonly absorb?: number
+  readonly speed?: number
+}
+
+/** 同一装备在NPC情报、主动战斗与来袭使用同一面板；在身上的剑没有出击被动。 */
+export function artifactCombatSword(a: Artifact): CombatSword | null {
+  if (a.kind === 'guard') {
+    const t = DEFENSIVE_ARTIFACTS.find(t => t.name === a.name)
+    if (!t) return null
+    return { id: a.id, name: a.name, element: null, defensiveOnly: true,
+      attack: panelStat(t.attack, a.quality, a.refine), durability: panelStat(t.durability, a.quality, a.refine),
+      agility: panelStat(t.agility, a.quality, a.refine), absorb: 0 }
+  }
+  const t = a.kind === 'sword' ? swordByName(a.name) : undefined
+  if (!t) return null
+  return { id: a.id, name: a.name, element: t.element,
+    attack: panelStat(t.attack, a.quality, a.refine), durability: panelStat(t.durability, a.quality, a.refine),
+    agility: panelStat([t.agility ?? 1, t.agility ?? 1], a.quality, a.refine),
+    absorb: panelStat(t.absorb, a.quality, a.refine), speed: t.speed ?? 1 }
+}
+
+/** 原文伤过半降级；每次降一级、最低+0为重建。断剑仍可修，天雷仅销毁此前已断的剑。 */
+export function combatDamage(items: readonly Artifact[], outcomes: readonly SwordOutcome[], destroyBroken = false): Artifact[] {
+  return items.filter(a => !(destroyBroken && a.kind === 'sword' && a.status === '损坏')).map(a => {
+    const o = outcomes.find(o => o.id === a.id)
+    if (!o) return a
+    return { ...a, refine: Math.max(0, a.refine - (a.kind === 'sword' && o.damageTaken > o.durability / 2 ? 1 : 0)),
+      status: o.broken ? '损坏' : '空闲' }
+  })
 }
 
 export type SwordOutcome = {

@@ -12,6 +12,7 @@ import {
 } from './npc.ts'
 import { DAY } from './clock.ts'
 import { WORLD_SIZE } from '../data/world.ts'
+import { divineSucceeds } from './divine.ts'
 
 const SEED = 20081028
 const world = (count = 200): NpcWorld => ({ bases: generateNpcs(SEED, count), patches: {} })
@@ -202,14 +203,14 @@ test('被击退后位置用修正值，不再按日游走', () => {
   }
 })
 
-test('抢走真气后道行与真气都下降', () => {
+test('抢走真气只扣库存，不倒扣累计道行', () => {
   const w = world(30)
   const t = 60 * DAY
   const base = w.bases[5]!
   const before = npcAt(w, base, t, SEED)
   const after = npcAt(patchNpc(w, base.id, { qiLost: 1000 }), base, t, SEED)
   assert.equal(after.qi, Math.max(0, before.qi - 1000))
-  assert.ok(after.daoxing <= before.daoxing)
+  assert.equal(after.daoxing, before.daoxing)
 })
 
 test('数值不会变成负数', () => {
@@ -230,14 +231,14 @@ test('NPC 世界可 JSON 往返（进存档）', () => {
 })
 
 
-test('NPC易经按共享成长派生，出生为零、逐日单调且封顶500', () => {
+test('NPC易经按共享成长派生，出生为零、逐日单调且保留满级推算空间', () => {
   const w = world(1)
   const base = { ...w.bases[0]!, bornAt: 0 }
   assert.equal(npcAt(w, base, 0, SEED).yijing, 0)
   const levels = [1, 10, 30, 60, 300, 1000].map((day) => npcAt(w, base, day * DAY, SEED).yijing)
   assert.ok(levels[1]! > 0)
   for (let i = 1; i < levels.length; i++) assert.ok(levels[i]! >= levels[i - 1]!)
-  assert.equal(levels.at(-1), 500)
+  assert.ok(divineSucceeds(500, levels.at(-1)!), '满级玩家仍能推算长期存档中的 NPC')
   const original = npcAt(w, base, 30 * DAY, SEED)
   const looted = npcAt(patchNpc(w, base.id, { qiLost: 100000 }), base, 30 * DAY, SEED)
   assert.equal(looted.yijing, original.yijing, '抢真气不会抹掉已学术数')

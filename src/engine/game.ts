@@ -347,6 +347,7 @@ export function validateGameState(value: unknown): asserts value is GameState {
     Array.isArray(v) && v.every((item: unknown) => object(item) && valid(item))
   const optionalNumber = (v: unknown) => v === undefined || number(v)
   const integer = (v: unknown) => number(v) && Number.isSafeInteger(v)
+  const coordinate = (v: unknown) => integer(v) && (v as number) < WORLD_SIZE
   const ids = (v: unknown) => Array.isArray(v) && v.every(integer)
   const idMap = (v: unknown, valid: (item: unknown) => boolean) => object(v) &&
     Object.entries(v).every(([key, item]) => /^(0|[1-9][0-9]*)$/.test(key) && valid(item))
@@ -418,7 +419,9 @@ export function validateGameState(value: unknown): asserts value is GameState {
       !arrayOf(p.artifacts, artifact) ||
       !object(tl) || !arrayOf(tl.events, (e) => strings(e, ['id', 'kind']) && number(e.finishAt) && eventPayload(e)) ||
       !object(npc) || !arrayOf(npc.bases, (n) => strings(n, ['name', 'profile', 'school', 'element']) && numeric(n, ['id', 'bornAt', 'homeX', 'homeY'])) ||
-      !object(npc.patches) || !Object.values(npc.patches).every((patch) => object(patch) && Object.values(patch).every(number)) ||
+      !idMap(npc.patches, patch => object(patch) && ['swordsLost', 'qiLost', 'qiGained'].every(key => optionalNumber(patch[key])) &&
+        (patch.x === undefined || coordinate(patch.x)) && (patch.y === undefined || coordinate(patch.y)) &&
+        (patch.artifacts === undefined || arrayOf(patch.artifacts, artifact))) ||
       !object(quests) || !['qi', 'sword'].includes(quests.line as string) || !number(quests.dantianBonus) ||
       !arrayOf(quests.entries, (q) => string(q.id) && number(q.acceptedAt) && typeof q.done === 'boolean' &&
         (q.at === undefined || numbers(q.at, 2)) && optionalNumber(q.count) && optionalNumber(q.coreQi) &&

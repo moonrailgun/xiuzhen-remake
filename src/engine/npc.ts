@@ -16,7 +16,8 @@
 import { rand, randInt, pick } from './rng.ts'
 import { WORLD_SIZE, inWorld } from '../data/world.ts'
 import { DAY } from './clock.ts'
-import { daoxingText, DAOXING_PER_YEAR, type FiveQi } from './state.ts'
+import { daoxingText, DAOXING_PER_YEAR, type FiveQi, type Artifact, type GameState } from './state.ts'
+import { artifactCombatSword, combatDamage, type SwordOutcome, type CombatSword } from './combat.ts'
 
 /** NPC 画像。取自玩家攻略里的说法：羊（只修炼不打人）、小狼、大狼。 */
 export type NpcProfile = '羊' | '小狼' | '大狼'
@@ -41,6 +42,9 @@ export type NpcPatch = {
   readonly swordsLost?: number
   /** 被玩家抢走的真气 */
   readonly qiLost?: number
+  readonly qiGained?: number
+  /** 首次交战后装备落入稀疏修正，破损、降级和在外状态不再凭成长重生。 */
+  readonly artifacts?: readonly Artifact[]
   /** 被击退后的位置 */
   readonly x?: number
   readonly y?: number
@@ -84,7 +88,8 @@ export type NpcState = {
   readonly swords: number
   /** 单把飞剑的战力（攻击面板值） */
   readonly swordPower: number
-  /** 单机重建：术数随同一实力标量成长，最高500级。 */
+  readonly artifacts: readonly Artifact[]
+  /** 单机重建：最高499级，保留玩家易经500级时的推算空间。 */
   readonly yijing: number
   /** 丹田里的真气（可被掠夺的部分） */
   readonly qi: number
@@ -112,7 +117,7 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
   // 实力标量：所有派生量都从它出来，保证各入口一致
   const power = ageDays * GROWTH[base.profile] * (0.7 + rand(seed, 'gift', base.id) * 0.6)
 
-  const daoxing = Math.max(0, Math.floor(power * 900) - (patch.qiLost ?? 0))
+  const daoxing = Math.max(0, Math.floor(power * 900))
   const realm =
     daoxing > 60 * DAOXING_PER_YEAR ? '元婴期'
       : daoxing > 40 * DAOXING_PER_YEAR ? '金丹期'
@@ -120,11 +125,18 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
       : daoxing > 12 * DAOXING_PER_YEAR ? '辟谷期'
       : '筑基期'
 
-  const swords = Math.max(0, Math.min(5, Math.floor(power / 8)) - (patch.swordsLost ?? 0))
-  const swordPower = Math.floor(16 * (1 + power / 10))
+  // NPC 装备成长为单机重建；实体名字/面板复用真实剑表，避免情报和战斗各算一套。
+  const count = Math.max(0, Math.min(5, Math.floor(power / 8)) - (patch.swordsLost ?? 0))
+  const artifacts: readonly Artifact[] = patch.artifacts ?? Array.from({ length: count }, (_, i) => ({
+    id: `npc:${base.id}:sword:${i}`, kind: 'sword', name: base.school === '昆仑' ? '玉虚桃木剑' : base.school === '蜀山' ? '七星磐龙剑' : '青龙伏魔剑',
+    quality: '凡品', refine: Math.max(0, Math.floor(Math.log2(1 + power / 10))), status: '空闲', count: 1,
+  }))
+  const usable = artifacts.filter(a => a.kind === 'sword' && a.status === '空闲')
+  const swords = usable.length
+  const swordPower = Math.max(0, ...usable.map(a => artifactCombatSword(a)?.attack ?? 0))
   // NPC本来就是单机重建；复用同一实力标量，不把真实玩家失落的成长表当成已知。
-  const yijing = Math.min(500, Math.floor(power))
-  const qi = Math.max(0, Math.floor(power * 260) - (patch.qiLost ?? 0))
+  const yijing = Math.min(499, Math.floor(power))
+  const qi = Math.max(0, Math.floor(power * 260) - (patch.qiLost ?? 0) + (patch.qiGained ?? 0))
 
   // 位置：羊待在驻点；狼按日游走。被击退过就用修正位置。
   let x = patch.x ?? base.homeX
@@ -149,6 +161,7 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
     realm,
     swords,
     swordPower,
+    artifacts,
     yijing,
     qi,
     experience: Math.floor(power * 4000),
@@ -157,6 +170,27 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
     y,
     suffix,
   }
+}
+
+export const npcCombatArtifacts = (npc: NpcState): CombatSword[] => npc.artifacts
+  .filter(a => a.status === '空闲')
+  .map(artifactCombatSword).filter((s): s is CombatSword => s !== null)
+
+export function npcSwordStatus(state: GameState, id: number, swordIds: readonly string[], status: string): GameState {
+  const base = state.npc.bases.find(n => n.id === id)
+  if (!base) return state
+  const npc = npcAt(state.npc, base, state.clock.gameT, state.worldSeed)
+  const artifacts = npc.artifacts.map(a => swordIds.includes(a.id) && a.status !== '损坏' ? { ...a, status } : a)
+  return { ...state, npc: patchNpc(state.npc, id, { artifacts }) }
+}
+
+export function npcCombatDamage(state: GameState, id: number, outcomes: readonly SwordOutcome[], destroyBroken = false, status = '空闲'): GameState {
+  const base = state.npc.bases.find(n => n.id === id)
+  if (!base) return state
+  const npc = npcAt(state.npc, base, state.clock.gameT, state.worldSeed)
+  const artifacts = combatDamage(npc.artifacts, outcomes, destroyBroken).map(a =>
+    outcomes.some(o => o.id === a.id && !o.broken) ? { ...a, status } : a)
+  return { ...state, npc: patchNpc(state.npc, id, { artifacts }) }
 }
 
 /** 全部 NPC 在某一刻的状态（排行榜、地图都用它）。 */

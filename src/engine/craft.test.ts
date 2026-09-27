@@ -84,7 +84,7 @@ test('炼器事件不占修炼队列（官方指南原文）', () => {
 })
 
 test('飞剑与护身可以并行炼制（官方攻略《护身揭密》原文）', () => {
-  let s = state()
+  let s = state({ skills: { 灵宝真经: 1 } })
   s = (startCraft(s, swordOrder()) as { state: GameState }).state
   const guard = startCraft(s, { ...swordOrder(), kind: 'guard', name: '指玄道藏碑' })
   assert.equal(guard.ok, true, '护身应能与飞剑同时炼')
@@ -101,7 +101,7 @@ test('同类法宝一次只能炼一炉', () => {
 })
 
 test('丹药一次一炉（否则会浪费一个 CD）', () => {
-  const s = state()
+  const s = state({ skills: { 炼丹之术: 1 } })
   const first = (startCraft(s, pillOrder()) as { state: GameState }).state
   const again = startCraft(first, pillOrder())
   assert.equal(again.ok, false)
@@ -128,8 +128,8 @@ test('炼剑检查铸剑等级，拒绝时不扣费；无需提前学习御剑',
 test('炼制扣真气并计入道行', () => {
   const s = state()
   const after = (startCraft(s, swordOrder(2)) as { state: GameState }).state
-  // 两件：140×2 = 280 金
-  assert.equal(s.player.qi[0]! - after.player.qi[0]!, 280)
+  // 木属性映射：克我（金）的成本为48，两件共96。
+  assert.equal(s.player.qi[0]! - after.player.qi[0]!, 96)
   const totalCost = (140 + 144 + 71 + 48 + 95) * 2
   assert.equal(after.player.daoxing, totalCost, '炼制消耗同样算道行')
 })
@@ -294,4 +294,21 @@ test('损坏法宝修理扣气、占同类炼器队列，满包原位恢复并�
   assert.equal(startRepair(poor, broken.id).ok, false)
   assert.equal(poor.player.artifacts[0]!.status, '损坏')
   assert.equal(startRepair(before, 'missing').ok, false)
+})
+
+test('F01：丹药只消耗时间并由引擎覆盖伪造配方', () => {
+  const s = state({ qi: qi(0, 0, 0, 0, 0), skills: { 炼丹之术: 1 } })
+  for (const [name, seconds] of [['一炼紫金丹', 81000], ['一炼五行丹', 86400]] as const) {
+    const r = startCraft(s, { ...pillOrder(), name, baseSeconds: 1 })
+    assert.ok(r.ok)
+    assert.deepEqual(r.state.player.qi, s.player.qi)
+    assert.equal(r.state.player.daoxing, s.player.daoxing)
+    assert.equal(r.state.timeline.events.find(e => e.kind === 'craft')!.finishAt, seconds)
+  }
+})
+
+test('F01：炼丹和护身配方校验对应技能，未知物品不可伪造', () => {
+  assert.equal(startCraft(state({ skills: {} }), pillOrder()).ok, false)
+  assert.equal(startCraft(state(), { ...swordOrder(), kind: 'guard', name: '指玄道藏碑' }).ok, false)
+  assert.equal(startCraft(state(), { ...swordOrder(), name: '伪造飞剑' }).ok, false)
 })

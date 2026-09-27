@@ -255,7 +255,7 @@ export function itemVm(s: GameState, tab: ItemTab): ItemVm {
   return {
     tab: 'pill',
     alchemyLevel: alchemy,
-    // 丹药消耗表零存档（05 §5.2 只记了不显示五行消耗），所以炼丹门槛只看炼丹之术
+    // 炼丹不耗真气（guides/13903），门槛由炼丹之术控制。
     rows: pillRows(alchemy, () => (alchemy >= 1 ? 1 : null)),
     brewing: brewRows(s, 'pill'),
   }

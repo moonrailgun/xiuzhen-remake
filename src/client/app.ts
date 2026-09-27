@@ -2180,8 +2180,8 @@ function craftOrderFor(
         kind: 'pill',
         name: `${tier}${kind}`,
         count,
-        // 丹药的五行消耗原版页面就不显示（05 §5.2），这里按炼数取一个量级
-        cost: [0, 0, 0, 0, 0].map(() => 500 * (tierIdx + 1)) as unknown as FiveQi,
+        // 13903-p1.txt：炼丹只消耗时间。
+        cost: [0, 0, 0, 0, 0],
         baseSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
         quality: '凡品',
       },

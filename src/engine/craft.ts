@@ -18,7 +18,7 @@ import { subQi, canAfford, totalQi, type FiveQi, type GameState, type Artifact }
 import { refineSuccessRate, refinePieces, DEFENSIVE_ARTIFACTS, type Quality } from '../data/artifacts.ts'
 import { roll, next, type RngState } from './rng.ts'
 import { capacityOf } from './cultivate.ts'
-import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
+import { pillRecipe } from '../data/pills.ts'
 import { canForge, swordByName, craftCostFor } from '../data/swords.ts'
 
 export type CraftKind = 'sword' | 'guard' | 'pill'
@@ -69,12 +69,23 @@ export function craftQuality(state: GameState): { quality: Quality; rng: RngStat
   return { quality, rng: r.state }
 }
 
+/** 配方唯一来源；调用方可预览，引擎开始炼制时仍重新读取。 */
+export function craftRecipe(state: GameState, kind: CraftKind, name: string): { cost: FiveQi; baseSeconds: number } | null {
+  if (kind === 'pill') {
+    const pill = pillRecipe(name)
+    return pill ? { cost: [0, 0, 0, 0, 0], baseSeconds: pill.baseSeconds } : null
+  }
+  const recipe = kind === 'sword' ? swordByName(name) : DEFENSIVE_ARTIFACTS.find(g => g.name === name)
+  if (!recipe?.craftCost || !recipe.craftSeconds) return null
+  return { cost: craftCostFor(recipe.craftCost, state.player.element)!, baseSeconds: recipe.craftSeconds }
+}
+
 export function usePill(state: GameState, id: string): CraftResult {
   const item = state.player.artifacts.find(a => a.id === id)
   if (!item || item.kind !== 'pill' || item.status !== '空闲' || item.count < 1) return { ok: false, reason: '请先选中一颗空闲丹药' }
-  const kind = PILL_NAMES.findIndex(n => item.name.endsWith(n))
-  const tier = PILL_TIERS.findIndex(n => item.name === n + PILL_NAMES[kind]) + 1
-  if (kind < 0 || tier === 0) return { ok: false, reason: '没有这颗丹药的服食记载' }
+  const recipe = pillRecipe(item.name)
+  if (!recipe) return { ok: false, reason: '没有这颗丹药的服食记载' }
+  const { kind, tier } = recipe
   const cap = capacityOf(state)
   return { ok: true, state: { ...state, player: { ...state.player,
     qi: state.player.qi.map((v, i) => Math.min(cap, v + (kind === 5 ? 160 * tier : i === kind ? 1000 * tier : 0))) as unknown as FiveQi,
@@ -88,6 +99,12 @@ export function usePill(state: GameState, id: string): CraftResult {
 export function startCraft(state: GameState, order: CraftOrder): CraftResult {
   if (!Number.isSafeInteger(order.count) || order.count <= 0) return { ok: false, reason: '请填写炼制数量' }
 
+  const recipe = craftRecipe(state, order.kind, order.name)
+  if (!recipe) return { ok: false, reason: '没有这件物品的炼制配方' }
+  const pill = order.kind === 'pill' ? pillRecipe(order.name) : null
+  if (pill && (state.player.skills['炼丹之术'] ?? 0) < pill.tier) return { ok: false, reason: `炼制${order.name}需要炼丹之术${pill.tier}级` }
+  const guard = order.kind === 'guard' ? DEFENSIVE_ARTIFACTS.find(g => g.name === order.name) : undefined
+  if (guard && (state.player.skills['灵宝真经'] ?? 0) < guard.lingbaoLevel) return { ok: false, reason: `炼制${order.name}需要灵宝真经${guard.lingbaoLevel}级` }
   const sword = order.kind === 'sword' ? swordByName(order.name) : undefined
   if (sword && !canForge(sword, state.player.skills['铸剑之术'] ?? 0)) {
     return { ok: false, reason: `炼制${sword.name}需要铸剑之术${sword.forgeLevel}级` }
@@ -103,17 +120,17 @@ export function startCraft(state: GameState, order: CraftOrder): CraftResult {
 
   if (!canAcquireArtifacts(state, order.count)) return { ok: false, reason: '法宝携带数量已达上限，请先提升袖里乾坤或腾出空位' }
 
-  const total: FiveQi = order.cost.map((v) => v * order.count) as unknown as FiveQi
+  const total: FiveQi = recipe.cost.map((v) => v * order.count) as unknown as FiveQi
   if (!canAfford(state.player.qi, total)) {
     return { ok: false, reason: '炼制所需真气不足' }
   }
 
-  const per = craftSeconds(order.baseSeconds, order.kind, state.player.body[BODY_HAND] ?? 0)
+  const per = craftSeconds(recipe.baseSeconds, order.kind, state.player.body[BODY_HAND] ?? 0)
   const event: GameEvent = {
     id: queueId,
     kind: 'craft',
     finishAt: state.clock.gameT + per * order.count,
-    payload: { ...order, perSeconds: per },
+    payload: { ...order, ...recipe, perSeconds: per },
   }
 
   return {

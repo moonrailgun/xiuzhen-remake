@@ -27,8 +27,8 @@
 import { esc, escJs, each, num, when, js } from './html.ts'
 import { pageHeader, countdown } from './shell.ts'
 import { formatDuration } from '../engine/clock.ts'
-import { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
-export { PILL_NAMES, PILL_TIERS } from '../data/pills.ts'
+import { PILL_NAMES, PILL_TIERS, pillRecipe } from '../data/pills.ts'
+export { PILL_NAMES, PILL_TIERS, PILL_SECONDS, WUXING_PILL_SECONDS } from '../data/pills.ts'
 
 export type ItemTab = 'list' | 'sword' | 'guard' | 'pill' | 'refine'
 
@@ -270,14 +270,6 @@ ${each(rows, (r) =>
 
 // —— 丹药 ——
 
-/** 六种丹药。名称出自 05 §5.1 逐字转录（#68 九炼、#71 一炼）。 */
-
-/** 一炼…九炼。#68 与 #71 各只列一档，说明页面只显示当前炼丹之术等级对应的那一档。 */
-
-/** 五种丹 22:30:00，五行丹 24:00:00 —— 一炼与九炼两张截图读数相同。 */
-export const PILL_SECONDS = 22 * 3600 + 30 * 60
-export const WUXING_PILL_SECONDS = 24 * 3600
-
 /**
  * 按炼丹之术等级取那一档的六行。丹药 item id 规律见 09 §1.16
  * （`202` 二炼碧罗丹、`401` 一炼烈炎丹）→ 百位=丹种(1..6)、个位=炼数。
@@ -291,7 +283,7 @@ export function pillRows(alchemyLevel: number, craftable: (name: string) => numb
       name,
       itemId: (i + 1) * 100 + (tierIdx + 1),
       owned: 0,
-      craftSeconds: kind === '五行丹' ? WUXING_PILL_SECONDS : PILL_SECONDS,
+      craftSeconds: pillRecipe(name)!.baseSeconds,
       craftable: craftable(name),
     }
   })

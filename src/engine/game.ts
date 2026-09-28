@@ -12,7 +12,7 @@ import { resolveCultivate, capacityOf, gainQi } from './cultivate.ts'
 import { resolveMove } from './move.ts'
 import { resolveBattleEvent } from './battle.ts'
 import { artifactUpkeepPerHour, resolveCraft } from './craft.ts'
-import { allNpcsAt, generateNpcs } from './npc.ts'
+import { npcBasicsAt, generateNpcs } from './npc.ts'
 import { applyQuestProgress, emptyQuestLog, expireDailyQuests, resolveQuestBattle } from './quest.ts'
 import { resolveEscort, settleTownIncome } from './town.ts'
 import { emptyMarket, refillNpcOrders, resolveMarketEvent, nextNpcPurchaseAt, settleNpcPurchases, ctxOf, applyCtx } from './market.ts'
@@ -189,9 +189,11 @@ export function currentQiPerHour(
   const upkeep = state.player.artifacts.map(a => artifactUpkeepPerHour(a, self))
   const sharingPlayers = isOutOfProtection(state.player, state.clock.gameT, DAY) &&
     sanctuaryQi(state, state.player.x, state.player.y) === null
-    ? 1 + allNpcsAt(state.npc, state.clock.gameT, state.worldSeed).filter(n =>
-      n.x === state.player.x && n.y === state.player.y &&
-      (n.daoxing >= PROTECTION_POINTS || state.clock.gameT - n.base.bornAt >= PROTECTION_DAYS * DAY)).length
+    ? 1 + state.npc.bases.filter(base => {
+      const n = npcBasicsAt(state.npc, base, state.clock.gameT, state.worldSeed)
+      return n.x === state.player.x && n.y === state.player.y &&
+        (n.daoxing >= PROTECTION_POINTS || state.clock.gameT - base.bornAt >= PROTECTION_DAYS * DAY)
+    }).length
     : 1
 
   return ELEMENTS.map((element, i) => {

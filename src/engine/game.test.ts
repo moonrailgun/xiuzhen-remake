@@ -38,6 +38,17 @@ const fresh = (over: Partial<Parameters<typeof newGame>[0]> = {}) => {
   return { ...s, player: { ...s.player, qi: qi(0, 0, 0, 0, 0) } }
 }
 
+test('地气分享不构建 NPC 装备面板', () => {
+  const s = born()
+  const npc = { ...s.npc.bases[0]!, bornAt: 0, homeX: 100, homeY: 100, profile: '羊' as const }
+  const shared = { ...s, clock: { ...s.clock, gameT: 11 * DAY }, npc: { bases: [npc], patches: {} } }
+  const expected = currentQiPerHour(shared)
+  const cheap = { ...shared, npc: { ...shared.npc, patches: { [npc.id]: {
+    get artifacts(): never { throw new Error('产量不应读取装备') },
+  } } } }
+  assert.deepEqual(currentQiPerHour(cheap), expected)
+})
+
 test('新号自带初始真气：四行 1000、克我 500，丹田 Lv0 容量 2000（资源条读作 1000/2000）', () => {
   const s = born() // 木属性 → 克我 = 金
   assert.deepEqual(s.player.qi, qi(500, 1000, 1000, 1000, 1000))

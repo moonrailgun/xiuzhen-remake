@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   newGame,
   tick,
+  tickSteps,
   changeRate,
   currentQiPerHour,
   resourceBarOf,
@@ -37,6 +38,30 @@ const fresh = (over: Partial<Parameters<typeof newGame>[0]> = {}) => {
   const s = born(over)
   return { ...s, player: { ...s.player, qi: qi(0, 0, 0, 0, 0) } }
 }
+
+test('分批结算可暂停且不改输入，最终状态和事件顺序与同步结算完全一致', () => {
+  let s = born()
+  const move = startMove(s, 101, 100)
+  assert.ok(move.ok)
+  s = move.state
+  for (const rate of [1, 1.5, 600]) {
+    const input = { ...s, clock: { ...s.clock, rate } }
+    const before = structuredClone(input)
+    const target = 11 * DAY * 1000 / rate + 123.5
+    const expected = tick(input, target)
+    const steps = tickSteps(input, target)
+    let next = steps.next()
+    assert.equal(next.done, false, '长结算必须能在完成前交还控制权')
+    let previous = input.clock.gameT
+    while (!next.done) {
+      assert.ok(next.value >= previous && next.value <= expected.state.clock.gameT)
+      previous = next.value
+      assert.deepEqual(input, before, '暂停时不得把半结算状态写回原档')
+      next = steps.next()
+    }
+    assert.deepEqual(next.value, expected)
+  }
+})
 
 test('地气分享不构建 NPC 装备面板', () => {
   const s = born()

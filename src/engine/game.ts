@@ -224,6 +224,18 @@ export function tick(
   nowWall: number,
   terrain?: TerrainProvider,
 ): { state: GameState; resolved: readonly GameEvent[] } {
+  const steps = tickSteps(state, nowWall, terrain)
+  let next = steps.next()
+  while (!next.done) next = steps.next()
+  return next.value
+}
+
+/** 同一条结算循环可暂停；只返回进度，完成前不向调用方暴露半结算状态。 */
+export function* tickSteps(
+  state: GameState,
+  nowWall: number,
+  terrain?: TerrainProvider,
+): Generator<number, { state: GameState; resolved: readonly GameEvent[] }, void> {
   const clock = advance(state.clock, nowWall)
   let current = state
   const resolved: GameEvent[] = []
@@ -256,11 +268,13 @@ export function tick(
       current = applyQuestProgress(current, out.state, event)
       for (const follow of out.follow ?? []) current = { ...current, timeline: schedule(current.timeline, follow) }
       resolved.push(event)
+      yield at
       continue
     }
 
     if (purchaseAt !== null && purchaseAt <= at) {
       current = settleNpcPurchases(current)
+      yield at
       continue // 成交可能生成已到期的注入事件，同一时刻继续处理。
     }
 
@@ -269,6 +283,7 @@ export function tick(
       nextHour += HOUR
     }
     if (at >= clock.gameT) break
+    yield at
   }
 
   // **不要在这里再补一次货。** 补货批次按「补货发生在第几个游戏小时」编号

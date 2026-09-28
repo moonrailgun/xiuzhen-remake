@@ -2,7 +2,7 @@
  * 把引擎接到界面上：真正能玩的那一层。
  *
  * 流程：读档（没有就进建号页）→ 每次交互先 `tick` 到当前 → 重渲染 → 存档。
- * 所有时间都走游戏时钟，离线多久都靠一次 `tick` 补回来。
+ * 所有时间都走游戏时钟，长离线分批运行同一条结算循环。
  */
 
 import { renderShell, type MainTab } from '../pages/shell.ts'
@@ -46,7 +46,7 @@ import { formatGameDate } from '../engine/clock.ts'
 import { generates, ELEMENTS } from '../data/meridian.ts'
 import { renderMid, renderRight } from '../pages/sidebar.ts'
 import { renderCreatePlayer, validateName, type CreatePlayerVm } from '../pages/createplayer.ts'
-import { newGame, tick, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
+import { newGame, tickSteps, saveGame, loadGame, resourceBarOf, importGame } from '../engine/game.ts'
 import { startMove, startFlight, cancelMove, moveDisplay, sightRange, BODY_EYE } from '../engine/move.ts'
 import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox, useWenchangIncense, requestWenchang, claimWenchang } from '../engine/treasure.ts'
 import { SECRET_MATERIALS, isSecretBook } from '../data/secrets.ts'
@@ -554,23 +554,80 @@ export function routeJsp(href: string): boolean {
   return true
 }
 
-/** 推进到现在 → 重渲染 → 存档。所有交互都走这一条路径。 */
-function advanceState(): void {
-  if (!state) return
-  const out = tick(state, Date.now())
-  state = out.state
-  if (out.resolved.some(e => e.kind === 'move')) mapCenter = null
+let catchUp: ReturnType<typeof tickSteps> | null = null
+let catchUpFailed = false
+
+function cancelCatchUp(): void {
+  catchUp = null
+  catchUpFailed = false
+  const dialog = document.getElementById('offline-progress') as HTMLDialogElement | null
+  dialog?.close()
+  dialog?.remove()
+}
+
+function showCatchUp(progress: number): HTMLDialogElement {
+  let dialog = document.getElementById('offline-progress') as HTMLDialogElement | null
+  if (!dialog) {
+    dialog = document.createElement('dialog')
+    dialog.id = 'offline-progress'
+    dialog.setAttribute('aria-label', '离线结算')
+    dialog.style.cssText = 'width:360px;padding:20px;background:#ffffee;border:1px solid #897b55;font-size:14px'
+    dialog.innerHTML = '<p role="status">正在结算离线进度，请稍候……</p><progress max="1" style="width:100%"></progress><p>关闭页面后，下次打开会继续补算。</p>'
+    dialog.addEventListener('cancel', e => e.preventDefault())
+    document.body.append(dialog)
+    dialog.showModal()
+  }
+  dialog.querySelector('progress')!.value = progress
+  return dialog
+}
+
+/** 短结算同步完成；长结算每批约 8ms，完成前保留原状态与原时钟。 */
+function advanceState(): boolean {
+  if (catchUp || catchUpFailed) return false
+  if (!state) return true
+  const from = state.clock.gameT
+  const now = Date.now()
+  const to = from + Math.max(0, now - state.clock.wallT) / 1000 * state.clock.rate
+  const steps = tickSteps(state, now)
+  catchUp = steps
+  const resume = (): boolean => {
+    if (catchUp !== steps) return false // 关闭、导入或其他标签读档后，旧批次作废。
+    try {
+      const deadline = performance.now() + 8
+      let next = steps.next()
+      while (!next.done && performance.now() < deadline) next = steps.next()
+      if (!next.done) {
+        showCatchUp(to > from ? (next.value - from) / (to - from) : 0)
+        setTimeout(() => { if (resume()) { render(true); persist() } }, 0)
+        return false
+      }
+      state = next.value.state
+      if (next.value.resolved.some(e => e.kind === 'move')) mapCenter = null
+      cancelCatchUp()
+      return true
+    } catch (e) {
+      catchUp = null
+      catchUpFailed = true
+      const dialog = showCatchUp(0)
+      dialog.innerHTML = `<p role="alert">离线结算失败：${esc(e instanceof Error ? e.message : String(e))}</p><p>原进度已保留，请导出备份后重新打开页面。</p><button type="button">导出存档</button>`
+      dialog.querySelector('button')!.onclick = () => {
+        ;(globalThis as unknown as Record<string, () => void>)['exportSave']!()
+      }
+      return false
+    }
+  }
+  return resume()
 }
 
 function step(): void {
-  advanceState()
+  if (!advanceState()) return
   render()
   persist()
 }
 
 function pulse(): void {
   if (!state) return
-  advanceState()
+  if (!advanceState()) return
   render(true)
   persist()
 }
@@ -580,7 +637,8 @@ function persist(): void {
   if (loadFailure) return
   if (!state || !STORAGE_KEY_AVAILABLE) return
   try {
-    state = saveGame(localStorage, state, Date.now())
+    // 只保存已完整结算的时刻；尤其 pagehide 不能再同步重放长离线。
+    state = saveGame(localStorage, state, state.clock.wallT)
   } catch (e) {
     // 配额不足或隐私模式：提示用户导出，不静默吞掉
     openWindow('mwindow', '存档失败', `<DIV class=middle style="padding:10px">
@@ -591,7 +649,7 @@ function persist(): void {
 // —— 交互（挂到 window，供页面里的内联 onclick 调用）——
 
 export function installGameActions(): void {
-  const g = globalThis as unknown as Record<string, unknown>
+  const g: Record<string, unknown> = {}
 
   // 原版页面将这两个刷新函数作为 ajaxPost 的回调参数传入。
   g['refleshAll'] = step
@@ -1304,6 +1362,7 @@ export function installGameActions(): void {
       try {
         const loaded = importGame(await file.text())
         const apply = () => {
+          cancelCatchUp()
           state = { ...loaded, clock: { ...loaded.clock, wallT: Date.now() } }
           loadFailure = null   // 导入成功，解除「禁止写盘」
           closeWindow('lwindow')
@@ -1337,6 +1396,7 @@ export function installGameActions(): void {
       '重新开始',
       '<DIV class=middle style="padding:10px">这会清空当前进度，重新建号。<BR>建议先导出存档。</DIV>',
       () => {
+        cancelCatchUp()
         try {
           clearSave(localStorage)
         } catch { /* 忽略 */ }
@@ -1566,6 +1626,14 @@ export function installGameActions(): void {
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 0)
   }
+  for (const [name, action] of Object.entries(g)) {
+    if (typeof action !== 'function') continue
+    ;(globalThis as unknown as Record<string, unknown>)[name] = (...args: unknown[]) => {
+      if (name === 'exportSave' && catchUpFailed) return action(...args)
+      if (!advanceState()) return
+      return action(...args)
+    }
+  }
 }
 
 
@@ -1654,7 +1722,7 @@ function gmVm(s: GameState): GmVm {
  * 本地版按同样的 URL 分发到各页面模块（见 `windows.ts` 的 `setPageResolver`）。
  */
 function resolvePage(url: string): string {
-  advanceState()
+  if (!advanceState()) return ''
   const s = state
   if (!s) return ''
   const [path, query] = url.replace(/&amp;/g, '&').split('?')
@@ -2654,8 +2722,15 @@ export function boot(): void {
   installGameActions()
   setPageResolver(resolvePage)
   setCountdownClock(() => state ? state.clock.gameT + Math.max(0, Date.now() - state.clock.wallT) / 1000 * state.clock.rate : Date.now() / 1000)
-  document.addEventListener('click', () => advanceState(), true)
-  document.addEventListener('submit', () => advanceState(), true)
+  const beforeAction = (ev: Event) => {
+    if ((ev.target as HTMLElement | null)?.closest?.('#offline-progress')) return
+    if (!advanceState()) {
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+    }
+  }
+  document.addEventListener('click', beforeAction, true)
+  document.addEventListener('submit', beforeAction, true)
 
   // 页面里的原版 .jsp 链接统一在这里拦一次（子标签、分页、筛选都走它）
   document.addEventListener('click', (ev) => {
@@ -2700,13 +2775,15 @@ export function boot(): void {
   // 事件到点时自动推进（倒计时归零会冒泡这个事件）
   window.setInterval(pulse, 1000)
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pulse() })
-  window.addEventListener('pagehide', () => { advanceState(); persist() })
+  window.addEventListener('pagehide', () => { cancelCatchUp(); persist() })
+  window.addEventListener('pageshow', ev => { if (ev.persisted) pulse() })
   // 另一个标签页存了档 → 重新读，避免互相覆盖
   window.addEventListener('storage', () => {
     if (!STORAGE_KEY_AVAILABLE) return
     try {
       const fresh = loadGame(localStorage)
       if (fresh) {
+        cancelCatchUp()
         state = fresh
         render()
       }

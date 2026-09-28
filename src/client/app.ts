@@ -52,7 +52,7 @@ import { startTreasure, claimTreasure, combineSecret, learnSecret, openNoviceBox
 import { SECRET_MATERIALS, isSecretBook } from '../data/secrets.ts'
 import { terrainAt, qiAt, sceneName, terrainVariant, terrainScene, TERRAIN_KEY } from '../data/world.ts'
 import { weekOfServer } from '../engine/clock.ts'
-import { npcsAtCell, allNpcsAt } from '../engine/npc.ts'
+import { npcsAtCell, allNpcsAt, npcCountsByCell } from '../engine/npc.ts'
 import { availableQuests, activeQuests, accept, abandon, claim, goalMet, questLocation, questTarget, answerQuiz, chooseLine, applyQuestProgress, gatherCoreQi, startCoreCompression } from '../engine/quest.ts'
 import { questTitle, qiRewardFor, EXPERIENCE_THRESHOLDS } from '../data/quests.ts'
 import { socialOf, guildOf, changeGuardian, createGuild, joinGuild, leaveGuild, recruitGuildMember, setGuildRelation, buyPeace, setBlocked, receiveLetter } from '../engine/social.ts'
@@ -203,6 +203,7 @@ function playerVm(s: GameState): PlayerVm {
 function mapVm(s: GameState): MapVm {
   const weeks = weekOfServer(s.clock)
   const center = mapCenter ?? { x: s.player.x, y: s.player.y }
+  const counts = npcCountsByCell(s.npc, s.clock.gameT, s.worldSeed)
   const cells: MapCell[] = screenCells(center.x, center.y).map((p) => {
     const t = terrainAt(s.worldSeed, p.x, p.y, weeks)
     const key = TERRAIN_KEY[t]
@@ -216,7 +217,7 @@ function mapVm(s: GameState): MapVm {
       revealed: s.divination?.scenes.some(scene => scene.x === p.x && scene.y === p.y && scene.expiresAt > s.clock.gameT) ?? false,
       // 本格的人数 = NPC + 自己
       playernum:
-        npcsAtCell(s.npc, s.clock.gameT, s.worldSeed, p.x, p.y).length +
+        (counts.get(`${p.x},${p.y}`) ?? 0) +
         (p.x === s.player.x && p.y === s.player.y ? 1 : 0),
     }
   })

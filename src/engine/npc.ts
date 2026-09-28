@@ -78,7 +78,7 @@ export function generateNpcs(seed: number, count = 300): NpcBase[] {
   }))
 }
 
-/** NPC 在某一刻的完整状态。**所有入口都只用这一个函数。** */
+/** NPC 在某一刻的完整状态；战斗、情报等入口共用。 */
 export type NpcState = {
   readonly base: NpcBase
   /** 道行点数 */
@@ -110,7 +110,7 @@ const GROWTH: Record<NpcProfile, number> = { 羊: 1, 小狼: 1.35, 大狼: 1.9 }
  *
  * 时间按**游戏日取整**，所以同一天内多次查询结果一致，离线结算也能按日重放。
  */
-export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: number): NpcState {
+export function npcBasicsAt(world: NpcWorld, base: NpcBase, gameT: number, seed: number) {
   const day = Math.floor(gameT / DAY)
   const ageDays = Math.max(0, day - Math.floor(base.bornAt / DAY))
   const patch = world.patches[base.id] ?? {}
@@ -119,6 +119,33 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
   const power = ageDays * GROWTH[base.profile] * (0.7 + rand(seed, 'gift', base.id) * 0.6)
 
   const daoxing = Math.max(0, Math.floor(power * 900))
+  // 位置：羊待在驻点；狼按日游走。被击退过就用修正位置。
+  let x = patch.x ?? base.homeX
+  let y = patch.y ?? base.homeY
+  if (patch.x === undefined && base.profile !== '羊') {
+    const range = base.profile === '大狼' ? 12 : 6
+    x = base.homeX + randInt(range * 2 + 1, seed, 'wx', base.id, day) - range
+    y = base.homeY + randInt(range * 2 + 1, seed, 'wy', base.id, day) - range
+  }
+  x = Math.max(0, Math.min(WORLD_SIZE - 1, x))
+  y = Math.max(0, Math.min(WORLD_SIZE - 1, y))
+  return { day, ageDays, power, daoxing, x, y }
+}
+
+/** 地图每次渲染只遍历一次 NPC，不构建装备与战斗面板。 */
+export function npcCountsByCell(world: NpcWorld, gameT: number, seed: number): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const base of world.bases) {
+    const { x, y } = npcBasicsAt(world, base, gameT, seed)
+    const key = `${x},${y}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
+export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: number): NpcState {
+  const { day, ageDays, power, daoxing, x, y } = npcBasicsAt(world, base, gameT, seed)
+  const patch = world.patches[base.id] ?? {}
   const realm =
     daoxing > 60 * DAOXING_PER_YEAR ? '元婴期'
       : daoxing > 40 * DAOXING_PER_YEAR ? '金丹期'
@@ -138,17 +165,6 @@ export function npcAt(world: NpcWorld, base: NpcBase, gameT: number, seed: numbe
   // NPC本来就是单机重建；复用同一实力标量，不把真实玩家失落的成长表当成已知。
   const yijing = Math.min(499, Math.floor(power))
   const qi = Math.max(0, Math.floor(power * 260) - (patch.qiLost ?? 0) + (patch.qiGained ?? 0))
-
-  // 位置：羊待在驻点；狼按日游走。被击退过就用修正位置。
-  let x = patch.x ?? base.homeX
-  let y = patch.y ?? base.homeY
-  if (patch.x === undefined && base.profile !== '羊') {
-    const range = base.profile === '大狼' ? 12 : 6
-    x = base.homeX + randInt(range * 2 + 1, seed, 'wx', base.id, day) - range
-    y = base.homeY + randInt(range * 2 + 1, seed, 'wy', base.id, day) - range
-  }
-  x = Math.max(0, Math.min(WORLD_SIZE - 1, x))
-  y = Math.max(0, Math.min(WORLD_SIZE - 1, y))
 
   // 出保：道行 18 年或建号 10 天
   const outOfProtection = daoxing >= 18 * DAOXING_PER_YEAR || ageDays >= 10

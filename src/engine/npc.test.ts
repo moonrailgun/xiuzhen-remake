@@ -8,6 +8,8 @@ import {
   npcsInSight,
   ranking,
   patchNpc,
+  npcBasicsAt,
+  npcCountsByCell,
   type NpcWorld,
 } from './npc.ts'
 import { DAY } from './clock.ts'
@@ -16,6 +18,27 @@ import { divineSucceeds } from './divine.ts'
 
 const SEED = 20081028
 const world = (count = 200): NpcWorld => ({ bases: generateNpcs(SEED, count), patches: {} })
+
+test('轻量 NPC 查询与完整状态一致，跨日和击退修正即时生效，统计不读取装备', () => {
+  let w = world(300)
+  const wolf = w.bases.find(b => b.profile === '大狼')!
+  for (const patch of [{}, { y: 37 }, { x: 0, y: 199 }, { x: 199, y: 0 }]) {
+    w = { ...w, patches: { [wolf.id]: patch } }
+    for (const t of [0, 10 * DAY - 0.5, 10 * DAY, 60 * DAY]) {
+      const counts = new Map<string, number>()
+      for (const base of w.bases) {
+        const full = npcAt(w, base, t, SEED)
+        const light = npcBasicsAt(w, base, t, SEED)
+        assert.deepEqual([light.x, light.y, light.daoxing], [full.x, full.y, full.daoxing])
+        const key = `${full.x},${full.y}`
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+      }
+      assert.deepEqual(npcCountsByCell(w, t, SEED), counts)
+    }
+  }
+  w = { ...w, patches: { [wolf.id]: { get artifacts(): never { throw new Error('统计不应读取装备') } } } }
+  assert.equal([...npcCountsByCell(w, 60 * DAY, SEED).values()].reduce((a, b) => a + b, 0), 300)
+})
 
 test('生成 NPC：数量受控、名字与画像齐全', () => {
   const w = world(100)
